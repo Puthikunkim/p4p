@@ -87,7 +87,10 @@ jobs:
         run: npm ci
         working-directory: frontend
 
-      # Phase 1 will add the actual validator scripts here.
-      # For now, this job is a placeholder that confirms the job structure is valid.
-      - name: Contract gate (placeholder — wired in Phase 1)
-        run: echo "Contract validators added in Phase 1"
+      - name: Python contract tests (jsonschema + pydantic + version-skew)
+        run: pytest tests/test_contracts.py -v
+        working-directory: backend
+
+      - name: TypeScript contract tests (ajv + golden examples)
+        run: npm test
+        working-directory: frontend
