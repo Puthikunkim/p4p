@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcore/contracts/rule_grammar",
+  "title": "Rule Grammar — Contract 2",
+  "description": "Declarative IF→THEN rule files authored in the UI or dropped into backend/rules/. The engine hot-reloads these files via watchdog.",
+  "type": "object",
+  "required": ["id", "schema_version", "when", "then"],
+  "additionalProperties": false,
+  "properties": {
+    "id":             { "type": "string", "minLength": 1 },
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "description":    { "type": "string" },
+    "enabled":        { "type": "boolean", "default": true },
+    "when":           { "$ref": "#/$defs/condition_group" },
+    "then":           { "$ref": "#/$defs/then_clause" }
+  },
+  "$defs": {
+    "condition_group": {
+      "type": "object",
+      "oneOf": [
+        {
+          "required": ["all"],
+          "additionalProperties": false,
+          "properties": {
+            "all": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/condition_item" } }
+          }
+        },
+        {
+          "required": ["any"],
+          "additionalProperties": false,
+          "properties": {
+            "any": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/condition_item" } }
+          }
+        }
+      ]
+    },
+    "condition_item": {
+      "type": "object",
+      "required": ["signal", "op"],
+      "additionalProperties": false,
+      "properties": {
+        "signal":    { "type": "string", "minLength": 1 },
+        "op":        { "enum": [">", ">=", "<", "<=", "==", "!=", "between"] },
+        "threshold": { "type": "number" },
+        "low":       { "type": "number" },
+        "high":      { "type": "number" },
+        "value":     { "type": "string" },
+        "sustain_s": { "type": "number", "minimum": 0 }
+      }
+    },
+    "then_clause": {
+      "type": "object",
+      "required": ["set"],
+      "additionalProperties": false,
+      "properties": {
+        "set": { "$ref": "#/$defs/set_action" },
+        "cooldown_s": { "type": "number", "minimum": 0 }
+      },
+      "$comment": "TODO(abstract-actions): add an 'action' branch here once the abstract-action capability is implemented. It would look like: { 'action': string, 'params': object }. The target/status/value model is the primary path; abstract actions are a future extension."
+    },
+    "set_action": {
+      "type": "object",
+      "required": ["target", "status", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "target": { "$ref": "#/$defs/target" },
+        "status": { "type": "string", "minLength": 1 },
+        "value":  {
+          "oneOf": [
+            { "type": "number" },
+            { "type": "string" }
+          ]
+        }
+      }
+    },
+    "target": {
+      "type": "object",
+      "oneOf": [
+        {
+          "required": ["tag"],
+          "additionalProperties": false,
+          "properties": { "tag": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "required": ["id"],
+          "additionalProperties": false,
+          "properties": { "id": { "type": "string", "minLength": 1 } }
+        }
+      ]
+    },
+    "$defs": {
+      "$comment": "TODO(abstract-actions): placeholder for the future abstract_action definition. Add here when abstract-action capability is implemented.",
+      "abstract_action": {
+        "$comment": "Not currently wired into 'then'. Future: { action: string, params: object } targeting scene-level capabilities rather than per-object statuses.",
+        "type": "object",
+        "required": ["action"],
+        "properties": {
+          "action": { "type": "string" },
+          "params": { "type": "object" }
+        }
+      }
+    }
+  }
+}

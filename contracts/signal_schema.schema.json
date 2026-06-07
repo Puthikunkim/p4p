@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcore/contracts/signal_schema",
+  "title": "Signal Schema — Contract 1",
+  "description": "Self-describing manifest that Om publishes alongside its LSL stream. Drives dashboard renderer selection and rule engine signal resolution.",
+  "type": "object",
+  "required": ["schema_version", "stream", "channels"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$",
+      "description": "SemVer — see contracts/VERSIONING.md for compatibility policy."
+    },
+    "stream": {
+      "type": "object",
+      "required": ["name", "source_id", "nominal_srate"],
+      "additionalProperties": false,
+      "properties": {
+        "name":         { "type": "string", "minLength": 1 },
+        "source_id":    { "type": "string", "minLength": 1 },
+        "nominal_srate": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "channels": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/channel" }
+    }
+  },
+  "$defs": {
+    "channel": {
+      "type": "object",
+      "required": ["name", "unit", "type", "display"],
+      "additionalProperties": false,
+      "properties": {
+        "name":  { "type": "string", "minLength": 1 },
+        "unit":  { "type": "string", "minLength": 1 },
+        "type":  { "enum": ["scalar", "timeseries", "categorical"] },
+        "range": {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "number" },
+            "max": { "type": "number" }
+          }
+        },
+        "categories": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" }
+        },
+        "display": { "$ref": "#/$defs/display_hint" }
+      },
+      "if":   { "properties": { "type": { "const": "categorical" } }, "required": ["type"] },
+      "then": { "required": ["categories"] }
+    },
+    "display_hint": {
+      "type": "object",
+      "required": ["hint", "label"],
+      "additionalProperties": true,
+      "properties": {
+        "hint":      { "type": "string", "minLength": 1 },
+        "label":     { "type": "string", "minLength": 1 },
+        "precision": { "type": "integer", "minimum": 0 },
+        "window_s":  { "type": "number", "exclusiveMinimum": 0 }
+      }
+    }
+  }
+}

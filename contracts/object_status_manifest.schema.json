@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcore/contracts/object_status_manifest",
+  "title": "Object-Status Manifest — Contract 3b",
+  "description": "Sent by the Unity runtime over /ws/runtime at connect time and on scene change. Declares every controllable object and its settable statuses so V-CORE can populate the rule builder THEN side and validate incoming status requests.",
+  "type": "object",
+  "required": ["schema_version", "scene", "runtime", "objects"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "scene":          { "type": "string", "minLength": 1 },
+    "runtime":        { "type": "string", "minLength": 1 },
+    "objects": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/object_declaration" }
+    },
+    "abstract_actions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/abstract_action" },
+      "$comment": "TODO(abstract-actions): populate once abstract-action capability is implemented. Currently always empty []."
+    }
+  },
+  "$defs": {
+    "object_declaration": {
+      "type": "object",
+      "required": ["id", "tags", "statuses"],
+      "additionalProperties": false,
+      "properties": {
+        "id":       { "type": "string", "minLength": 1 },
+        "tags":     { "type": "array", "items": { "type": "string" } },
+        "statuses": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/status_declaration" }
+        }
+      }
+    },
+    "status_declaration": {
+      "type": "object",
+      "required": ["name", "type"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "type": { "enum": ["discrete", "continuous"] },
+        "values": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string" },
+          "description": "Required when type=discrete."
+        },
+        "range": {
+          "type": "object",
+          "required": ["min", "max"],
+          "additionalProperties": false,
+          "properties": {
+            "min": { "type": "number" },
+            "max": { "type": "number" }
+          },
+          "description": "Required when type=continuous."
+        }
+      },
+      "if":   { "properties": { "type": { "const": "discrete" } }, "required": ["type"] },
+      "then": { "required": ["values"] },
+      "else": { "required": ["range"] }
+    },
+    "abstract_action": {
+      "$comment": "TODO(abstract-actions): scene-level semantic capability. Not yet wired. Future shape: { action: string, params_schema: object }.",
+      "type": "object",
+      "required": ["action"],
+      "additionalProperties": true,
+      "properties": {
+        "action":       { "type": "string" },
+        "params_schema": { "type": "object" }
+      }
+    }
+  }
+}

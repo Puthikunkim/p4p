@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcore/contracts/status_request",
+  "title": "Status Request — Contract 3a",
+  "description": "Emitted by the rule engine (source=engine) or by a researcher manually triggering a rule (source=manual). Sent to Unity over /ws/runtime to change an object's status.",
+  "type": "object",
+  "required": ["schema_version", "intent_id", "timestamp", "target", "status", "value", "source"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "intent_id":      { "type": "string", "minLength": 1, "description": "UUID for deduplication and event logging." },
+    "timestamp":      { "type": "string", "format": "date-time" },
+    "target":         { "$ref": "#/$defs/target" },
+    "status":         { "type": "string", "minLength": 1 },
+    "value": {
+      "oneOf": [
+        { "type": "number" },
+        { "type": "string" }
+      ]
+    },
+    "source_rule": {
+      "type": "string",
+      "description": "ID of the rule that generated this request. Omitted for manual triggers with no associated rule."
+    },
+    "source": {
+      "enum": ["engine", "manual"],
+      "description": "engine = fired by the rule evaluator; manual = fired by the researcher via the dashboard trigger button."
+    }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "oneOf": [
+        {
+          "required": ["tag"],
+          "additionalProperties": false,
+          "properties": { "tag": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "required": ["id"],
+          "additionalProperties": false,
+          "properties": { "id": { "type": "string", "minLength": 1 } }
+        }
+      ]
+    }
+  }
+}
