@@ -18,6 +18,7 @@ class Topics:
     RULE_FIRED = "rule.fired"
     WARNING = "warning"
     LINK_STATUS = "link.status"
+    STALE = "signal.stale"
 
 
 class EventBus:

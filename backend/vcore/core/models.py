@@ -131,3 +131,35 @@ class ObjectStatusManifest(BaseModel):
     runtime: str
     objects: list[ObjectDeclaration]
     abstract_actions: list[dict[str, object]] = Field(default_factory=list)
+
+
+# ── Runtime events (published on the event bus) ───────────────────────────────
+
+class SampleEvent(BaseModel):
+    """One sample frame from the signal pipeline."""
+    model_config = {"extra": "forbid"}
+    stream_name: str
+    timestamp: float  # LSL clock time
+    values: dict[str, float | str]  # channel name → value
+
+
+class StaleEvent(BaseModel):
+    """Emitted when no sample has arrived within stale_timeout_s."""
+    model_config = {"extra": "forbid"}
+    stream_name: str
+    age_s: float  # seconds since last sample
+
+
+class LinkStatusEvent(BaseModel):
+    """Network link state change for any of the three links."""
+    model_config = {"extra": "forbid"}
+    link: Literal["om-lsl", "unity-ws", "browser-ws"]
+    state: Literal["up", "down", "stale", "reconnecting"]
+    detail: str | None = None
+
+
+class WarningEvent(BaseModel):
+    """Generic warning surfaced to the dashboard."""
+    model_config = {"extra": "forbid"}
+    source: str
+    message: str
