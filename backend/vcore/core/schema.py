@@ -46,7 +46,7 @@ def check_version(payload_version: str, contract: str) -> VersionSkew:
 
     Returns OK / WARN / REFUSE per VERSIONING.md policy.
     """
-    schema_version_raw: str = _schema(contract).get("$schema_version", "1.0.0")
+    _schema(contract).get("$schema_version", "1.0.0")
     # The contracts themselves don't embed their own version in a machine-readable
     # top-level field; we derive it from the golden example instead.
     # For runtime use, we hard-code the known current version here and update it
@@ -72,5 +72,61 @@ def check_version(payload_version: str, contract: str) -> VersionSkew:
         return VersionSkew.WARN
     return VersionSkew.OK
 
-    # suppress unused variable warning
-    _ = schema_version_raw
+
+class AcceptResult:
+    """Returned by ActiveManifests.update_* methods."""
+
+    def __init__(self, skew: VersionSkew, warning: str | None = None) -> None:
+        self.skew = skew
+        self.warning = warning
+
+    @property
+    def accepted(self) -> bool:
+        return self.skew != VersionSkew.REFUSE
+
+
+class ActiveManifests:
+    """Holds the currently active Signal Schema and Object-Status Manifest.
+
+    Each update validates the payload against its contract schema and checks
+    version skew. Callers inspect AcceptResult.accepted before using the
+    updated manifest; on REFUSE the previous manifest is kept unchanged.
+    """
+
+    def __init__(self) -> None:
+        self._signal: dict[str, Any] | None = None
+        self._object_status: dict[str, Any] | None = None
+
+    # ── Signal Schema (Contract 1) ────────────────────────────────────────
+
+    def update_signal_manifest(self, payload: dict[str, Any]) -> AcceptResult:
+        validate(payload, "signal_schema")
+        skew = check_version(payload["schema_version"], "signal_schema")
+        if skew == VersionSkew.REFUSE:
+            return AcceptResult(skew, f"signal_schema major version mismatch: {payload['schema_version']}")
+        self._signal = payload
+        warning = f"signal_schema minor version skew: {payload['schema_version']}" if skew == VersionSkew.WARN else None
+        return AcceptResult(skew, warning)
+
+    @property
+    def signal_manifest(self) -> dict[str, Any] | None:
+        return self._signal
+
+    # ── Object-Status Manifest (Contract 3b) ─────────────────────────────
+
+    def update_object_status_manifest(self, payload: dict[str, Any]) -> AcceptResult:
+        validate(payload, "object_status_manifest")
+        skew = check_version(payload["schema_version"], "object_status_manifest")
+        if skew == VersionSkew.REFUSE:
+            return AcceptResult(skew, f"object_status_manifest major version mismatch: {payload['schema_version']}")
+        self._object_status = payload
+        warning = f"object_status_manifest minor version skew: {payload['schema_version']}" if skew == VersionSkew.WARN else None
+        return AcceptResult(skew, warning)
+
+    @property
+    def object_status_manifest(self) -> dict[str, Any] | None:
+        return self._object_status
+
+
+# Module-level singleton — import and use directly.
+manifests = ActiveManifests()
