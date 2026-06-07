@@ -1,0 +1,93 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    name: Backend — lint, type-check, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -e ".[dev]"
+        working-directory: backend
+
+      - name: Lint (ruff)
+        run: ruff check .
+        working-directory: backend
+
+      - name: Type-check (mypy)
+        run: mypy vcore/
+        working-directory: backend
+
+      - name: Test (pytest)
+        run: pytest
+        working-directory: backend
+
+  frontend:
+    name: Frontend — lint, build, test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Lint (ESLint)
+        run: npm run lint
+        working-directory: frontend
+
+      - name: Build
+        run: npm run build
+        working-directory: frontend
+
+      - name: Test (vitest)
+        run: npm test
+        working-directory: frontend
+
+  contracts:
+    name: Contracts — validate schemas and golden examples
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install backend deps (for Python validator)
+        run: pip install -e ".[dev]"
+        working-directory: backend
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps (for TS validator)
+        run: npm ci
+        working-directory: frontend
+
+      # Phase 1 will add the actual validator scripts here.
+      # For now, this job is a placeholder that confirms the job structure is valid.
+      - name: Contract gate (placeholder — wired in Phase 1)
+        run: echo "Contract validators added in Phase 1"

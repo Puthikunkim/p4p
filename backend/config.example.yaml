@@ -1,0 +1,57 @@
+# V-CORE configuration template.
+# Copy to config.yaml (gitignored) and adjust for your deployment.
+# See ARCHITECTURE §10 for the topology overview.
+
+# ── Ingestion (Om / signal pipeline — Machine C) ─────────────────────────────
+ingestion:
+  # Name(s) of the LSL streams to resolve. Matches the 'name' field in Contract 1.
+  lsl_streams:
+    - om.cognitive
+  # Seconds without a sample before the signal is marked stale (rules won't fire).
+  stale_timeout_s: 5
+  # Path to an XDF or CSV fixture for offline replay (hardware-free dev/test).
+  # replay_fixture: "tools/fixtures/sample_session.xdf"
+
+# ── Outbound (Jerry / Unity runtime — Machine B) ─────────────────────────────
+outbound:
+  # Primary transport. 'ws' = Unity connects to /ws/runtime on this server.
+  # Alternative: 'zmq' — see outbound/zmq_sink.py (documented stub).
+  transport: ws
+  # Path that Unity's WS client connects to (relative to the bind address).
+  runtime_ws_path: /ws/runtime
+  # Seconds between reconnect attempts if Unity drops the link.
+  reconnect_backoff_s: 2
+
+# ── WebSocket bridge (V-CORE server — Machine A) ──────────────────────────────
+bridge:
+  # Interface and port V-CORE listens on.
+  # Use 0.0.0.0 for LAN; 127.0.0.1 for single-machine dev.
+  host: 0.0.0.0
+  port: 8000
+  # Path the browser dashboard subscribes to.
+  dashboard_ws_path: /ws/dashboard
+  # Optional bearer token. Leave empty to disable auth (isolated LAN only).
+  # bearer_token: "change-me-before-use"
+
+# ── Recording ─────────────────────────────────────────────────────────────────
+recording:
+  # Directory for session data (gitignored by default).
+  data_dir: ../data
+  # Raw LSL streams → XDF per session.
+  xdf_enabled: true
+  # Session metadata + rule-fire events → SQLite.
+  sqlite_enabled: true
+  sqlite_path: ../data/vcore.db
+
+# ── Participant video (Amendment 2 — WebRTC) ──────────────────────────────────
+video:
+  enabled: true
+  # V-CORE brokers WebRTC signaling only; media is peer-to-peer.
+  signaling_ws_path: /ws/signaling
+  # Fallback: MJPEG-over-WS preview when WebRTC is unavailable.
+  fallback_transport: none  # options: none | mjpeg
+
+# ── Rule files ────────────────────────────────────────────────────────────────
+rules:
+  # Directory watched for YAML/JSON rule files (hot-reloaded by watchdog).
+  rules_dir: ./rules
