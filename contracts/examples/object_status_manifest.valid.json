@@ -1,0 +1,23 @@
+{
+  "schema_version": "1.0.0",
+  "scene": "calm_forest",
+  "runtime": "jerry-unity",
+  "objects": [
+    {
+      "id": "campfire_01",
+      "tags": ["ambient_light", "fire"],
+      "statuses": [
+        { "name": "brightness", "type": "continuous", "range": { "min": 0, "max": 100 } },
+        { "name": "crackle", "type": "discrete", "values": ["off", "low", "high"] }
+      ]
+    },
+    {
+      "id": "fog_volume",
+      "tags": ["atmosphere"],
+      "statuses": [
+        { "name": "density", "type": "continuous", "range": { "min": 0, "max": 1 } }
+      ]
+    }
+  ],
+  "abstract_actions": []
+}

@@ -1,0 +1,14 @@
+{
+  "_invalid_reason": "'then' uses 'action' branch which is not wired — only 'set' is valid in the current schema",
+  "id": "bad-abstract-action",
+  "schema_version": "1.0.0",
+  "when": {
+    "all": [
+      { "signal": "cognitive_load", "op": ">=", "threshold": 0.8 }
+    ]
+  },
+  "then": {
+    "action": "reduce_visual_load",
+    "params": { "intensity": 0.5 }
+  }
+}

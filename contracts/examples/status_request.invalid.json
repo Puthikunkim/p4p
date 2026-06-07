@@ -1,0 +1,10 @@
+{
+  "_invalid_reason": "'source' field has an invalid value — only 'engine' and 'manual' are allowed",
+  "schema_version": "1.0.0",
+  "intent_id": "3f1c9a2b-4d5e-6789-abcd-ef0123456789",
+  "timestamp": "2026-06-01T12:00:00.000Z",
+  "target": { "tag": "ambient_light" },
+  "status": "brightness",
+  "value": 20,
+  "source": "automatic"
+}

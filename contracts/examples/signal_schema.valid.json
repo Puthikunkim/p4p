@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0.0",
+  "stream": {
+    "name": "om.cognitive",
+    "source_id": "om-01",
+    "nominal_srate": 10
+  },
+  "channels": [
+    {
+      "name": "cognitive_load",
+      "unit": "normalized",
+      "type": "scalar",
+      "range": { "min": 0, "max": 1 },
+      "display": { "hint": "stat_card", "label": "Cognitive Load", "precision": 2 }
+    },
+    {
+      "name": "eeg_alpha_power",
+      "unit": "uV^2",
+      "type": "timeseries",
+      "range": { "min": 0, "max": 100 },
+      "display": { "hint": "line_chart", "label": "Alpha Power", "window_s": 30 }
+    },
+    {
+      "name": "affect",
+      "unit": "category",
+      "type": "categorical",
+      "categories": ["calm", "stressed", "bored", "engaged"],
+      "display": { "hint": "quadrant", "label": "Affective State" }
+    }
+  ]
+}

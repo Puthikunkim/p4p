@@ -1,0 +1,17 @@
+{
+  "_invalid_reason": "categorical channel missing required 'categories' field",
+  "schema_version": "1.0.0",
+  "stream": {
+    "name": "om.cognitive",
+    "source_id": "om-01",
+    "nominal_srate": 10
+  },
+  "channels": [
+    {
+      "name": "affect",
+      "unit": "category",
+      "type": "categorical",
+      "display": { "hint": "quadrant", "label": "Affective State" }
+    }
+  ]
+}

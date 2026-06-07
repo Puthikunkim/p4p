@@ -1,0 +1,19 @@
+{
+  "id": "overload-dim-lights",
+  "schema_version": "1.0.0",
+  "description": "Sustained high cognitive load → reduce visual complexity.",
+  "enabled": true,
+  "when": {
+    "all": [
+      { "signal": "cognitive_load", "op": ">=", "threshold": 0.8, "sustain_s": 5 }
+    ]
+  },
+  "then": {
+    "set": {
+      "target": { "tag": "ambient_light" },
+      "status": "brightness",
+      "value": 20
+    },
+    "cooldown_s": 30
+  }
+}

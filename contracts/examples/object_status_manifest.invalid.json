@@ -1,0 +1,16 @@
+{
+  "_invalid_reason": "discrete status 'crackle' is missing the required 'values' field",
+  "schema_version": "1.0.0",
+  "scene": "calm_forest",
+  "runtime": "jerry-unity",
+  "objects": [
+    {
+      "id": "campfire_01",
+      "tags": ["ambient_light"],
+      "statuses": [
+        { "name": "crackle", "type": "discrete" }
+      ]
+    }
+  ],
+  "abstract_actions": []
+}
