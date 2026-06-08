@@ -1,0 +1,108 @@
+import { create } from 'zustand'
+import type { SignalSchemaContract1, Channel } from '../contracts/SignalSchema'
+import type { ObjectStatusManifestContract3B } from '../contracts/ObjectStatusManifest'
+import type { RuleGrammarContract2 } from '../contracts/RuleGrammar'
+
+export interface LinkStatus {
+  link: string
+  state: 'up' | 'down' | 'stale' | 'reconnecting'
+  detail?: string
+}
+
+export interface Warning {
+  source: string
+  message: string
+  at: number  // Date.now()
+}
+
+export interface VCoreStore {
+  // manifests
+  signalManifest: SignalSchemaContract1 | null
+  objectStatusManifest: ObjectStatusManifestContract3B | null
+  // live values: channel name → latest sample value
+  latestValues: Record<string, number | string>
+  // history: channel name → circular buffer of [timestamp, value] pairs
+  history: Record<string, [number, number][]>
+  // rules
+  rules: RuleGrammarContract2[]
+  disabledRules: Record<string, string>
+  // system
+  warnings: Warning[]
+  linkStatuses: Record<string, LinkStatus>
+  wsState: 'connecting' | 'connected' | 'disconnected'
+
+  // actions
+  applyMessage: (msg: ServerMessage) => void
+  setWsState: (state: VCoreStore['wsState']) => void
+  clearWarnings: () => void
+}
+
+export type ServerMessage =
+  | { type: 'signal_manifest'; payload: SignalSchemaContract1 }
+  | { type: 'object_status_manifest'; payload: ObjectStatusManifestContract3B }
+  | { type: 'sample'; payload: { stream_name: string; timestamp: number; values: Record<string, number | string> } }
+  | { type: 'warning'; payload: { source: string; message: string } }
+  | { type: 'link_status'; payload: { link: string; state: string; detail?: string } }
+  | { type: 'rule_list'; payload: { rules: RuleGrammarContract2[]; disabled: Record<string, string> } }
+
+const MAX_HISTORY = 300  // samples per channel
+
+export const useVCoreStore = create<VCoreStore>((set) => ({
+  signalManifest: null,
+  objectStatusManifest: null,
+  latestValues: {},
+  history: {},
+  rules: [],
+  disabledRules: {},
+  warnings: [],
+  linkStatuses: {},
+  wsState: 'disconnected',
+
+  applyMessage: (msg) =>
+    set((state) => {
+      switch (msg.type) {
+        case 'signal_manifest':
+          return { signalManifest: msg.payload }
+
+        case 'object_status_manifest':
+          return { objectStatusManifest: msg.payload }
+
+        case 'sample': {
+          const newLatest = { ...state.latestValues, ...msg.payload.values }
+          const newHistory = { ...state.history }
+          for (const [ch, val] of Object.entries(msg.payload.values)) {
+            if (typeof val !== 'number') continue
+            const prev = newHistory[ch] ?? []
+            const next: [number, number][] = [...prev, [msg.payload.timestamp, val]]
+            newHistory[ch] = next.length > MAX_HISTORY ? next.slice(-MAX_HISTORY) : next
+          }
+          return { latestValues: newLatest, history: newHistory }
+        }
+
+        case 'warning': {
+          const w: Warning = { ...msg.payload, at: Date.now() }
+          return { warnings: [w, ...state.warnings].slice(0, 50) }
+        }
+
+        case 'link_status': {
+          const ls = msg.payload as LinkStatus
+          return { linkStatuses: { ...state.linkStatuses, [ls.link]: ls } }
+        }
+
+        case 'rule_list':
+          return { rules: msg.payload.rules, disabledRules: msg.payload.disabled }
+
+        default:
+          return {}
+      }
+    }),
+
+  setWsState: (wsState) => set({ wsState }),
+
+  clearWarnings: () => set({ warnings: [] }),
+}))
+
+// Convenience selector: channels from the active signal manifest
+export function useChannels(): Channel[] {
+  return useVCoreStore((s) => s.signalManifest?.channels ?? [])
+}
