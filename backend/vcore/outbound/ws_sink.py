@@ -7,7 +7,6 @@ import logging
 from typing import Any
 
 import websockets
-import websockets.exceptions
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import (
@@ -85,7 +84,7 @@ class WsSink(ActionSink):
     # ── server loop ───────────────────────────────────────────────────────────
 
     async def _serve(self) -> None:
-        async with websockets.serve(self._handle_connection, self._host, self._port) as server:
+        async with websockets.serve(self.handle_connection, self._host, self._port) as server:
             self._server = server
             self._ready.set()
             log.info("ws_sink: listening on ws://%s:%d", self._host, self._port)
@@ -93,7 +92,12 @@ class WsSink(ActionSink):
 
     # ── connection handler ────────────────────────────────────────────────────
 
-    async def _handle_connection(self, ws: Any) -> None:
+    async def handle_connection(self, ws: Any) -> None:
+        """Handle one Unity WebSocket connection.
+
+        `ws` must expose: ``recv() -> str``, ``send(str) -> None``, ``remote_address``.
+        Compatible with both the *websockets* library and a thin FastAPI adapter.
+        """
         log.info("ws_sink: Unity connected from %s", ws.remote_address)
         self._conn = ws
         await self._bus.publish(
@@ -122,14 +126,15 @@ class WsSink(ActionSink):
             )
             log.info("ws_sink: object-status manifest accepted")
 
-            # Keep alive: Unity may send future re-registrations; ignore for now.
-            async for _ in ws:
-                pass
+            # Keep alive: read until Unity closes the connection.
+            while True:
+                try:
+                    await ws.recv()
+                except Exception:
+                    break
 
-        except websockets.exceptions.ConnectionClosed:
-            pass
         except Exception as exc:
-            log.warning("ws_sink: connection error: %s", exc)
+            log.debug("ws_sink: connection closed: %s", type(exc).__name__)
         finally:
             self._conn = None
             log.info("ws_sink: Unity disconnected")
@@ -162,7 +167,7 @@ class WsSink(ActionSink):
 
         try:
             await ws.send(event.model_dump_json())
-        except websockets.exceptions.ConnectionClosed:
+        except Exception:
             log.warning("ws_sink: connection closed while sending StatusRequest")
 
 

@@ -67,6 +67,7 @@ class RuleEvaluator:
     # Called by the registry hot-reload path to re-check after rule files change.
     async def on_registry_change(self) -> None:
         self._reconcile()
+        await self._bus.publish(Topics.RULES_UPDATED, None)
         await self._bus.publish(
             Topics.WARNING,
             {"source": "evaluator", "message": "rule registry reloaded"},
@@ -88,6 +89,7 @@ class RuleEvaluator:
 
     async def _on_manifest_change(self, _: object) -> None:
         self._reconcile()
+        await self._bus.publish(Topics.RULES_UPDATED, None)
 
     # ── reconciliation ────────────────────────────────────────────────────────
 

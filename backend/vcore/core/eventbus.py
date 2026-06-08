@@ -16,6 +16,7 @@ class Topics:
     SAMPLE = "sample"
     OBJECT_STATUS_UPDATED = "object_status.updated"
     RULE_FIRED = "rule.fired"
+    RULES_UPDATED = "rules.updated"
     WARNING = "warning"
     LINK_STATUS = "link.status"
     STALE = "signal.stale"

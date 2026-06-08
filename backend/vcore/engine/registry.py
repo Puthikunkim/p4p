@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import threading
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +40,7 @@ class RuleRegistry:
         self._path_to_id: dict[Path, str] = {}
         self._errors: list[RuleLoadError] = []
         self._observer: Any = None  # watchdog Observer; Any avoids mypy valid-type issue
+        self._lock = threading.RLock()  # guards _rules and _path_to_id (watchdog vs. API thread)
 
     # ── public interface ──────────────────────────────────────────────────────
 
@@ -69,37 +71,44 @@ class RuleRegistry:
 
     @property
     def rules(self) -> dict[str, Rule]:
-        return dict(self._rules)
+        with self._lock:
+            return dict(self._rules)
 
     @property
     def errors(self) -> list[RuleLoadError]:
-        return list(self._errors)
+        with self._lock:
+            return list(self._errors)
 
     # ── internal ──────────────────────────────────────────────────────────────
 
     def _load_file(self, path: Path) -> None:
-        # Remove stale entry for this path before (re)loading.
-        old_id = self._path_to_id.pop(path, None)
-        if old_id:
-            self._rules.pop(old_id, None)
-        self._errors = [e for e in self._errors if e.path != str(path)]
-
         try:
             text = path.read_text()
             raw: dict[str, Any] = yaml.safe_load(text) if path.suffix in (".yaml", ".yml") else __import__("json").loads(text)
             vschema.validate(raw, "rule_grammar")
             rule = Rule.model_validate(raw)
+        except Exception as exc:
+            with self._lock:
+                self._errors = [e for e in self._errors if e.path != str(path)]
+                self._errors.append(RuleLoadError(path=str(path), reason=str(exc)))
+            log.warning("registry: skipped %s — %s", path.name, exc)
+            return
+
+        with self._lock:
+            old_id = self._path_to_id.pop(path, None)
+            if old_id and old_id != rule.id:
+                self._rules.pop(old_id, None)
+            self._errors = [e for e in self._errors if e.path != str(path)]
             self._rules[rule.id] = rule
             self._path_to_id[path] = rule.id
-            log.info("registry: loaded rule %r from %s", rule.id, path.name)
-        except Exception as exc:
-            self._errors.append(RuleLoadError(path=str(path), reason=str(exc)))
-            log.warning("registry: skipped %s — %s", path.name, exc)
+        log.info("registry: loaded rule %r from %s", rule.id, path.name)
 
     def _remove_file(self, path: Path) -> None:
-        rule_id = self._path_to_id.pop(path, None)
+        with self._lock:
+            rule_id = self._path_to_id.pop(path, None)
+            if rule_id:
+                self._rules.pop(rule_id, None)
         if rule_id:
-            self._rules.pop(rule_id, None)
             log.info("registry: removed rule %r (file deleted)", rule_id)
 
 
