@@ -102,7 +102,9 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
   clearWarnings: () => set({ warnings: [] }),
 }))
 
+const EMPTY_CHANNELS: Channel[] = []
+
 // Convenience selector: channels from the active signal manifest
 export function useChannels(): Channel[] {
-  return useVCoreStore((s) => s.signalManifest?.channels ?? [])
+  return useVCoreStore((s) => s.signalManifest?.channels ?? EMPTY_CHANNELS)
 }

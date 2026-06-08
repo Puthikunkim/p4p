@@ -40,6 +40,7 @@ function _connect(url: string): void {
   }
 
   socket.onclose = () => {
+    if (ws !== socket) return  // stale socket from a previous connect cycle; ignore
     ws = null
     setWsState('disconnected')
     if (!stopped) {
