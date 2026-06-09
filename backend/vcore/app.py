@@ -11,16 +11,19 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
 from vcore.api.rules import router as rules_router
+from vcore.api.sessions import router as sessions_router
 from vcore.bridge.ws import DashboardBridge
 from vcore.core.eventbus import EventBus
 from vcore.core.schema import ActiveManifests
 from vcore.engine.evaluator import RuleEvaluator
 from vcore.engine.registry import RuleRegistry
 from vcore.outbound.ws_sink import WsSink
+from vcore.recording.recorder import Recorder
 
 log = logging.getLogger(__name__)
 
 _RULES_DIR = Path(__file__).parent.parent / "rules"
+_DATA_DIR = Path(__file__).parent.parent / "data"
 _SINK_HOST = "localhost"
 _SINK_PORT = 9001
 
@@ -28,6 +31,7 @@ _SINK_PORT = 9001
 def create_app(
     *,
     rules_dir: Path = _RULES_DIR,
+    data_dir: Path = _DATA_DIR,
     sink_host: str = _SINK_HOST,
     sink_port: int = _SINK_PORT,
 ) -> FastAPI:
@@ -42,6 +46,7 @@ def create_app(
     evaluator = RuleEvaluator(registry, bus, manifests)
     ws_sink = WsSink(sink_host, sink_port, bus=bus, manifests=manifests)
     bridge = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
+    recorder = Recorder(bus, manifests, data_dir)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -52,9 +57,11 @@ def create_app(
         registry.start_watching(evaluator.on_registry_change, loop)
         await ws_sink.start()
         await bridge.start()
+        await recorder.start()
         log.info("V-CORE started (rules_dir=%s)", rules_dir)
         yield
         # ── shutdown ─────────────────────────────────────────────────────────
+        await recorder.stop()
         await bridge.stop()
         await ws_sink.stop()
         registry.stop_watching()
@@ -76,11 +83,13 @@ def create_app(
     app.state.evaluator = evaluator
     app.state.ws_sink = ws_sink
     app.state.bridge = bridge
+    app.state.recorder = recorder
     app.state.rules_dir = rules_dir
 
     # ── routes ────────────────────────────────────────────────────────────────
 
     app.include_router(rules_router)
+    app.include_router(sessions_router)
 
     @app.websocket("/ws/dashboard")
     async def ws_dashboard(ws: WebSocket) -> None:
