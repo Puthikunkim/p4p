@@ -1,14 +1,4 @@
-/**
- * VideoFeed — subscribes to the V-CORE WebRTC signaling broker, accepts the
- * Unity publisher's offer, renders the remote video stream, and (when a
- * session is active) records it locally via MediaRecorder for upload.
- *
- * Data flow (browser is always the subscriber / receiver):
- *   Unity publisher → SDP offer → SignalingBroker → VideoFeed
- *   VideoFeed → SDP answer → SignalingBroker → Unity publisher
- *   Unity publisher --[WebRTC media]--> VideoFeed <video>
- */
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { SignalingClient } from './signaling'
 
 interface Props {
@@ -25,6 +15,86 @@ export function VideoFeed({ sessionId }: Props) {
   const chunksRef = useRef<Blob[]>([])
   const [status, setStatus] = useState<FeedStatus>('idle')
 
+  // ── helpers (defined before effects so ESLint sees them in order) ─────────
+
+  const stopRecording = useCallback(() => {
+    if (recorderRef.current?.state === 'recording') {
+      recorderRef.current.stop()
+    }
+    recorderRef.current = null
+  }, [])
+
+  const uploadVideo = useCallback((sid: string, blob: Blob) => {
+    fetch(`/api/sessions/${sid}/video`, {
+      method: 'POST',
+      headers: { 'content-type': 'video/webm' },
+      body: blob,
+    }).catch(() => null)
+  }, [])
+
+  const startRecording = useCallback((sid: string, stream: MediaStream) => {
+    if (recorderRef.current) return
+    chunksRef.current = []
+    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' })
+    recorderRef.current = recorder
+
+    fetch(`/api/sessions/${sid}/video-start`, { method: 'POST' }).catch(() => null)
+
+    recorder.ondataavailable = (ev) => {
+      if (ev.data.size > 0) chunksRef.current.push(ev.data)
+    }
+
+    recorder.onstop = () => {
+      const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+      chunksRef.current = []
+      uploadVideo(sid, blob)
+    }
+
+    recorder.start(1000)
+    setStatus('recording')
+  }, [uploadVideo])
+
+  const teardownPeer = useCallback(() => {
+    stopRecording()
+    pcRef.current?.close()
+    pcRef.current = null
+    if (videoRef.current) videoRef.current.srcObject = null
+  }, [stopRecording])
+
+  const buildPeerConnection = useCallback((publisherPeerId: string): RTCPeerConnection => {
+    teardownPeer()
+    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] })
+    pcRef.current = pc
+
+    pc.onicecandidate = (ev) => {
+      if (ev.candidate) {
+        sigRef.current?.sendIce(ev.candidate.toJSON(), publisherPeerId)
+      }
+    }
+
+    pc.ontrack = (ev) => {
+      if (videoRef.current) {
+        const stream = ev.streams[0]
+        videoRef.current.srcObject = stream
+        if (sessionId) {
+          startRecording(sessionId, stream)
+          setStatus('recording')
+        } else {
+          setStatus('live')
+        }
+      }
+    }
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        teardownPeer()
+        setStatus('idle')
+      }
+    }
+
+    return pc
+  }, [teardownPeer, startRecording, sessionId])
+
   // ── boot / teardown ──────────────────────────────────────────────────────────
 
   useEffect(() => {
@@ -35,12 +105,6 @@ export function VideoFeed({ sessionId }: Props) {
 
     const sig = new SignalingClient(signalingUrl)
     sigRef.current = sig
-
-    sig.onPublisherAvailable = () => {
-      // The publisher is already connected — initiate the offer/answer exchange
-      // by creating a new RTCPeerConnection and waiting for their offer.
-      // (publisher sends the offer; browser answers)
-    }
 
     sig.onPublisherGone = () => {
       teardownPeer()
@@ -56,11 +120,10 @@ export function VideoFeed({ sessionId }: Props) {
       sig.sendAnswer(answer.sdp!, publisherPeerId)
     }
 
-    sig.onIce = (candidate, _peerId) => {
+    sig.onIce = (candidate) => {
       pcRef.current?.addIceCandidate(candidate).catch(() => null)
     }
 
-    setStatus('connecting')
     sig.connect().catch(() => setStatus('error'))
 
     return () => {
@@ -68,9 +131,9 @@ export function VideoFeed({ sessionId }: Props) {
       sig.disconnect()
       sigRef.current = null
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [teardownPeer, buildPeerConnection])
 
-  // ── start recording when session becomes active ───────────────────────────
+  // ── start/stop recording when session changes ─────────────────────────────
 
   useEffect(() => {
     if (!sessionId) {
@@ -81,84 +144,7 @@ export function VideoFeed({ sessionId }: Props) {
     if (stream instanceof MediaStream && stream.active) {
       startRecording(sessionId, stream)
     }
-  }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── helpers ──────────────────────────────────────────────────────────────────
-
-  function buildPeerConnection(publisherPeerId: string): RTCPeerConnection {
-    teardownPeer()
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] })
-    pcRef.current = pc
-
-    pc.onicecandidate = (ev) => {
-      if (ev.candidate) {
-        sigRef.current?.sendIce(ev.candidate.toJSON(), publisherPeerId)
-      }
-    }
-
-    pc.ontrack = (ev) => {
-      if (videoRef.current) {
-        const stream = ev.streams[0]
-        videoRef.current.srcObject = stream
-        setStatus(sessionId ? 'recording' : 'live')
-        if (sessionId) startRecording(sessionId, stream)
-      }
-    }
-
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        teardownPeer()
-        setStatus('idle')
-      }
-    }
-
-    return pc
-  }
-
-  function teardownPeer() {
-    stopRecording()
-    pcRef.current?.close()
-    pcRef.current = null
-    if (videoRef.current) videoRef.current.srcObject = null
-  }
-
-  function startRecording(sid: string, stream: MediaStream) {
-    if (recorderRef.current) return
-    chunksRef.current = []
-    const recorder = new MediaRecorder(stream, { mimeType: 'video/webm' })
-    recorderRef.current = recorder
-
-    // Capture LSL timestamp at recording start for alignment
-    fetch(`/api/sessions/${sid}/video-start`, { method: 'POST' }).catch(() => null)
-
-    recorder.ondataavailable = (ev) => {
-      if (ev.data.size > 0) chunksRef.current.push(ev.data)
-    }
-
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' })
-      chunksRef.current = []
-      uploadVideo(sid, blob)
-    }
-
-    recorder.start(1000) // 1 s chunks
-    setStatus('recording')
-  }
-
-  function stopRecording() {
-    if (recorderRef.current?.state === 'recording') {
-      recorderRef.current.stop()
-    }
-    recorderRef.current = null
-  }
-
-  function uploadVideo(sid: string, blob: Blob) {
-    fetch(`/api/sessions/${sid}/video`, {
-      method: 'POST',
-      headers: { 'content-type': 'video/webm' },
-      body: blob,
-    }).catch(() => null)
-  }
+  }, [sessionId, stopRecording, startRecording])
 
   // ── render ───────────────────────────────────────────────────────────────────
 

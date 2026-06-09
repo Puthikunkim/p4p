@@ -48,9 +48,9 @@ describe('getRenderer', () => {
   })
 
   it('returns fallback when hint and type-map both miss', () => {
-    const ch = makeChannel({ type: 'scalar' as any, display: { hint: 'absolute_unknown', label: 'L' } })
+    const ch = makeChannel({ type: 'scalar' as never, display: { hint: 'absolute_unknown', label: 'L' } })
     // Clear stat_card to force full fallback
-    registerRenderer('stat_card', undefined as any)
+    registerRenderer('stat_card', undefined as never)
     expect(getRenderer(ch)).toBe(Dummy)  // __fallback__
   })
 })

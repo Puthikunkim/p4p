@@ -36,7 +36,7 @@ describe('signal_manifest', () => {
 
 describe('object_status_manifest', () => {
   it('stores the manifest', () => {
-    const manifest = { schema_version: '1.0.0', objects: [] } as any
+    const manifest = { schema_version: '1.0.0', objects: [] } as never
     apply({ type: 'object_status_manifest', payload: manifest })
     expect(useVCoreStore.getState().objectStatusManifest).toBe(manifest)
   })
@@ -103,9 +103,9 @@ describe('rule_list', () => {
       id: 'r1',
       schema_version: '1.0.0',
       enabled: true,
-      when: { all: [{ signal: 'x', op: '>=' as const, threshold: 0.5 }] as [any, ...any[]]} ,
+      when: { all: [{ signal: 'x', op: '>=' as const, threshold: 0.5 }] as never} ,
       then: { set: { target: { tag: 't' }, status: 's', value: 1 } },
-    } as any
+    } as never
     apply({ type: 'rule_list', payload: { rules: [rule], disabled: { r2: 'no signal' } } })
     const { rules, disabledRules } = useVCoreStore.getState()
     expect(rules).toHaveLength(1)
