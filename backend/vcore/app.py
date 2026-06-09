@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from vcore.api.rules import router as rules_router
 from vcore.api.sessions import router as sessions_router
+from vcore.bridge.signaling import SignalingBroker
 from vcore.bridge.ws import DashboardBridge
 from vcore.core.eventbus import EventBus
 from vcore.core.schema import ActiveManifests
@@ -19,6 +20,7 @@ from vcore.engine.evaluator import RuleEvaluator
 from vcore.engine.registry import RuleRegistry
 from vcore.outbound.ws_sink import WsSink
 from vcore.recording.recorder import Recorder
+from vcore.recording.video_store import VideoStore
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +49,8 @@ def create_app(
     ws_sink = WsSink(sink_host, sink_port, bus=bus, manifests=manifests)
     bridge = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
     recorder = Recorder(bus, manifests, data_dir)
+    signaling = SignalingBroker()
+    video_store = VideoStore(data_dir)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -84,6 +88,8 @@ def create_app(
     app.state.ws_sink = ws_sink
     app.state.bridge = bridge
     app.state.recorder = recorder
+    app.state.signaling = signaling
+    app.state.video_store = video_store
     app.state.rules_dir = rules_dir
 
     # ── routes ────────────────────────────────────────────────────────────────
@@ -98,6 +104,10 @@ def create_app(
     @app.websocket("/ws/runtime")
     async def ws_runtime(ws: WebSocket) -> None:
         await bridge.handle_runtime(ws)
+
+    @app.websocket("/ws/signaling")
+    async def ws_signaling(ws: WebSocket) -> None:
+        await signaling.handle_peer(ws)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

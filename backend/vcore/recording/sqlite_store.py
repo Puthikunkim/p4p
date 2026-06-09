@@ -38,7 +38,21 @@ class SqliteStore:
         self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
         self._conn.executescript(_SCHEMA)
+        self._migrate()
         self._conn.commit()
+
+    def _migrate(self) -> None:
+        """Add columns introduced after initial schema without dropping existing data."""
+        new_cols = [
+            ("video_path", "TEXT"),
+            ("video_started_at", "TEXT"),
+            ("video_lsl_ts", "REAL"),
+        ]
+        for col, typ in new_cols:
+            try:
+                self._conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {typ}")
+            except sqlite3.OperationalError:
+                pass  # column already exists
 
     def create_session(self, participant: str, notes: str = "") -> str:
         sid = str(uuid.uuid4())
@@ -98,6 +112,19 @@ class SqliteStore:
         ).fetchall()
         result["events"] = [dict(e) for e in events]
         return result
+
+    def set_video(
+        self,
+        session_id: str,
+        video_path: str | None = None,
+        video_started_at: str | None = None,
+        video_lsl_ts: float | None = None,
+    ) -> None:
+        self._conn.execute(
+            "UPDATE sessions SET video_path=?, video_started_at=?, video_lsl_ts=? WHERE id=?",
+            (video_path, video_started_at, video_lsl_ts, session_id),
+        )
+        self._conn.commit()
 
     def close(self) -> None:
         self._conn.close()

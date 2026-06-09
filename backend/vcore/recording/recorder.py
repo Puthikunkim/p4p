@@ -23,6 +23,7 @@ class Recorder:
         self._store = SqliteStore(data_dir / "sessions.db")
         self._session_id: str | None = None
         self._xdf: XdfWriter | None = None
+        self._last_lsl_ts: float | None = None
 
     async def start(self) -> None:
         self._bus.subscribe(Topics.SAMPLE, self._on_sample)
@@ -70,7 +71,12 @@ class Recorder:
 
     # ── bus handlers ──────────────────────────────────────────────────────────
 
+    @property
+    def last_lsl_ts(self) -> float | None:
+        return self._last_lsl_ts
+
     async def _on_sample(self, event: SampleEvent) -> None:
+        self._last_lsl_ts = event.timestamp
         if not self._session_id:
             return
         if self._xdf is None:
