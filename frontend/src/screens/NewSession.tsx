@@ -1,17 +1,42 @@
 import { useState } from 'react'
 
-export function NewSession() {
-  const [participantId, setParticipantId] = useState('')
-  const [notes, setNotes] = useState('')
-  const [status, setStatus] = useState<'idle' | 'running' | 'done'>('idle')
+type Status = 'idle' | 'running' | 'done'
 
-  function startSession() {
-    if (!participantId.trim()) return
+export function NewSession() {
+  const [participant, setParticipant] = useState('')
+  const [notes, setNotes] = useState('')
+  const [status, setStatus] = useState<Status>('idle')
+  const [sessionId, setSessionId] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  async function startSession() {
+    setError(null)
+    const resp = await fetch('/api/sessions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ participant, notes }),
+    })
+    if (!resp.ok) {
+      const body = await resp.json() as { detail?: string }
+      setError(body.detail ?? `HTTP ${resp.status}`)
+      return
+    }
+    const { session_id } = await resp.json() as { session_id: string }
+    setSessionId(session_id)
     setStatus('running')
   }
 
-  function stopSession() {
+  async function stopSession() {
+    if (!sessionId) return
+    await fetch(`/api/sessions/${sessionId}/stop`, { method: 'POST' })
     setStatus('done')
+  }
+
+  function reset() {
+    setStatus('idle')
+    setSessionId(null)
+    setParticipant('')
+    setNotes('')
   }
 
   return (
@@ -25,27 +50,18 @@ export function NewSession() {
         <div className="form-panel">
           <div className="form-row">
             <label>Participant ID</label>
-            <input
-              value={participantId}
-              onChange={(e) => setParticipantId(e.target.value)}
-              placeholder="P01"
-            />
+            <input value={participant} onChange={(e) => setParticipant(e.target.value)}
+              placeholder="P01" />
           </div>
           <div className="form-row">
             <label>Notes</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              rows={3}
-              placeholder="Condition, environment, …"
-            />
+            <textarea value={notes} onChange={(e) => setNotes(e.target.value)}
+              rows={3} placeholder="Condition, environment, …" />
           </div>
+          {error && <p className="form-error">{error}</p>}
           <div className="form-actions">
-            <button
-              className="btn btn--primary"
-              onClick={startSession}
-              disabled={!participantId.trim()}
-            >
+            <button className="btn btn--primary" onClick={startSession}
+              disabled={!participant.trim()}>
               Start Session
             </button>
           </div>
@@ -54,15 +70,16 @@ export function NewSession() {
 
       {status === 'running' && (
         <div className="session-running">
-          <p>Recording <strong>{participantId}</strong>…</p>
+          <p>Recording <strong>{participant}</strong></p>
+          <p className="session-id-label">Session ID: <code>{sessionId}</code></p>
           <button className="btn btn--danger" onClick={stopSession}>Stop Session</button>
         </div>
       )}
 
       {status === 'done' && (
         <div className="session-done">
-          <p>Session saved.</p>
-          <button className="btn" onClick={() => setStatus('idle')}>New Session</button>
+          <p>Session saved. View it in Data History.</p>
+          <button className="btn" onClick={reset}>New Session</button>
         </div>
       )}
     </div>
