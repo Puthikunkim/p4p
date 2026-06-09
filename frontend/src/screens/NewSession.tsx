@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useVCoreStore } from '../ws/store'
 
 type Status = 'idle' | 'running' | 'done'
 
@@ -8,6 +9,7 @@ export function NewSession() {
   const [status, setStatus] = useState<Status>('idle')
   const [sessionId, setSessionId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const setActiveSession = useVCoreStore((s) => s.setActiveSession)
 
   async function startSession() {
     setError(null)
@@ -23,12 +25,14 @@ export function NewSession() {
     }
     const { session_id } = await resp.json() as { session_id: string }
     setSessionId(session_id)
+    setActiveSession(session_id)
     setStatus('running')
   }
 
   async function stopSession() {
     if (!sessionId) return
     await fetch(`/api/sessions/${sessionId}/stop`, { method: 'POST' })
+    setActiveSession(null)
     setStatus('done')
   }
 

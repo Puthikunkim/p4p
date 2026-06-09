@@ -1,5 +1,6 @@
 import { useVCoreStore, useChannels } from '../ws/store'
 import { getRenderer } from '../renderers/registry'
+import { VideoFeed } from '../video/VideoFeed'
 
 export function SessionMonitor() {
   const channels = useChannels()
@@ -10,6 +11,7 @@ export function SessionMonitor() {
   const clearWarnings = useVCoreStore((s) => s.clearWarnings)
   const rules = useVCoreStore((s) => s.rules)
   const disabledRules = useVCoreStore((s) => s.disabledRules)
+  const activeSessionId = useVCoreStore((s) => s.activeSessionId)
 
   return (
     <div className="screen">
@@ -26,6 +28,9 @@ export function SessionMonitor() {
           )
         })}
       </div>
+
+      {/* Video mirror */}
+      <VideoFeed sessionId={activeSessionId} />
 
       {/* Channel renderers — driven entirely by the manifest, no code change needed */}
       {channels.length === 0 ? (

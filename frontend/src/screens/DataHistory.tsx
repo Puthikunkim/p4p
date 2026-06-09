@@ -7,6 +7,7 @@ interface Session {
   started_at: string
   ended_at: string | null
   xdf_path: string | null
+  video_path: string | null
   status: string
   event_count: number
 }
@@ -89,6 +90,7 @@ export function DataHistory() {
             <div><strong>Started:</strong> {new Date(selected.started_at).toLocaleString()}</div>
             {selected.ended_at && <div><strong>Ended:</strong> {new Date(selected.ended_at).toLocaleString()}</div>}
             {selected.xdf_path && <div><strong>XDF:</strong> <code>{selected.xdf_path}</code></div>}
+            {selected.video_path && <div><strong>Video:</strong> <code>{selected.video_path}</code></div>}
           </div>
 
           <h3>Events ({selected.events.length})</h3>

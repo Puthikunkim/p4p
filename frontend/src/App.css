@@ -539,3 +539,62 @@
   white-space: nowrap;
   display: inline-block;
 }
+
+/* ── Video Feed ── */
+
+.video-feed {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.video-feed-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.video-feed-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  opacity: 0.6;
+}
+
+.video-feed-status {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.video-feed-status--idle        { background: rgba(255,255,255,0.08); }
+.video-feed-status--connecting  { background: #e67e22; color: #fff; }
+.video-feed-status--live        { background: #27ae60; color: #fff; }
+.video-feed-status--recording   { background: #e74c3c; color: #fff; }
+.video-feed-status--error       { background: #c0392b; color: #fff; }
+
+.video-feed-player {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  background: #000;
+}
+
+.video-feed-player--hidden {
+  display: none;
+}
+
+.video-feed-placeholder {
+  padding: 24px;
+  text-align: center;
+  font-size: 13px;
+  opacity: 0.45;
+}

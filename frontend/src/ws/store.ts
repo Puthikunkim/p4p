@@ -30,11 +30,14 @@ export interface VCoreStore {
   warnings: Warning[]
   linkStatuses: Record<string, LinkStatus>
   wsState: 'connecting' | 'connected' | 'disconnected'
+  // session
+  activeSessionId: string | null
 
   // actions
   applyMessage: (msg: ServerMessage) => void
   setWsState: (state: VCoreStore['wsState']) => void
   clearWarnings: () => void
+  setActiveSession: (id: string | null) => void
 }
 
 export type ServerMessage =
@@ -57,6 +60,7 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
   warnings: [],
   linkStatuses: {},
   wsState: 'disconnected',
+  activeSessionId: null,
 
   applyMessage: (msg) =>
     set((state) => {
@@ -100,6 +104,8 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
   setWsState: (wsState) => set({ wsState }),
 
   clearWarnings: () => set({ warnings: [] }),
+
+  setActiveSession: (id) => set({ activeSessionId: id }),
 }))
 
 const EMPTY_CHANNELS: Channel[] = []
