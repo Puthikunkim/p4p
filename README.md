@@ -22,11 +22,66 @@ three versioned contracts:
 
 ## Status
 
-🟡 **Design phase** (reflecting Amendment 1: frontend rule authoring + Unity object-status
-context; Amendment 2: participant video mirror + recording + manual rule trigger). The
-architecture and implementation plan are complete and approved; no application code has been
-written yet. Implementation proceeds **one phase at a time** through [`TODO.md`](./TODO.md),
-pausing for review between phases.
+🟢 **Implemented** — all nine phases complete. The system runs end-to-end: signal ingestion,
+rule evaluation, Unity WebSocket delivery, session recording (XDF + SQLite), schema-driven
+dashboard, rule builder, and participant video mirror over WebRTC. See [`TODO.md`](./TODO.md)
+for a full phase-by-phase checklist.
+
+## Quick start
+
+### Prerequisites
+
+- Python 3.11+ and Node 20+
+- `pip install -e ".[dev]"` inside `backend/`
+- `npm install` inside `frontend/`
+
+### 1. Backend
+
+```bash
+cd backend
+uvicorn vcore.app:app --reload --host 0.0.0.0 --port 8000
+```
+
+### 2. Frontend
+
+```bash
+cd frontend
+npm run dev          # serves on http://localhost:5173 (proxies API to :8000)
+```
+
+### 3. Mock signal pipeline (no hardware required)
+
+```bash
+# streams synthetic signals over LSL at 10 Hz
+python tools/mock_pipeline.py
+
+# optional flags
+python tools/mock_pipeline.py --pattern high --rate 5   # constant-high values, 5 Hz
+python tools/mock_pipeline.py --manifest path/to/my.manifest.json
+```
+
+### 4. Mock Unity client (no Unity required)
+
+```bash
+# connects to WsSink, sends Object-Status Manifest, prints incoming StatusRequests
+python tools/mock_unity.py --port 9001
+```
+
+### Running tests
+
+```bash
+cd backend
+pytest               # 165+ tests, ~14 s, no hardware needed
+
+cd frontend
+npm test             # vitest unit tests
+npm run lint         # ESLint + type check
+```
+
+### Config
+
+Copy `backend/config.example.yaml` → `backend/config.yaml` and adjust LSL stream names,
+WsSink bind address, and (optional) auth token for multi-machine deployments.
 
 ## Documents
 
