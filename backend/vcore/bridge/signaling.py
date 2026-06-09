@@ -27,6 +27,7 @@ from __future__ import annotations
 import json
 import logging
 import uuid
+from contextlib import suppress
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -116,7 +117,5 @@ class SignalingBroker:
 
 
 async def _safe_send(ws: WebSocket, payload: dict) -> None:  # type: ignore[type-arg]
-    try:
+    with suppress(Exception):
         await ws.send_json(payload)
-    except Exception:
-        pass

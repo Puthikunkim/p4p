@@ -8,8 +8,6 @@ import pytest
 from fastapi.testclient import TestClient
 
 from vcore.app import create_app
-from vcore.core.eventbus import Topics
-from vcore.core.models import SampleEvent, WarningEvent
 
 SIGNAL_MANIFEST = {
     "schema_version": "1.0.0",
@@ -53,9 +51,8 @@ def app(tmp_path: Path):  # type: ignore[return]
 
 def test_dashboard_receives_signal_manifest_on_connect(app) -> None:  # type: ignore[no-untyped-def]
     app.state.manifests.update_signal_manifest(SIGNAL_MANIFEST)
-    with TestClient(app) as client:
-        with client.websocket_connect("/ws/dashboard") as ws:
-            messages = _collect(ws, count=1, looking_for="signal_manifest")
+    with TestClient(app) as client, client.websocket_connect("/ws/dashboard") as ws:
+        messages = _collect(ws, count=1, looking_for="signal_manifest")
     assert any(m["type"] == "signal_manifest" for m in messages)
     assert messages[0]["payload"]["stream"]["name"] == "om.cognitive"
 
@@ -63,18 +60,16 @@ def test_dashboard_receives_signal_manifest_on_connect(app) -> None:  # type: ig
 def test_dashboard_receives_object_status_manifest_on_connect(app) -> None:  # type: ignore[no-untyped-def]
     app.state.manifests.update_signal_manifest(SIGNAL_MANIFEST)
     app.state.manifests.update_object_status_manifest(OBJECT_MANIFEST)
-    with TestClient(app) as client:
-        with client.websocket_connect("/ws/dashboard") as ws:
-            messages = _collect(ws, count=3, looking_for="object_status_manifest")
+    with TestClient(app) as client, client.websocket_connect("/ws/dashboard") as ws:
+        messages = _collect(ws, count=3, looking_for="object_status_manifest")
     types = {m["type"] for m in messages}
     assert "signal_manifest" in types
     assert "object_status_manifest" in types
 
 
 def test_dashboard_receives_rule_list_on_connect(app) -> None:  # type: ignore[no-untyped-def]
-    with TestClient(app) as client:
-        with client.websocket_connect("/ws/dashboard") as ws:
-            messages = _collect(ws, count=1, looking_for="rule_list")
+    with TestClient(app) as client, client.websocket_connect("/ws/dashboard") as ws:
+        messages = _collect(ws, count=1, looking_for="rule_list")
     assert any(m["type"] == "rule_list" for m in messages)
     rl = next(m for m in messages if m["type"] == "rule_list")
     assert "rules" in rl["payload"]

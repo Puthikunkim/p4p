@@ -1,11 +1,12 @@
 """Tests for XdfWriter, SqliteStore, Recorder, and the sessions API."""
 from __future__ import annotations
 
+from collections.abc import AsyncGenerator
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any
 
-import pyxdf
 import pytest
+import pyxdf
 from fastapi.testclient import TestClient
 
 from vcore.app import create_app
@@ -97,7 +98,7 @@ def test_xdf_no_numeric_channels(tmp_path: Path) -> None:
 
 def test_sqlite_create_and_list(tmp_path: Path) -> None:
     store = SqliteStore(tmp_path / "db.sqlite")
-    sid = store.create_session("P01", "notes")
+    store.create_session("P01", "notes")
     sessions = store.list_sessions()
     assert len(sessions) == 1
     assert sessions[0]["participant"] == "P01"

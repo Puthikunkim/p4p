@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from contextlib import suppress
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -49,10 +50,8 @@ class SqliteStore:
             ("video_lsl_ts", "REAL"),
         ]
         for col, typ in new_cols:
-            try:
+            with suppress(sqlite3.OperationalError):
                 self._conn.execute(f"ALTER TABLE sessions ADD COLUMN {col} {typ}")
-            except sqlite3.OperationalError:
-                pass  # column already exists
 
     def create_session(self, participant: str, notes: str = "") -> str:
         sid = str(uuid.uuid4())
