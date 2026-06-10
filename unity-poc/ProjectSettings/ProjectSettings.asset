@@ -1,0 +1,413 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!129 &1
+PlayerSettings:
+  m_ObjectHideFlags: 0
+  serializedVersion: 24
+  productGUID: 1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d
+  AndroidProfiler: 0
+  AndroidFilterTouchesWhenObscured: 0
+  AndroidEnableSustainedPerformanceMode: 0
+  defaultScreenOrientation: 4
+  targetDevice: 2
+  useOnDemandResources: 0
+  accelerometerFrequency: 60
+  companyName: VCorePOC
+  productName: VCore Unity POC
+  defaultCursor: {fileID: 0}
+  cursorHotspot: {x: 0, y: 0}
+  m_SplashScreenBackgroundColor: {r: 0.13725490196, g: 0.12156862745, b: 0.12549019607, a: 1}
+  m_ShowUnitySplashScreen: 1
+  m_VirtualRealitySplashScreen: {fileID: 0}
+  m_HolographicTrackingLossScreen: {fileID: 0}
+  defaultScreenWidth: 1920
+  defaultScreenHeight: 1080
+  defaultScreenWidthWeb: 960
+  defaultScreenHeightWeb: 600
+  m_StereoRenderingPath: 0
+  m_ActiveColorSpace: 0
+  m_MTRendering: 1
+  mipStripping: 0
+  numberOfMipsStripped: 0
+  m_StackTraceTypes: 010000000100000001000000010000000100000001000000
+  iosShowActivityIndicatorOnLoading: -1
+  androidShowActivityIndicatorOnLoading: -1
+  iosUseCustomAppBackgroundBehavior: 0
+  allowedAutorotateToPortrait: 1
+  allowedAutorotateToPortraitUpsideDown: 1
+  allowedAutorotateToLandscapeRight: 1
+  allowedAutorotateToLandscapeLeft: 1
+  useOSAutorotation: 1
+  use32BitDisplayBuffer: 1
+  preserveFramebufferAlpha: 0
+  disableDepthAndStencilBuffers: 0
+  androidStartInFullscreen: 1
+  androidRenderOutsideSafeArea: 1
+  androidUseSwappy: 1
+  androidBlitType: 0
+  androidResizableWindow: 0
+  androidDefaultWindowWidth: 1920
+  androidDefaultWindowHeight: 1080
+  androidMinimumWindowWidth: 400
+  androidMinimumWindowHeight: 300
+  androidFullscreenMode: 1
+  defaultIsNativeResolution: 1
+  macRetinaSupport: 1
+  runInBackground: 0
+  captureSimShutdownLogs: 1
+  muteOtherAudioSources: 0
+  Prepare IOS For Recording: 0
+  Force IOS Speakers When Recording: 0
+  deferSystemGesturesMode: 0
+  hideHomeButton: 0
+  submitAnalytics: 1
+  useAnimatedAutorotation: 1
+  keepLoadedShadersAlive: 0
+  bakeCollisionMeshes: 0
+  forceSingleInstance: 0
+  useFlipModelSwapchain: 1
+  resizableWindow: 0
+  useMacAppStoreValidation: 0
+  macAppStoreCategory: public.app-category.games
+  gpuSkinning: 0
+  graphicsJobs: 0
+  xboxPIXTextureCapture: 0
+  xboxEnableAvatar: 0
+  xboxEnableKinect: 0
+  xboxEnableKinectAutoTracking: 0
+  xboxEnableFitness: 0
+  visibleInBackground: 1
+  allowFullscreenSwitch: 1
+  graphicsJobMode: 0
+  fullscreenMode: 1
+  xboxSpeechDB: 0
+  xboxEnableHeadOrientation: 0
+  xboxEnableGuest: 0
+  xboxEnableIPv6: 0
+  ps4NPAgeRating: 12
+  ps4NPTitleSecret:
+  ps4NPDGCParameter:
+  ps4NPCommunicationID:
+  ps4NPCommunicationPassphrase:
+  ps4NPCommunicationSignature:
+  ps4NPTitleID:
+  ps4ParentalLevel: 11
+  ps4ContentID: ED1633-NPXX51362_00-AAAAAAAAAAAAAA
+  ps4Category: 0
+  ps4MasterVersion: 01.00
+  ps4AppVersion: 01.00
+  ps4AppType: 0
+  ps4ParamSfxPath:
+  ps4VideoOutPixelFormat: 0
+  ps4VideoOutInitialWidth: 1920
+  ps4VideoOutBaseModeInitialWidth: 1920
+  ps4VideoOutReprojectionRate: 60
+  ps4PronunciationXMLPath:
+  ps4PronunciationSIGPath:
+  ps4BackgroundImagePath:
+  ps4StartupImagePath:
+  ps4StartupImagesFolder:
+  ps4SaveDataImagePath:
+  ps4SdkOverride:
+  ps4ShaderOptimisationLevel: 0
+  ps4Mono2xFlag: 0
+  ps4GP10BugWorkarounds: 1
+  ps4PatchPkgPath:
+  ps4PatchLatestPkgPath:
+  ps4PatchChangeinfoPath:
+  ps4PatchDayOne: 0
+  ps4UserGcmMemory: 0
+  ps4SystemHeapSize: 160
+  ps4AgcEnable: 0
+  ps4FrontPanelDimMode: 0
+  ps4UseAudio3dBackend: 0
+  ps4UseLowGarlicFragmentationAlgorithm: 1
+  ps4SocialScreenEnabled: 0
+  ps4ScriptOptimizationLevel: 0
+  ps4Audio3dVirtualSpeakerCount: 14
+  ps4attribCpuUsage: 0
+  ps4PatchPkgContentID:
+  ps4attribUserManagement: 0
+  ps4attribMoveSupport: 0
+  ps4attrib3DSupport: 0
+  ps4attribShareSupport: 0
+  ps4attribExclusiveVR: 0
+  ps4DisableAutoHideSplash: 0
+  ps4videoRecordingFeaturesUsed: 0
+  ps4contentSearchFeaturesUsed: 0
+  ps4CompatibilityPS5: 0
+  ps4AllowPS5Detection: 0
+  ps4GPU800MHz: 1
+  ps4attribCpuUsageDefault: 0
+  ps4Libs: []
+  vulkanEnableSetSRGBWrite: 0
+  m_SupportedAspectRatios:
+    4:3: 1
+    5:4: 1
+    16:10: 1
+    16:9: 1
+    Others: 1
+  bundleVersion: 1.0
+  preloadedAssets: []
+  metroInputSource: 0
+  wsaTransparentSwapchain: 0
+  m_HolographicPauseOnTrackingLoss: 1
+  xboxOneResolution: 0
+  xboxOneSResolution: 0
+  xboxOneXResolution: 3
+  xboxOneMonoLoggingLevel: 0
+  xboxOneLoggingLevel: 1
+  xboxOneDisableEsram: 0
+  xboxOneEnableTypeOptimization: 0
+  xboxOnePresentImmediateThreshold: 0
+  switchQueueCommandMemory: 1048576
+  switchQueueControlMemory: 16384
+  switchQueueComputeMemory: 262144
+  switchNVNShaderPoolsGranularity: 33554432
+  switchNVNDefaultPoolsGranularity: 16777216
+  switchNVNOtherPoolsGranularity: 16777216
+  switchNVNMaxPublicTextureIDCount: 0
+  switchNVNMaxPublicSamplerIDCount: 0
+  switchNVNGraphicsFirmwareMemory: 8
+  stadiaPresentMode: 0
+  stadiaTargetFramerate: 0
+  vulkanNumSwapchainBuffers: 3
+  vulkanEnableLateAcquireNextImage: 0
+  vulkanEnableCommandBufferRecycling: 1
+  m_FrameTimingStatsEnabled: 0
+  m_OpenGLRequireES31: 0
+  m_OpenGLRequireES31AEP: 0
+  m_OpenGLRequireES32: 0
+  iPhoneSdkVersion: 988
+  iOSTargetOSVersionString: 12.0
+  tvOSSdkVersion: 0
+  tvOSRequireExtendedGameController: 0
+  tvOSTargetOSVersionString: 12.0
+  uIPrerenderedIcon: 0
+  uIRequiresPersistentWiFi: 0
+  uIRequiresFullScreen: 1
+  uIStatusBarHidden: 1
+  uIExitOnSuspend: 0
+  uIStatusBarStyle: 0
+  iPhoneSplashScreen: {fileID: 0}
+  iPhoneHighResSplashScreen: {fileID: 0}
+  iPhoneTallHighResSplashScreen: {fileID: 0}
+  iPhone47inNoAspectRatioSplashScreen: {fileID: 0}
+  iPhone55inNoAspectRatioSplashScreen: {fileID: 0}
+  iPhone58inNoAspectRatioSplashScreen: {fileID: 0}
+  iPhone65inNoAspectRatioSplashScreen: {fileID: 0}
+  iPad768x1024Splash: {fileID: 0}
+  iPadHighResSplashScreen: {fileID: 0}
+  iPadProHighResSplashScreen: {fileID: 0}
+  iOSLaunchScreenType: 0
+  iOSLaunchScreenPortrait: {fileID: 0}
+  iOSLaunchScreenLandscape: {fileID: 0}
+  iOSLaunchScreenBackgroundColor:
+    serializedVersion: 2
+    rgba: 0
+  iOSLaunchScreenFillPct: 100
+  iOSLaunchScreenSize: 100
+  iOSLaunchScreenCustomXibPath:
+  iOSLaunchScreeniPadType: 0
+  iOSLaunchScreeniPadImage: {fileID: 0}
+  iOSLaunchScreeniPadBackgroundColor:
+    serializedVersion: 2
+    rgba: 0
+  iOSLaunchScreeniPadFillPct: 100
+  iOSLaunchScreeniPadSize: 100
+  iOSLaunchScreeniPadCustomXibPath:
+  iOSUseLaunchScreenStoryboard: 0
+  iOSLaunchScreenCustomStoryboardPath:
+  iOSLaunchScreeniPadCustomStoryboardPath:
+  iOSDeviceRequirements: []
+  iOSURLSchemes: []
+  iOSBackgroundModes: 0
+  iOSMetalForceHardShadows: 0
+  metalEditorSupport: 1
+  metalAPIValidation: 1
+  iOSRenderExtraFrameOnPause: 0
+  iosCopyPluginsCodeInsteadOfSymlink: 0
+  appleDeveloperTeamID:
+  iOSManualSigningProvisioningProfileID:
+  tvOSManualSigningProvisioningProfileID:
+  iOSManualSigningProvisioningProfileType: 0
+  tvOSManualSigningProvisioningProfileType: 0
+  appleEnableAutomaticSigning: 0
+  iOSRequireARKit: 0
+  iOSAutomaticallyDetectAndAddCapabilities: 1
+  appleEnableProMotion: 0
+  shaderPrecisionModel: 0
+  clampBlendShapeWeights: 1
+  iPhoneAdvertisingId: 0
+  playerMinOpenGLESVersion: 1
+  iOSAllowHTTPDownload: 1
+  appleSdkVersion: 0
+  nsPhotoLibraryUsageDescription:
+  nsPhotoLibraryAddUsageDescription:
+  nsMicrophoneUsageDescription:
+  nsCameraUsageDescription:
+  nsLocationWhenInUseUsageDescription:
+  nsLocationUsageDescription:
+  nsBluetoothPeripheralUsageDescription:
+  nsBluetoothAlwaysUsageDescription:
+  nsCalendarsUsageDescription:
+  nsContactsUsageDescription:
+  nsMotionUsageDescription:
+  nsHealthShareUsageDescription:
+  nsHealthUpdateUsageDescription:
+  nsFaceIDUsageDescription:
+  nsLocationAlwaysAndWhenInUseUsageDescription:
+  nsLocationAlwaysUsageDescription:
+  iosSuppressedWarnings: 0
+  appleSuperLayer: 0
+  iOSApplicationDisplayName:
+  androidTVCompatibility: 0
+  androidIsGame: 1
+  androidEnableTango: 0
+  androidShowActivityIndicatorOnLoading: -1
+  androidUseLowLatencyAudioIfPossible: 0
+  androidDisableDepthAndStencilBuffers: 0
+  androidStartInFullscreen: 1
+  androidRenderOutsideSafeArea: 1
+  androidUseSwappy: 1
+  androidBlitType: 0
+  m_AndroidKeystoreName:
+  m_AndroidKeyaliasName:
+  m_AndroidBuildApkPerCpuArchitecture: 0
+  m_AndroidBuildSubtarget: 0
+  m_AndroidBuildType: 0
+  m_AndroidMinSdkVersion: 22
+  m_AndroidTargetSdkVersion: 0
+  m_AndroidSdkBuildToolsVersion:
+  m_AndroidMaxAspectRatio: 2.1
+  m_AndroidSupportedABIFilters: 0
+  m_AndroidTargetArchitectures: 1
+  m_AndroidTargetDevices: 0
+  m_AndroidSplashScreenScale: 0
+  m_AndroidKeystorePass:
+  m_AndroidKeyaliasPass:
+  m_AndroidBundleVersionCode: 1
+  m_AndroidMinifyWithR8: 0
+  m_AndroidMinifyRelease: 0
+  m_AndroidMinifyDebug: 0
+  m_AndroidValidateAppBundleSize: 1
+  m_AndroidAppBundleSizeToValidate: 150
+  m_BuildTargetIcons: []
+  m_BuildTargetPlatformIcons: []
+  m_BuildTargetBatching:
+  - {}
+  - {}
+  m_BuildTargetGraphicsAPIs:
+  - m_BuildTarget: WindowsStandaloneSupport
+    m_APIs: 02000000
+    m_Automatic: 0
+  m_BuildTargetVRSettings: []
+  openGLRequireES31: 0
+  openGLRequireES31AEP: 0
+  openGLRequireES32: 0
+  m_TemplateCustomTags: {}
+  mobileMTRendering:
+    Android: 1
+    iPhone: 1
+    tvOS: 1
+  m_BuildTargetGroupIcons: []
+  m_BuildTargetGroupGraphicsAPIs: []
+  m_BuildTargetGroupLoadedShaderVariantCollections: []
+  m_Stereoscopic360Images: 0
+  m_CaptureSinglePass: 1
+  m_EnableFrameTimingStats: 0
+  m_EnableOpenGLProfilerGPURecorders: 1
+  m_UseHDRDisplay: 0
+  m_HDRBitDepth: 0
+  m_ColorGamuts: 00000000
+  m_TargetPixelDensity: 30
+  m_ResolutionScalingMode: 0
+  m_ResetResolutionOnWindowResize: 0
+  m_AndroidSupportedABIFilters: 0
+  m_iosCustomEntitlements:
+  m_ICloudContainerEnvironment: 0
+  playModeTestRunnerEnabled: 0
+  actionOnDotNetUnhandledException: 1
+  enableInternalProfiler: 0
+  logObjCUncaughtExceptions: 1
+  enableCrashReportAPI: 0
+  cameraUsageDescription:
+  locationUsageDescription:
+  microphoneUsageDescription:
+  switchNetworkInterfaceManagerInitializeSelf: 0
+  switchSocketMemoryPoolSize: 6144
+  switchUseCPUProfiler: 0
+  switchUseGOLDLinker: 0
+  switchApplicationID: 0x01004b9000490000
+  switchContentsHash:
+  switchApplicationErrorCodeCategory:
+  switchUserAccountSaveDataSize: 0
+  switchUserAccountSaveDataJournalSize: 0
+  switchApplicationAttribute: 0
+  switchCardSpecSize: -1
+  switchCardSpecClock: -1
+  switchRatingsMask: 0
+  switchRatingsInt: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+  switchLocalCommunicationIds: 00000000000000000000000000000000
+  switchParentalControl: 0
+  switchAllowsScreenshot: 1
+  switchAllowsVideoCapturing: 1
+  switchAllowsRuntimeAddOnContentInstall: 0
+  switchDataLossConfirmation: 0
+  switchUserAccountLockEnabled: 0
+  switchSystemResourceMemory: 16
+  switchSupportedLanguagesMask: 0
+  switchLogoHandling: 0
+  switchReleaseVersion: 0
+  switchDisplayVersion: 1.0.0
+  switchStartupUserAccount: 0
+  switchTouchScreenUsage: 0
+  switchSupportedNpadStylesMask: 3
+  switchNativeFsCacheSize: 32
+  switchIsHoldTypeHorizontal: 0
+  switchSupportedNpadCount: 8
+  switchEnableSaveDataRebuild: 0
+  switchBcatPassphrase:
+  switchStartupUserAccountOptionOnArgate: 0
+  switchUserAccountSelectAllUsersForNewSave: 0
+  switchBcatDeliveryCacheStorageSize: 0
+  switchApplicationId:
+  ps4ApplicationParam1: 0
+  ps4ApplicationParam2: 0
+  ps4ApplicationParam3: 0
+  ps4ApplicationParam4: 0
+  ps4AppType: 0
+  ps4AgesRating: 0000000000000000000000000000000000
+  ps4Passcode: frAqBc8Wh4REoMKFZIMLFQ==
+  ps4pnSessions: 1
+  ps4pnPresence: 1
+  ps4pnFriends: 1
+  ps4pnGameCustomData: 1
+  playerPrefsSupport: 0
+  enableApplicationExit: 0
+  resetInputAxes: 0
+  restrictedRenderTextureResolution: 0
+  usePlayerLog: 1
+  dedicatedServerOptimizations: 0
+  gpuSkinning: 0
+  graphicsJobs: 0
+  graphicsJobMode: 0
+  xboxOneResolution: 0
+  xboxOneSResolution: 0
+  xboxOneXResolution: 3
+  xboxOneMonoLoggingLevel: 0
+  xboxOneLoggingLevel: 1
+  xboxOneDisableEsram: 0
+  m_XboxOneDisableKinect: 0
+  xboxOneEnableTypeOptimization: 0
+  xboxOnePresentImmediateThreshold: 0
+  m_GraphicsAPIs_Windows:
+  - 2
+  m_GraphicsAPIs_Windows_Automatic: 0
+  m_GraphicsAPIs_WebGL: []
+  m_GraphicsAPIs_WebGL_Automatic: 1
+  m_GraphicsAPIs_Android: []
+  m_GraphicsAPIs_Android_Automatic: 1
+  m_GraphicsAPIs_iOS: []
+  m_GraphicsAPIs_iOS_Automatic: 1
+  m_API: 2
