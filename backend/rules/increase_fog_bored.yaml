@@ -1,0 +1,17 @@
+id: increase-fog-bored
+schema_version: "1.0.0"
+description: "Increase environmental density to re-engage a bored participant"
+enabled: true
+when:
+  all:
+    - signal: affect
+      op: "=="
+      value: bored
+      sustain_s: 5
+then:
+  set:
+    target:
+      tag: fog
+    status: density
+    value: high
+  cooldown_s: 30

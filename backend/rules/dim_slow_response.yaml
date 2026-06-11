@@ -1,0 +1,17 @@
+id: dim-slow-response
+schema_version: "1.0.0"
+description: "Simplify scene when participant response latency is high"
+enabled: true
+when:
+  all:
+    - signal: response_latency
+      op: ">="
+      threshold: 8
+      sustain_s: 3
+then:
+  set:
+    target:
+      tag: ambient_light
+    status: brightness
+    value: 30
+  cooldown_s: 25

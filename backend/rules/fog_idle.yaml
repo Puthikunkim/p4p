@@ -1,0 +1,17 @@
+id: fog-idle
+schema_version: "1.0.0"
+description: "Add medium fog when participant has been idle too long"
+enabled: true
+when:
+  all:
+    - signal: idle_time
+      op: ">="
+      threshold: 15
+      sustain_s: 5
+then:
+  set:
+    target:
+      tag: fog
+    status: density
+    value: medium
+  cooldown_s: 20

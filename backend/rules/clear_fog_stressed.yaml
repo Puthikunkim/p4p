@@ -1,0 +1,17 @@
+id: clear-fog-stressed
+schema_version: "1.0.0"
+description: "Reduce visual clutter when participant is stressed"
+enabled: true
+when:
+  all:
+    - signal: affect
+      op: "=="
+      value: stressed
+      sustain_s: 3
+then:
+  set:
+    target:
+      tag: fog
+    status: density
+    value: low
+  cooldown_s: 20

@@ -1,0 +1,17 @@
+id: restore-lights-calm
+schema_version: "1.0.0"
+description: "Restore lights when cognitive load returns to baseline"
+enabled: true
+when:
+  all:
+    - signal: cognitive_load
+      op: "<="
+      threshold: 0.35
+      sustain_s: 8
+then:
+  set:
+    target:
+      tag: ambient_light
+    status: brightness
+    value: 80
+  cooldown_s: 45
