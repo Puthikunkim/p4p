@@ -1,9 +1,9 @@
 import { useVCoreStore } from '../ws/store'
 
 const CHIP_LABELS: Record<string, string> = {
-  'om-lsl': 'OM LSL Stream',
-  'unity-ws': 'Unity VR Scene',
   'browser-ws': 'Browser WS',
+  'unity-ws': 'Unity VR Scene',
+  'om-lsl': 'OM LSL Stream',
 }
 
 function stateLabel(state: string): string {
@@ -21,40 +21,36 @@ function stateLabel(state: string): string {
 }
 
 const PIPELINE_STAGES = [
-  { key: 'dashboard', label: 'Dashboard WS' },
+  { key: 'browser-ws', label: 'Browser → Backend' },
   { key: 'om-lsl', label: 'OM LSL → Backend' },
   { key: 'unity-ws', label: 'Backend → Unity' },
 ]
 
-function derivePipelineState(wsState: string, omLslState: string | undefined): string {
-  if (wsState === 'connecting' || wsState === 'reconnecting') return wsState
-  if (wsState !== 'connected') return 'disconnected'
+function derivePipelineState(browserWsState: string | undefined, omLslState: string | undefined): string {
+  if (!browserWsState || browserWsState === 'down') return 'down'
+  if (browserWsState !== 'up') return browserWsState
   if (!omLslState) return 'unknown'
   return omLslState
 }
 
 export function SystemConfig() {
-  const wsState = useVCoreStore((s) => s.wsState)
   const linkStatuses = useVCoreStore((s) => s.linkStatuses)
 
+  const browserWsState = linkStatuses['browser-ws']?.state
   const omLslState = linkStatuses['om-lsl']?.state
-  const pipelineState = derivePipelineState(wsState, omLslState)
+  const pipelineState = derivePipelineState(browserWsState, omLslState)
 
   const pipelineStages = PIPELINE_STAGES.map((stage) => {
-    if (stage.key === 'dashboard') return { ...stage, state: wsState, detail: null }
     const ls = linkStatuses[stage.key]
     return { ...stage, state: ls?.state ?? 'unknown', detail: ls?.detail ?? null }
   })
 
-  const chips = [
-    { key: 'dashboard', name: 'Dashboard WS', state: wsState, detail: null },
-    ...Object.entries(linkStatuses).map(([key, ls]) => ({
-      key,
-      name: CHIP_LABELS[key] ?? key,
-      state: ls.state,
-      detail: ls.detail ?? null,
-    })),
-  ]
+  const chips = Object.entries(linkStatuses).map(([key, ls]) => ({
+    key,
+    name: CHIP_LABELS[key] ?? key,
+    state: ls.state,
+    detail: ls.detail ?? null,
+  }))
 
   return (
     <div className="screen">
