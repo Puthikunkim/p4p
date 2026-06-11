@@ -343,6 +343,7 @@ export function DataHistory() {
             {s.events.length === 0 ? (
               <p className="empty-state" style={{ padding: '16px' }}>No events recorded for this session.</p>
             ) : (
+              <div className="detail-event-log__body">
               <table className="history-table">
                 <thead>
                   <tr>
@@ -370,6 +371,7 @@ export function DataHistory() {
                   })}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
         </div>
