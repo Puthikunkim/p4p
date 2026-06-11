@@ -70,9 +70,12 @@ class DashboardBridge:
     # ── connection handler (called from FastAPI route) ────────────────────────
 
     async def handle_dashboard(self, ws: WebSocket) -> None:
+        from vcore.core.models import LinkStatusEvent
         await ws.accept()
         self._clients.add(ws)
         log.info("bridge: dashboard client connected (%d total)", len(self._clients))
+        if len(self._clients) == 1:
+            await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="browser-ws", state="up"))
         try:
             await self._push_current_state(ws)
             while True:
@@ -83,6 +86,8 @@ class DashboardBridge:
         finally:
             self._clients.discard(ws)
             log.info("bridge: dashboard client disconnected (%d total)", len(self._clients))
+            if not self._clients:
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="browser-ws", state="down"))
 
     async def handle_runtime(self, ws: WebSocket) -> None:
         """Delegate a Unity /ws/runtime connection to WsSink."""
