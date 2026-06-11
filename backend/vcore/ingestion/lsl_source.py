@@ -52,6 +52,7 @@ class LSLSource(SignalSource):
         self._last_sample_at: float = 0.0
         self._running = False
         self._is_stale = False
+        self._is_offline = False
         self._stale_since: float = 0.0
 
     @property
@@ -152,20 +153,21 @@ class LSLSource(SignalSource):
             now = time.monotonic()
             age = now - self._last_sample_at
             is_stale = self._last_sample_at > 0 and age > self._stale_timeout_s
-            if is_stale and not self._is_stale:
+            if is_stale and not self._is_stale and not self._is_offline:
                 manifest = self._manifests.signal_manifest
                 name = manifest["stream"]["name"] if manifest else self._stream_name
                 await self._bus.publish(Topics.STALE, StaleEvent(stream_name=name, age_s=age))
                 await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="stale"))
                 self._is_stale = True
                 self._stale_since = now
-            elif is_stale and self._is_stale and (now - self._stale_since) >= self._offline_timeout_s:
+            elif is_stale and self._is_stale and not self._is_offline and (now - self._stale_since) >= self._offline_timeout_s:
                 await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="down", detail="stream went silent"))
-                self._is_stale = False  # suppress further transitions until samples resume
+                self._is_stale = False
+                self._is_offline = True
                 self._stale_since = 0.0
-            elif not is_stale and self._last_sample_at > 0:
-                if self._is_stale:
-                    await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))
-                    self._is_stale = False
-                    self._stale_since = 0.0
+            elif not is_stale and self._last_sample_at > 0 and (self._is_stale or self._is_offline):
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))
+                self._is_stale = False
+                self._is_offline = False
+                self._stale_since = 0.0
             await asyncio.sleep(1.0)
