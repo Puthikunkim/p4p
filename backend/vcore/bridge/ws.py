@@ -45,6 +45,7 @@ class DashboardBridge:
         self._evaluator = evaluator
         self._ws_sink = ws_sink
         self._clients: set[WebSocket] = set()
+        self._cached_link_states: dict[str, object] = {}
 
     async def start(self) -> None:
         self._bus.subscribe(Topics.MANIFEST_UPDATED, self._on_manifest)
@@ -99,6 +100,8 @@ class DashboardBridge:
         await _send(ws, "rule_list", self._rule_list_payload())
         unity_state = "up" if self._ws_sink.is_connected else "down"
         await _send(ws, "link_status", LinkStatusEvent(link="unity-ws", state=unity_state).model_dump(mode="json"))
+        for payload in self._cached_link_states.values():
+            await _send(ws, "link_status", payload)
 
     # ── bus event handlers ────────────────────────────────────────────────────
 
@@ -124,7 +127,9 @@ class DashboardBridge:
     async def _on_link_status(self, payload: object) -> None:
         from vcore.core.models import LinkStatusEvent
         if isinstance(payload, LinkStatusEvent):
-            await self._broadcast("link_status", payload.model_dump(mode="json"))
+            data = payload.model_dump(mode="json")
+            self._cached_link_states[payload.link] = data
+            await self._broadcast("link_status", data)
         else:
             await self._broadcast("link_status", payload)
 
