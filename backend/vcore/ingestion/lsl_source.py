@@ -49,6 +49,7 @@ class LSLSource(SignalSource):
         self._watchdog_task: asyncio.Task[None] | None = None
         self._last_sample_at: float = 0.0
         self._running = False
+        self._is_stale = False
 
     @property
     def stream_name(self) -> str:
@@ -145,12 +146,17 @@ class LSLSource(SignalSource):
     async def _watchdog(self) -> None:
         await asyncio.sleep(self._stale_timeout_s)
         while self._running:
-            age = time.monotonic() - self._last_sample_at
-            if self._last_sample_at > 0 and age > self._stale_timeout_s:
+            now = time.monotonic()
+            age = now - self._last_sample_at
+            is_stale = self._last_sample_at > 0 and age > self._stale_timeout_s
+            if is_stale and not self._is_stale:
                 manifest = self._manifests.signal_manifest
                 name = manifest["stream"]["name"] if manifest else self._stream_name
-                await self._bus.publish(
-                    Topics.STALE,
-                    StaleEvent(stream_name=name, age_s=age),
-                )
+                await self._bus.publish(Topics.STALE, StaleEvent(stream_name=name, age_s=age))
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="stale"))
+                self._is_stale = True
+            elif not is_stale and self._last_sample_at > 0:
+                if self._is_stale:
+                    await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))
+                    self._is_stale = False
             await asyncio.sleep(1.0)
