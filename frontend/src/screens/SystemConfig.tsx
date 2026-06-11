@@ -15,13 +15,36 @@ function stateLabel(state: string): string {
     disconnected: 'Offline',
     stale: 'Stale',
     reconnecting: 'Reconnecting',
+    unknown: 'Unknown',
   }
   return map[state] ?? state
+}
+
+const PIPELINE_STAGES = [
+  { key: 'dashboard', label: 'Dashboard WS' },
+  { key: 'om-lsl', label: 'OM LSL → Backend' },
+  { key: 'unity-ws', label: 'Backend → Unity' },
+]
+
+function derivePipelineState(wsState: string, omLslState: string | undefined): string {
+  if (wsState === 'connecting' || wsState === 'reconnecting') return wsState
+  if (wsState !== 'connected') return 'disconnected'
+  if (!omLslState) return 'unknown'
+  return omLslState
 }
 
 export function SystemConfig() {
   const wsState = useVCoreStore((s) => s.wsState)
   const linkStatuses = useVCoreStore((s) => s.linkStatuses)
+
+  const omLslState = linkStatuses['om-lsl']?.state
+  const pipelineState = derivePipelineState(wsState, omLslState)
+
+  const pipelineStages = PIPELINE_STAGES.map((stage) => {
+    if (stage.key === 'dashboard') return { ...stage, state: wsState, detail: null }
+    const ls = linkStatuses[stage.key]
+    return { ...stage, state: ls?.state ?? 'unknown', detail: ls?.detail ?? null }
+  })
 
   const chips = [
     { key: 'dashboard', name: 'Dashboard WS', state: wsState, detail: null },
@@ -55,6 +78,29 @@ export function SystemConfig() {
           </div>
         ))}
       </div>
+
+      {/* Signal pipeline section */}
+      <section className="config-section">
+        <div className="config-section-header">
+          <span className="config-section-title">Signal Pipeline</span>
+          <span className={`badge badge--${pipelineState}`} style={{ marginLeft: 10 }}>
+            {stateLabel(pipelineState)}
+          </span>
+        </div>
+        <table className="config-table">
+          <tbody>
+            {pipelineStages.map((stage) => (
+              <tr key={stage.key}>
+                <td>{stage.label}</td>
+                <td>
+                  <span className={`badge badge--${stage.state}`}>{stateLabel(stage.state)}</span>
+                  {stage.detail && <span className="config-meta">{stage.detail}</span>}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </section>
 
       {/* Connection section */}
       <section className="config-section">
