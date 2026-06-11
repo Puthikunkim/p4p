@@ -5,6 +5,7 @@ import asyncio
 import json
 from pathlib import Path
 from typing import Any
+from unittest import mock
 
 import pytest
 import yaml
@@ -376,8 +377,14 @@ async def test_evaluator_cooldown_suppresses_repeat(tmp_path: Path) -> None:
     fired: list[object] = []
     bus.subscribe(Topics.RULE_FIRED, lambda p: fired.append(p))
 
-    await _fire_sample(bus, cognitive_load=0.9)
-    await _fire_sample(bus, cognitive_load=0.9)
+    # Pin monotonic to a value well above cooldown_s so the first sample fires
+    # (now - default_last=0.0 >= 60) and the immediate second is suppressed
+    # (now - now = 0 < 60). Without pinning, a freshly booted container where
+    # time.monotonic() < 60 would suppress even the first fire.
+    with mock.patch("vcore.engine.evaluator.time") as mt:
+        mt.monotonic.return_value = 10_000.0
+        await _fire_sample(bus, cognitive_load=0.9)
+        await _fire_sample(bus, cognitive_load=0.9)
     assert len(fired) == 1  # second sample suppressed by cooldown
     await ev.stop()
 
