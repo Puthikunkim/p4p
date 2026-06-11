@@ -36,6 +36,7 @@ class LSLSource(SignalSource):
         bus: EventBus,
         manifests: ActiveManifests,
         stale_timeout_s: float = 5.0,
+        offline_timeout_s: float = 30.0,
         resolve_timeout: float = _RESOLVE_TIMEOUT,
     ) -> None:
         self._stream_name = stream_name
@@ -43,6 +44,7 @@ class LSLSource(SignalSource):
         self._bus = bus
         self._manifests = manifests
         self._stale_timeout_s = stale_timeout_s
+        self._offline_timeout_s = offline_timeout_s
         self._resolve_timeout = resolve_timeout
         self._inlet: pylsl.StreamInlet | None = None
         self._stream_task: asyncio.Task[None] | None = None
@@ -50,6 +52,7 @@ class LSLSource(SignalSource):
         self._last_sample_at: float = 0.0
         self._running = False
         self._is_stale = False
+        self._stale_since: float = 0.0
 
     @property
     def stream_name(self) -> str:
@@ -155,8 +158,14 @@ class LSLSource(SignalSource):
                 await self._bus.publish(Topics.STALE, StaleEvent(stream_name=name, age_s=age))
                 await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="stale"))
                 self._is_stale = True
+                self._stale_since = now
+            elif is_stale and self._is_stale and (now - self._stale_since) >= self._offline_timeout_s:
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="down", detail="stream went silent"))
+                self._is_stale = False  # suppress further transitions until samples resume
+                self._stale_since = 0.0
             elif not is_stale and self._last_sample_at > 0:
                 if self._is_stale:
                     await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))
                     self._is_stale = False
+                    self._stale_since = 0.0
             await asyncio.sleep(1.0)
