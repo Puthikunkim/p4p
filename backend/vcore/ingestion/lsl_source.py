@@ -11,7 +11,7 @@ from typing import Any
 import pylsl
 
 from vcore.core.eventbus import EventBus, Topics
-from vcore.core.models import SampleEvent, StaleEvent, WarningEvent
+from vcore.core.models import LinkStatusEvent, SampleEvent, StaleEvent, WarningEvent
 from vcore.core.schema import ActiveManifests
 from vcore.ingestion.base import SignalSource
 
@@ -89,17 +89,20 @@ class LSLSource(SignalSource):
     async def _stream(self) -> None:
         loop = asyncio.get_running_loop()
 
-        # Resolve runs blocking I/O; offload to a thread so the event loop stays alive.
-        streams = await loop.run_in_executor(
-            None,
-            lambda: pylsl.resolve_byprop("name", self._stream_name, timeout=self._resolve_timeout),
-        )
-        if not streams:
-            log.error("lsl_source: stream %r not found after %.1fs", self._stream_name, self._resolve_timeout)
-            await self._bus.publish(
-                Topics.WARNING,
-                WarningEvent(source=self._stream_name, message=f"LSL stream '{self._stream_name}' not found"),
+        # Retry resolve until the stream appears or we are stopped.
+        streams: list = []
+        while self._running and not streams:
+            streams = await loop.run_in_executor(
+                None,
+                lambda: pylsl.resolve_byprop("name", self._stream_name, timeout=self._resolve_timeout),
             )
+            if not streams:
+                log.warning("lsl_source: stream %r not found, retrying…", self._stream_name)
+                await self._bus.publish(
+                    Topics.LINK_STATUS,
+                    LinkStatusEvent(link="om-lsl", state="down", detail=f"waiting for '{self._stream_name}'"),
+                )
+        if not self._running:
             return
 
         self._inlet = pylsl.StreamInlet(streams[0], processing_flags=pylsl.proc_clocksync)
@@ -112,6 +115,10 @@ class LSLSource(SignalSource):
         stream_id: str = manifest["stream"]["name"]
 
         log.info("lsl_source: connected to %r", self._stream_name)
+        await self._bus.publish(
+            Topics.LINK_STATUS,
+            LinkStatusEvent(link="om-lsl", state="up"),
+        )
 
         while self._running:
             # pull_sample blocks for up to 0.05 s then returns (None, None)
