@@ -22,6 +22,7 @@ export function RuleManager() {
   const signalManifest = useVCoreStore((s) => s.signalManifest)
   const objectStatusManifest = useVCoreStore((s) => s.objectStatusManifest)
   const [showBuilder, setShowBuilder] = useState(false)
+  const [editingRule, setEditingRule] = useState<RuleGrammarContract2 | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -39,6 +40,48 @@ export function RuleManager() {
   const [targetValue, setTargetValue] = useState('')
   const [statusName, setStatusName] = useState('')
   const [statusValue, setStatusValue] = useState('')
+
+  function openNew() {
+    setEditingRule(null)
+    setRuleId('')
+    setDescription('')
+    setSignal(channels[0]?.name ?? '')
+    setOp('>=')
+    setThreshold('0.8')
+    setSustainS('')
+    setCooldownS('30')
+    setTargetType('tag')
+    setTargetValue('')
+    setStatusName('')
+    setStatusValue('')
+    setError(null)
+    setShowBuilder(true)
+  }
+
+  function openEdit(rule: RuleGrammarContract2) {
+    const cond = 'all' in rule.when ? rule.when.all[0] : rule.when.any[0]
+    const target = rule.then.set.target
+    setEditingRule(rule)
+    setRuleId(rule.id)
+    setDescription(rule.description ?? '')
+    setSignal(cond?.signal ?? channels[0]?.name ?? '')
+    setOp(cond?.op ?? '>=')
+    setThreshold(String(cond?.threshold ?? cond?.value ?? ''))
+    setSustainS(cond?.sustain_s !== undefined ? String(cond.sustain_s) : '')
+    setCooldownS(rule.then.cooldown_s !== undefined ? String(rule.then.cooldown_s) : '')
+    setTargetType('tag' in target ? 'tag' : 'id')
+    setTargetValue('tag' in target ? (target as { tag: string }).tag : (target as { id: string }).id)
+    setStatusName(rule.then.set.status)
+    setStatusValue(String(rule.then.set.value))
+    setError(null)
+    setShowBuilder(true)
+  }
+
+  function closeBuilder() {
+    setShowBuilder(false)
+    setEditingRule(null)
+    setError(null)
+  }
 
   async function saveRule() {
     setError(null)
@@ -72,10 +115,14 @@ export function RuleManager() {
       },
     }
 
+    const isEditing = editingRule !== null
+    const url = isEditing ? `/api/rules/${encodeURIComponent(rule.id)}` : '/api/rules'
+    const method = isEditing ? 'PUT' : 'POST'
+
     setSaving(true)
     try {
-      const resp = await fetch('/api/rules', {
-        method: 'POST',
+      const resp = await fetch(url, {
+        method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(rule),
       })
@@ -83,9 +130,7 @@ export function RuleManager() {
         const body = await resp.json() as { detail?: string }
         setError(body.detail ?? `HTTP ${resp.status}`)
       } else {
-        setShowBuilder(false)
-        setRuleId('')
-        setDescription('')
+        closeBuilder()
       }
     } catch (e) {
       setError(String(e))
@@ -96,6 +141,7 @@ export function RuleManager() {
 
   async function deleteRule(id: string) {
     if (!confirm(`Delete rule "${id}"?`)) return
+    if (editingRule?.id === id) closeBuilder()
     await fetch(`/api/rules/${encodeURIComponent(id)}`, { method: 'DELETE' })
   }
 
@@ -108,19 +154,25 @@ export function RuleManager() {
             <div className="screen-subtitle">{rules.length} rule{rules.length !== 1 ? 's' : ''} loaded</div>
           )}
         </div>
-        <button className="btn" onClick={() => setShowBuilder(!showBuilder)}>
-          {showBuilder ? 'Cancel' : '+ New Rule'}
+        <button className="btn" onClick={showBuilder && !editingRule ? closeBuilder : openNew}>
+          {showBuilder && !editingRule ? 'Cancel' : '+ New Rule'}
         </button>
       </div>
 
-      {/* Rule builder */}
+      {/* Rule builder / editor */}
       {showBuilder && (
         <div className="rule-builder">
-          <h3>New Rule</h3>
+          <div className="rule-builder__header">
+            <h3>{editingRule ? `Edit Rule` : 'New Rule'}</h3>
+            {editingRule && <button className="btn btn--small" onClick={closeBuilder}>Cancel</button>}
+          </div>
 
           <div className="form-row">
             <label>ID</label>
-            <input value={ruleId} onChange={(e) => setRuleId(e.target.value)} placeholder="my-rule-id" />
+            {editingRule
+              ? <span className="form-value-readonly">{ruleId}</span>
+              : <input value={ruleId} onChange={(e) => setRuleId(e.target.value)} placeholder="my-rule-id" />
+            }
           </div>
           <div className="form-row">
             <label>Description</label>
@@ -133,7 +185,7 @@ export function RuleManager() {
               <label>Signal</label>
               <select value={signal} onChange={(e) => setSignal(e.target.value)}>
                 {channels.map((ch) => <option key={ch.name} value={ch.name}>{ch.display.label} ({ch.name})</option>)}
-                {channels.length === 0 && <option value="">— no manifest —</option>}
+                {channels.length === 0 && <option value={signal}>{signal || '— no manifest —'}</option>}
               </select>
             </div>
             <div className="form-row">
@@ -173,6 +225,8 @@ export function RuleManager() {
                   ? [...new Set(objects.flatMap((o) => o.tags))].map((t) => <option key={t} value={t}>{t}</option>)
                   : objects.map((o) => <option key={o.id} value={o.id}>{o.id}</option>)
                 }
+                {/* Show current value even if no manifest loaded */}
+                {targetValue && !objects.length && <option value={targetValue}>{targetValue}</option>}
               </select>
             </div>
             {targetValue && (() => {
@@ -184,10 +238,13 @@ export function RuleManager() {
                 <>
                   <div className="form-row">
                     <label>Status</label>
-                    <select value={statusName} onChange={(e) => { setStatusName(e.target.value); setStatusValue('') }}>
-                      <option value="">— pick —</option>
-                      {statuses.map((s) => <option key={s.name} value={s.name}>{s.name} ({s.type})</option>)}
-                    </select>
+                    {statuses.length > 0
+                      ? <select value={statusName} onChange={(e) => { setStatusName(e.target.value); setStatusValue('') }}>
+                          <option value="">— pick —</option>
+                          {statuses.map((s) => <option key={s.name} value={s.name}>{s.name} ({s.type})</option>)}
+                        </select>
+                      : <input value={statusName} onChange={(e) => setStatusName(e.target.value)} placeholder="status name" />
+                    }
                   </div>
                   {statusName && (() => {
                     const st = statuses.find((s) => s.name === statusName)
@@ -201,8 +258,9 @@ export function RuleManager() {
                       </div>
                     ) : (
                       <div className="form-row">
-                        <label>Value ({st?.range?.min ?? 0}–{st?.range?.max ?? 100})</label>
-                        <input type="number" value={statusValue} onChange={(e) => setStatusValue(e.target.value)}
+                        <label>Value{st ? ` (${st.range?.min ?? 0}–${st.range?.max ?? 100})` : ''}</label>
+                        <input value={statusValue} onChange={(e) => setStatusValue(e.target.value)}
+                          type={st ? 'number' : 'text'}
                           min={st?.range?.min} max={st?.range?.max} />
                       </div>
                     )
@@ -219,7 +277,7 @@ export function RuleManager() {
           {error && <p className="form-error">{error}</p>}
           <div className="form-actions">
             <button className="btn btn--primary" onClick={saveRule} disabled={saving}>
-              {saving ? 'Saving…' : 'Save Rule'}
+              {saving ? 'Saving…' : editingRule ? 'Update Rule' : 'Save Rule'}
             </button>
           </div>
         </div>
@@ -232,7 +290,16 @@ export function RuleManager() {
             No rules yet. Drop YAML files in <code>backend/rules/</code> or use the builder above.
           </p>
         ) : (
-          rules.map((r) => <RuleCard key={r.id} rule={r} disabled={disabledRules[r.id]} onDelete={deleteRule} />)
+          rules.map((r) => (
+            <RuleCard
+              key={r.id}
+              rule={r}
+              disabled={disabledRules[r.id]}
+              isEditing={editingRule?.id === r.id}
+              onEdit={openEdit}
+              onDelete={deleteRule}
+            />
+          ))
         )}
       </div>
     </div>
@@ -242,10 +309,14 @@ export function RuleManager() {
 function RuleCard({
   rule: r,
   disabled,
+  isEditing,
+  onEdit,
   onDelete,
 }: {
   rule: RuleGrammarContract2
   disabled?: string
+  isEditing: boolean
+  onEdit: (rule: RuleGrammarContract2) => void
   onDelete: (id: string) => void
 }) {
   const typeIdx = ruleTypeIndex(r.id)
@@ -253,11 +324,17 @@ function RuleCard({
   const action = r.then?.set
   const sustain = conditions[0]?.sustain_s
 
-  // Use first 3 chars of id as a type tag
   const typeTag = r.id.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || '???'
 
   return (
-    <div className={`rule-card ${disabled ? 'rule-card--disabled' : ''}`}>
+    <div
+      className={`rule-card ${disabled ? 'rule-card--disabled' : ''} ${isEditing ? 'rule-card--editing' : ''}`}
+      onClick={() => onEdit(r)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => e.key === 'Enter' && onEdit(r)}
+      style={{ cursor: 'pointer' }}
+    >
       <div className="rule-card__header">
         <span className={`rule-card__type rule-card__type--${typeIdx}`}>{typeTag}</span>
         <span className="rule-card__title">{r.description || r.id}</span>
@@ -305,7 +382,8 @@ function RuleCard({
         )}
       </div>
 
-      <div className="rule-card__footer">
+      <div className="rule-card__footer" onClick={(e) => e.stopPropagation()}>
+        <button className="btn btn--small" onClick={() => onEdit(r)}>Edit</button>
         <button className="btn btn--small btn--danger" onClick={() => onDelete(r.id)}>Delete</button>
       </div>
     </div>

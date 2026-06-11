@@ -566,13 +566,28 @@
   margin-bottom: 20px;
 }
 
+.rule-builder__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
 .rule-builder h3 {
-  margin: 0 0 14px;
+  margin: 0;
   font-size: 14px;
   font-weight: 600;
   color: var(--text-h);
   text-transform: none;
   letter-spacing: 0;
+}
+
+.form-value-readonly {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-h);
+  padding: 4px 0;
 }
 
 .form-section {
@@ -651,6 +666,16 @@
 
 .rule-card--disabled {
   opacity: 0.6;
+}
+
+.rule-card--editing {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.18);
+}
+
+.rule-card:hover {
+  border-color: var(--accent);
+  background: var(--surface-hover, var(--surface));
 }
 
 .rule-card__header {
