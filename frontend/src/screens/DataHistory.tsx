@@ -173,6 +173,7 @@ function FatigueTrendChart({ session }: { session: SessionDetail }) {
 
 const EVENT_STYLES: Record<string, { label: string; color: string; bg: string }> = {
   rule_fired:         { label: 'Adaptation Trigger', color: '#7c3aed', bg: 'rgba(124,58,237,0.12)' },
+  vr_context:         { label: 'Step Change',        color: '#0e7490', bg: 'rgba(14,116,144,0.12)' },
   warning:            { label: 'Warning',            color: '#b45309', bg: 'rgba(180,83,9,0.12)' },
   baseline_establish: { label: 'Baseline Establish', color: '#15803d', bg: 'rgba(21,128,61,0.12)' },
   session_start:      { label: 'Session Start',      color: '#1d4ed8', bg: 'rgba(29,78,216,0.12)' },
@@ -187,6 +188,13 @@ function summarizePayload(payload: string): string {
   try {
     const obj = JSON.parse(payload) as Record<string, unknown>
     if (obj.message) return String(obj.message)
+    if (obj.fields && typeof obj.fields === 'object') {
+      const f = obj.fields as Record<string, unknown>
+      return Object.keys(f)
+        .slice(0, 3)
+        .map((k) => `${k}: ${f[k]}`)
+        .join(' · ')
+    }
     if (obj.value !== undefined && obj.status) return `Set ${obj.status} → ${obj.value}`
     if (obj.then?.set) {
       const s = obj.then.set as Record<string, unknown>

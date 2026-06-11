@@ -6,10 +6,9 @@ import type { Channel } from '../contracts/SignalSchema'
 const GROUP_LABELS: Record<string, string> = {
   physiological: 'Physiological',
   behavioural: 'Behavioural Markers',
-  vr_context: 'VR Context',
 }
 
-const GROUP_ORDER = ['physiological', 'behavioural', 'vr_context']
+const GROUP_ORDER = ['physiological', 'behavioural']
 
 export function SessionMonitor() {
   const channels = useChannels()
@@ -55,6 +54,8 @@ export function SessionMonitor() {
       <div className="monitor-layout">
         {/* Left: main content */}
         <div className="monitor-main">
+          <VrContextPanel />
+
           <VideoFeed sessionId={activeSessionId} />
 
           {channels.length === 0 ? (
@@ -211,6 +212,47 @@ export function SessionMonitor() {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// ── VR Context (Unity-driven study/scene context) ─────────────────────────────
+
+function prettifyKey(key: string): string {
+  return key
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim()
+}
+
+function formatContextValue(v: string | number | boolean): string {
+  if (typeof v === 'boolean') return v ? 'Yes' : 'No'
+  return String(v)
+}
+
+function VrContextPanel() {
+  const vrContext = useVCoreStore((s) => s.vrContext)
+  const entries = vrContext ? Object.entries(vrContext.fields) : []
+
+  return (
+    <div className="signal-panel vr-context-panel">
+      <div className="signal-panel__header">
+        <span className="signal-panel__title">VR Context</span>
+        <span className="signal-panel__live">LIVE</span>
+      </div>
+      {entries.length === 0 ? (
+        <div className="vr-context-empty">Waiting for the Unity scene to report a step…</div>
+      ) : (
+        <div className="vr-context-grid">
+          {entries.map(([key, value]) => (
+            <div className="vr-context-item" key={key}>
+              <span className="vr-context-item__label">{prettifyKey(key)}</span>
+              <span className="vr-context-item__value">{formatContextValue(value)}</span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -15,6 +15,11 @@ export interface Warning {
   at: number  // Date.now()
 }
 
+export interface VrContext {
+  fields: Record<string, string | number | boolean>
+  at: number  // Date.now() when received
+}
+
 export interface VCoreStore {
   // manifests
   signalManifest: SignalSchemaContract1 | null
@@ -29,6 +34,7 @@ export interface VCoreStore {
   // system
   warnings: Warning[]
   linkStatuses: Record<string, LinkStatus>
+  vrContext: VrContext | null
   wsState: 'connecting' | 'connected' | 'disconnected'
   // session
   activeSessionId: string | null
@@ -49,6 +55,7 @@ export type ServerMessage =
   | { type: 'link_status'; payload: { link: string; state: string; detail?: string } }
   | { type: 'rule_list'; payload: { rules: RuleGrammarContract2[]; disabled: Record<string, string> } }
   | { type: 'rule_fired'; payload: { source_rule?: string; source: string; status: string; value: unknown; target: unknown } }
+  | { type: 'vr_context'; payload: { fields: Record<string, string | number | boolean>; ts?: number | null } }
 
 const MAX_HISTORY = 300  // samples per channel
 
@@ -61,6 +68,7 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
   disabledRules: {},
   warnings: [],
   linkStatuses: {},
+  vrContext: null,
   wsState: 'disconnected',
   activeSessionId: null,
 
@@ -94,6 +102,9 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
           const ls = msg.payload as LinkStatus
           return { linkStatuses: { ...state.linkStatuses, [ls.link]: ls } }
         }
+
+        case 'vr_context':
+          return { vrContext: { fields: msg.payload.fields, at: Date.now() } }
 
         case 'rule_list':
           return { rules: msg.payload.rules, disabledRules: msg.payload.disabled }

@@ -1437,6 +1437,52 @@
   }
 }
 
+/* ── VR Context panel (Unity-driven study/scene context) ──────────────────── */
+
+.vr-context-panel {
+  margin-bottom: 12px;
+}
+
+.vr-context-empty {
+  padding: 14px 12px;
+  font-size: 13px;
+  color: var(--text);
+  opacity: 0.55;
+}
+
+.vr-context-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 1px;
+  background: var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.vr-context-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: var(--surface);
+}
+
+.vr-context-item__label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text);
+  opacity: 0.55;
+}
+
+.vr-context-item__value {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text);
+  word-break: break-word;
+}
+
 /* ── Video Feed ── */
 
 .video-feed {
