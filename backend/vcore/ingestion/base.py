@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
+from typing import Literal
+
+LinkState = Literal["up", "down", "stale"]
 
 
 class SignalSource(ABC):
@@ -17,7 +20,7 @@ class SignalSource(ABC):
         """Human-readable identifier for this source (used in warnings/logs)."""
 
     @property
-    def link_state(self) -> str:
+    def link_state(self) -> LinkState:
         """Current om-lsl link state: 'up', 'stale', or 'down'."""
         return 'down'
 

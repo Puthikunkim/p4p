@@ -13,7 +13,7 @@ import pylsl
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import LinkStatusEvent, SampleEvent, StaleEvent, WarningEvent
 from vcore.core.schema import ActiveManifests
-from vcore.ingestion.base import SignalSource
+from vcore.ingestion.base import LinkState, SignalSource
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ class LSLSource(SignalSource):
         bus: EventBus,
         manifests: ActiveManifests,
         stale_timeout_s: float = 5.0,
-        offline_timeout_s: float = 30.0,
+        offline_timeout_s: float = 10.0,
         resolve_timeout: float = _RESOLVE_TIMEOUT,
     ) -> None:
         self._stream_name = stream_name
@@ -60,7 +60,7 @@ class LSLSource(SignalSource):
         return self._stream_name
 
     @property
-    def link_state(self) -> str:
+    def link_state(self) -> LinkState:
         if self._is_offline:
             return 'down'
         if self._is_stale:
@@ -105,7 +105,7 @@ class LSLSource(SignalSource):
         loop = asyncio.get_running_loop()
 
         # Retry resolve until the stream appears or we are stopped.
-        streams: list = []
+        streams: list[Any] = []
         while self._running and not streams:
             streams = await loop.run_in_executor(
                 None,
@@ -180,4 +180,4 @@ class LSLSource(SignalSource):
                 self._is_stale = False
                 self._is_offline = False
                 self._stale_since = 0.0
-            await asyncio.sleep(1.0)
+            await asyncio.sleep(0.5)

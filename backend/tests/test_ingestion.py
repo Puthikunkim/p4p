@@ -2,13 +2,16 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
+import time
 from pathlib import Path
 
 import pytest
 
 from vcore.core.eventbus import EventBus, Topics
-from vcore.core.models import SampleEvent, StaleEvent
+from vcore.core.models import LinkStatusEvent, SampleEvent, StaleEvent
 from vcore.core.schema import ActiveManifests
+from vcore.ingestion.lsl_source import LSLSource
 from vcore.ingestion.replay_source import ReplaySource
 
 FIXTURES = Path(__file__).parent.parent.parent / "tools" / "fixtures"
@@ -120,6 +123,45 @@ async def test_stale_event_emitted_after_silence() -> None:
     assert len(stale_events) >= 1
     assert stale_events[0].stream_name == "om.cognitive"
     assert stale_events[0].age_s > 0.5
+
+
+# ── LSL link-state watchdog (stale → down) ────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_lsl_watchdog_goes_down_after_prolonged_silence() -> None:
+    """After a sample, silence first yields 'stale' then escalates to 'down'."""
+    bus = EventBus()
+    manifests = ActiveManifests()
+    src = LSLSource(
+        "om.cognitive",
+        MANIFEST,
+        bus=bus,
+        manifests=manifests,
+        stale_timeout_s=0.2,
+        offline_timeout_s=0.5,
+    )
+
+    states: list[str] = []
+
+    async def on_link(p: object) -> None:
+        assert isinstance(p, LinkStatusEvent)
+        states.append(p.state)
+
+    bus.subscribe(Topics.LINK_STATUS, on_link)
+
+    # Simulate a sample having just arrived, then run only the watchdog (no inlet).
+    src._running = True
+    src._last_sample_at = time.monotonic()
+    task = asyncio.create_task(src._watchdog())
+    await asyncio.sleep(1.5)
+    src._running = False
+    task.cancel()
+    with contextlib.suppress(asyncio.CancelledError):
+        await task
+
+    assert "stale" in states
+    assert states[-1] == "down"
+    assert src.link_state == "down"
 
 
 # ── LSL source (integration, skipped if LSL not available) ────────────────────
