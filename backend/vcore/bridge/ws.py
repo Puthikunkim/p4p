@@ -54,6 +54,7 @@ class DashboardBridge:
         self._bus.subscribe(Topics.LINK_STATUS, self._on_link_status)
         self._bus.subscribe(Topics.RULES_UPDATED, self._on_rules_updated)
         self._bus.subscribe(Topics.STALE, self._on_stale)
+        self._bus.subscribe(Topics.RULE_FIRED, self._on_rule_fired)
 
     async def stop(self) -> None:
         self._bus.unsubscribe(Topics.MANIFEST_UPDATED, self._on_manifest)
@@ -63,6 +64,7 @@ class DashboardBridge:
         self._bus.unsubscribe(Topics.LINK_STATUS, self._on_link_status)
         self._bus.unsubscribe(Topics.RULES_UPDATED, self._on_rules_updated)
         self._bus.unsubscribe(Topics.STALE, self._on_stale)
+        self._bus.unsubscribe(Topics.RULE_FIRED, self._on_rule_fired)
 
     # ── connection handler (called from FastAPI route) ────────────────────────
 
@@ -136,6 +138,11 @@ class DashboardBridge:
 
     async def _on_rules_updated(self, _: object) -> None:
         await self._broadcast("rule_list", self._rule_list_payload())
+
+    async def _on_rule_fired(self, payload: object) -> None:
+        from vcore.core.models import StatusRequest
+        if isinstance(payload, StatusRequest):
+            await self._broadcast("rule_fired", payload.model_dump(mode="json"))
 
     # ── helpers ───────────────────────────────────────────────────────────────
 

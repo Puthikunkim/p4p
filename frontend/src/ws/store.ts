@@ -47,6 +47,7 @@ export type ServerMessage =
   | { type: 'warning'; payload: { source: string; message: string } }
   | { type: 'link_status'; payload: { link: string; state: string; detail?: string } }
   | { type: 'rule_list'; payload: { rules: RuleGrammarContract2[]; disabled: Record<string, string> } }
+  | { type: 'rule_fired'; payload: { source_rule?: string; source: string; status: string; value: unknown; target: unknown } }
 
 const MAX_HISTORY = 300  // samples per channel
 
@@ -95,6 +96,20 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
 
         case 'rule_list':
           return { rules: msg.payload.rules, disabledRules: msg.payload.disabled }
+
+        case 'rule_fired': {
+          const p = msg.payload
+          const ruleLabel = p.source_rule ?? p.source
+          const target = typeof p.target === 'object' && p.target !== null
+            ? ('tag' in p.target ? `tag:${(p.target as {tag:string}).tag}` : `id:${(p.target as {id:string}).id}`)
+            : String(p.target)
+          const w: Warning = {
+            source: ruleLabel,
+            message: `${p.status} → ${p.value} on ${target}${p.source === 'manual' ? ' (manual)' : ''}`,
+            at: Date.now(),
+          }
+          return { warnings: [w, ...state.warnings].slice(0, 50) }
+        }
 
         default:
           return {}

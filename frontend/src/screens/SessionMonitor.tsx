@@ -157,7 +157,7 @@ export function SessionMonitor() {
                       className="rule-btn"
                       onClick={() => triggerRule(r.id)}
                       disabled={disabled}
-                      title={disabled ? `Disabled: ${disabledRules[r.id]}` : undefined}
+                      title={disabled ? `Disabled: ${disabledRules[r.id]}` : 'Click to fire manually'}
                     >
                       <span className="rule-btn__name">
                         {r.description || r.id}
@@ -182,29 +182,33 @@ export function SessionMonitor() {
           </div>
 
           {/* Adaptation Log */}
-          {warnings.length > 0 && (
-            <div className="adapt-log">
-              <div className="adapt-log__header">
-                <span>Adaptation Log</span>
+          <div className="adapt-log">
+            <div className="adapt-log__header">
+              <span>Adaptation Log</span>
+              {warnings.length > 0 && (
                 <button className="btn btn--small btn--ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={clearWarnings}>
                   Clear
                 </button>
-              </div>
-              <div className="adapt-log__list">
-                {warnings.slice(0, 10).map((w, i) => (
+              )}
+            </div>
+            <div className="adapt-log__list">
+              {warnings.length === 0 ? (
+                <div className="adapt-log__empty">No events yet — fire a rule to see it here.</div>
+              ) : (
+                warnings.slice(0, 20).map((w, i) => (
                   <div key={i} className="adapt-log__entry">
                     <span className="adapt-log__time">
-                      {new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      {new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                     </span>
                     <div>
                       <span className="adapt-log__source">{w.source}</span>
                       <span className="adapt-log__msg"> — {w.message}</span>
                     </div>
                   </div>
-                ))}
-              </div>
+                ))
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
     </div>
