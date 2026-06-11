@@ -88,10 +88,6 @@ function App() {
           ))}
         </nav>
 
-        <div className="sidebar__footer">
-          <span className="sidebar__footer-link">Support</span>
-          <span className="sidebar__footer-link">System Logs</span>
-        </div>
       </aside>
 
       {/* Main content */}
