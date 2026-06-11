@@ -75,6 +75,10 @@ class WsSink(ActionSink):
             self._server = None
 
     @property
+    def is_connected(self) -> bool:
+        return self._conn is not None
+
+    @property
     def bound_port(self) -> int:
         """Actual port the server is listening on (valid after start())."""
         if self._server is None:

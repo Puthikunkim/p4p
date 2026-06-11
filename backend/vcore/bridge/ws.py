@@ -89,11 +89,14 @@ class DashboardBridge:
     # ── initial state push ────────────────────────────────────────────────────
 
     async def _push_current_state(self, ws: WebSocket) -> None:
+        from vcore.core.models import LinkStatusEvent
         if self._manifests.signal_manifest is not None:
             await _send(ws, "signal_manifest", self._manifests.signal_manifest)
         if self._manifests.object_status_manifest is not None:
             await _send(ws, "object_status_manifest", self._manifests.object_status_manifest)
         await _send(ws, "rule_list", self._rule_list_payload())
+        unity_state = "up" if self._ws_sink.is_connected else "down"
+        await _send(ws, "link_status", LinkStatusEvent(link="unity-ws", state=unity_state).model_dump(mode="json"))
 
     # ── bus event handlers ────────────────────────────────────────────────────
 
