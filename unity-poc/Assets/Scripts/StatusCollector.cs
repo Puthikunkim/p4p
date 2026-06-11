@@ -36,7 +36,10 @@ public class StatusCollector : MonoBehaviour
 
     private static readonly JsonSerializerSettings _settings = new()
     {
-        ContractResolver = new CamelCasePropertyNamesContractResolver(),
+        ContractResolver = new DefaultContractResolver
+        {
+            NamingStrategy = new SnakeCaseNamingStrategy(),
+        },
         NullValueHandling = NullValueHandling.Ignore,
     };
 
