@@ -198,6 +198,7 @@ public class WebRtcSender : MonoBehaviour
                 break;
 
             case "ice":
+            case "ice-candidate":
                 var init = new RTCIceCandidateInit
                 {
                     candidate      = msg["candidate"]?.ToString(),
