@@ -198,14 +198,29 @@ public class WebRtcSender : MonoBehaviour
                 break;
 
             case "ice":
-            case "ice-candidate":
-                var init = new RTCIceCandidateInit
+                // Flat format sent by Unity itself (unused in this direction, but handled for symmetry)
+                var initFlat = new RTCIceCandidateInit
                 {
-                    candidate      = msg["candidate"]?.ToString(),
-                    sdpMid         = msg["sdpMid"]?.ToString(),
-                    sdpMLineIndex  = msg["sdpMLineIndex"]?.ToObject<int?>(),
+                    candidate     = msg["candidate"]?.ToString(),
+                    sdpMid        = msg["sdpMid"]?.ToString(),
+                    sdpMLineIndex = msg["sdpMLineIndex"]?.ToObject<int?>(),
                 };
-                _pc?.AddIceCandidate(new RTCIceCandidate(init));
+                _pc?.AddIceCandidate(new RTCIceCandidate(initFlat));
+                break;
+
+            case "ice-candidate":
+                // Nested format sent by the browser: { candidate: { candidate, sdpMid, sdpMLineIndex } }
+                var candidateObj = msg["candidate"] as JObject;
+                if (candidateObj != null)
+                {
+                    var initNested = new RTCIceCandidateInit
+                    {
+                        candidate     = candidateObj["candidate"]?.ToString(),
+                        sdpMid        = candidateObj["sdpMid"]?.ToString(),
+                        sdpMLineIndex = candidateObj["sdpMLineIndex"]?.ToObject<int?>(),
+                    };
+                    _pc?.AddIceCandidate(new RTCIceCandidate(initNested));
+                }
                 break;
 
             case "publisher-gone":
