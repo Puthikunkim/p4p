@@ -74,7 +74,7 @@ export function VideoFeed({ sessionId }: Props) {
 
     pc.ontrack = (ev) => {
       if (videoRef.current) {
-        const stream = ev.streams[0]
+        const stream = ev.streams[0] ?? new MediaStream([ev.track])
         videoRef.current.srcObject = stream
         if (sessionId) {
           startRecording(sessionId, stream)
