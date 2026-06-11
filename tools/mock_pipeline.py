@@ -29,7 +29,7 @@ sys.path.insert(0, str(_ROOT / "backend"))
 
 # ── constants ─────────────────────────────────────────────────────────────────
 
-_DEFAULT_MANIFEST = _ROOT / "tools" / "fixtures" / "sample_session.manifest.json"
+_DEFAULT_MANIFEST = _ROOT / "tools" / "fixtures" / "full_session.manifest.json"
 _CATEGORIES = ["calm", "stressed", "bored", "engaged"]
 _CYCLE_S = 30.0  # full sine cycle length in seconds
 
@@ -113,7 +113,15 @@ def run(manifest_path: Path, rate: float, pattern: str, scale: float) -> None:
         while True:
             t = time.monotonic() - t0
             sample = [_make_value(ch, t, scale, pattern) for ch in all_channels]
-            outlet.push_sample([float(v) if isinstance(v, (int, float)) else 0.0 for v in sample])
+            # Encode categoricals as integer index so LSLSource can decode them back
+            encoded: list[float] = []
+            for ch, v in zip(all_channels, sample):
+                if isinstance(v, str):
+                    cats: list[str] = ch.get("categories", [])
+                    encoded.append(float(cats.index(v)) if v in cats else 0.0)
+                else:
+                    encoded.append(float(v))
+            outlet.push_sample(encoded)
             time.sleep(interval)
     except KeyboardInterrupt:
         print("\n[mock_pipeline] stopped", flush=True)

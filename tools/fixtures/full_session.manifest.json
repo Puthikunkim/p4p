@@ -1,0 +1,115 @@
+{
+  "schema_version": "1.0.0",
+  "stream": {
+    "name": "om.cognitive",
+    "source_id": "fixture-01",
+    "nominal_srate": 10
+  },
+  "channels": [
+    {
+      "name": "cognitive_load",
+      "unit": "normalized",
+      "type": "scalar",
+      "range": { "min": 0, "max": 1 },
+      "display": { "hint": "stat_card", "label": "Cognitive Load", "precision": 2, "group": "physiological" }
+    },
+    {
+      "name": "hrv",
+      "unit": "BPM",
+      "type": "timeseries",
+      "range": { "min": 40, "max": 120 },
+      "display": { "hint": "line_chart", "label": "HRV", "window_s": 30, "group": "physiological" }
+    },
+    {
+      "name": "affect",
+      "unit": "category",
+      "type": "categorical",
+      "categories": ["calm", "stressed", "bored", "engaged"],
+      "display": { "hint": "quadrant", "label": "Affective State", "group": "physiological" }
+    },
+    {
+      "name": "response_latency",
+      "unit": "s",
+      "type": "scalar",
+      "range": { "min": 0, "max": 15 },
+      "display": { "hint": "stat_card", "label": "Response Latency", "precision": 1, "group": "behavioural" }
+    },
+    {
+      "name": "response_accuracy",
+      "unit": "%",
+      "type": "scalar",
+      "range": { "min": 0, "max": 100 },
+      "display": { "hint": "stat_card", "label": "Response Accuracy", "precision": 0, "group": "behavioural" }
+    },
+    {
+      "name": "clarification_reqs",
+      "unit": "/task",
+      "type": "scalar",
+      "range": { "min": 0, "max": 10 },
+      "display": { "hint": "stat_card", "label": "Clarification Reqs", "precision": 1, "group": "behavioural" }
+    },
+    {
+      "name": "idle_time",
+      "unit": "s",
+      "type": "scalar",
+      "range": { "min": 0, "max": 30 },
+      "display": { "hint": "stat_card", "label": "Idle Time", "precision": 1, "group": "behavioural" }
+    },
+    {
+      "name": "gaze_dwell_time",
+      "unit": "s",
+      "type": "scalar",
+      "range": { "min": 0, "max": 30 },
+      "display": { "hint": "stat_card", "label": "Gaze Dwell Time", "precision": 1, "group": "behavioural" }
+    },
+    {
+      "name": "gaze_switching_rate",
+      "unit": "/s",
+      "type": "scalar",
+      "range": { "min": 0, "max": 2 },
+      "display": { "hint": "stat_card", "label": "Gaze Switching Rate", "precision": 2, "group": "behavioural" }
+    },
+    {
+      "name": "vr_scene",
+      "unit": "category",
+      "type": "categorical",
+      "categories": ["Aisle 1 – Produce", "Aisle 2 – Bakery", "Aisle 3 – Dairy", "Aisle 4 – Meat"],
+      "display": { "hint": "stat_card", "label": "Scene", "group": "vr_context" }
+    },
+    {
+      "name": "task_step",
+      "unit": "/ 8",
+      "type": "scalar",
+      "range": { "min": 1, "max": 8 },
+      "display": { "hint": "stat_card", "label": "Task Step", "precision": 0, "group": "vr_context" }
+    },
+    {
+      "name": "vr_station",
+      "unit": "category",
+      "type": "categorical",
+      "categories": ["PRODUCE_A1", "BAKERY_B2", "DAIRY_B4", "MEAT_C3"],
+      "display": { "hint": "stat_card", "label": "Station", "group": "vr_context" }
+    },
+    {
+      "name": "items_left",
+      "unit": "items",
+      "type": "scalar",
+      "range": { "min": 0, "max": 8 },
+      "display": { "hint": "stat_card", "label": "Items Left", "precision": 0, "group": "vr_context" }
+    },
+    {
+      "name": "time_at_station",
+      "unit": "s",
+      "type": "scalar",
+      "range": { "min": 0, "max": 300 },
+      "display": { "hint": "stat_card", "label": "Time at Station", "precision": 0, "group": "vr_context" }
+    },
+    {
+      "name": "last_utterance",
+      "unit": "text",
+      "type": "categorical",
+      "categories": ["Which milk would you like?", "Please select an item.", "Task complete!", "Move to next aisle."],
+      "display": { "hint": "stat_card", "label": "Last Utterance", "group": "vr_context" }
+    }
+  ]
+}
