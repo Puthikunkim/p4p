@@ -108,6 +108,7 @@ class LSLSource(SignalSource):
 
         channel_names = [ch["name"] for ch in manifest["channels"]]
         channel_types = {ch["name"]: ch["type"] for ch in manifest["channels"]}
+        channel_categories = {ch["name"]: ch.get("categories", []) for ch in manifest["channels"]}
         stream_id: str = manifest["stream"]["name"]
 
         log.info("lsl_source: connected to %r", self._stream_name)
@@ -121,7 +122,12 @@ class LSLSource(SignalSource):
             values: dict[str, float | str] = {}
             for i, name in enumerate(channel_names):
                 raw = sample[i]
-                values[name] = raw if channel_types[name] == "categorical" else float(raw)
+                if channel_types[name] == "categorical":
+                    cats = channel_categories.get(name, [])
+                    idx = int(round(float(raw)))
+                    values[name] = cats[idx] if 0 <= idx < len(cats) else str(idx)
+                else:
+                    values[name] = float(raw)
 
             self._last_sample_at = time.monotonic()
             await self._bus.publish(

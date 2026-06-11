@@ -18,6 +18,7 @@ from vcore.core.eventbus import EventBus
 from vcore.core.schema import ActiveManifests
 from vcore.engine.evaluator import RuleEvaluator
 from vcore.engine.registry import RuleRegistry
+from vcore.ingestion.lsl_source import LSLSource
 from vcore.outbound.ws_sink import WsSink
 from vcore.recording.recorder import Recorder
 from vcore.recording.video_store import VideoStore
@@ -28,6 +29,8 @@ _RULES_DIR = Path(__file__).parent.parent / "rules"
 _DATA_DIR = Path(__file__).parent.parent / "data"
 _SINK_HOST = "localhost"
 _SINK_PORT = 9001
+_DEFAULT_MANIFEST = Path(__file__).parent.parent.parent / "tools" / "fixtures" / "full_session.manifest.json"
+_DEFAULT_STREAM = "om.cognitive"
 
 
 def create_app(
@@ -62,9 +65,23 @@ def create_app(
         await ws_sink.start()
         await bridge.start()
         await recorder.start()
+
+        lsl_source: LSLSource | None = None
+        if _DEFAULT_MANIFEST.exists():
+            lsl_source = LSLSource(
+                stream_name=_DEFAULT_STREAM,
+                manifest_path=_DEFAULT_MANIFEST,
+                bus=bus,
+                manifests=manifests,
+            )
+            await lsl_source.start()
+            log.info("V-CORE LSL source started (stream=%s)", _DEFAULT_STREAM)
+
         log.info("V-CORE started (rules_dir=%s)", rules_dir)
         yield
         # ── shutdown ─────────────────────────────────────────────────────────
+        if lsl_source is not None:
+            await lsl_source.stop()
         await recorder.stop()
         await bridge.stop()
         await ws_sink.stop()
