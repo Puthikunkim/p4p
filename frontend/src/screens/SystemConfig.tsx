@@ -17,30 +17,8 @@ function stateLabel(state: string): string {
   return map[state] ?? state
 }
 
-const PIPELINE_STAGES = [
-  { key: 'browser-ws', label: 'Browser → Backend' },
-  { key: 'om-lsl', label: 'OM LSL → Backend' },
-  { key: 'unity-ws', label: 'Backend → Unity' },
-]
-
-function derivePipelineState(browserWsState: string | undefined, omLslState: string | undefined): string {
-  if (!browserWsState || browserWsState === 'down') return 'down'
-  if (browserWsState !== 'up') return browserWsState
-  if (!omLslState) return 'unknown'
-  return omLslState
-}
-
 export function SystemConfig() {
   const linkStatuses = useVCoreStore((s) => s.linkStatuses)
-
-  const browserWsState = linkStatuses['browser-ws']?.state
-  const omLslState = linkStatuses['om-lsl']?.state
-  const pipelineState = derivePipelineState(browserWsState, omLslState)
-
-  const pipelineStages = PIPELINE_STAGES.map((stage) => {
-    const ls = linkStatuses[stage.key]
-    return { ...stage, state: ls?.state ?? 'unknown', detail: ls?.detail ?? null }
-  })
 
   const chips = Object.entries(linkStatuses).map(([key, ls]) => ({
     key,
@@ -56,7 +34,6 @@ export function SystemConfig() {
         <div className="screen-subtitle">Health check, sensor pipeline status and protocol configuration.</div>
       </div>
 
-      {/* Status chips row */}
       <div className="status-chips-row" style={{ gridTemplateColumns: `repeat(${Math.min(chips.length, 4)}, 1fr)` }}>
         {chips.map((chip) => (
           <div key={chip.key} className="status-chip">
@@ -72,50 +49,6 @@ export function SystemConfig() {
         ))}
       </div>
 
-      {/* Signal pipeline section */}
-      <section className="config-section">
-        <div className="config-section-header">
-          <span className="config-section-title">Signal Pipeline</span>
-          <span className={`badge badge--${pipelineState}`} style={{ marginLeft: 10 }}>
-            {stateLabel(pipelineState)}
-          </span>
-        </div>
-        <table className="config-table">
-          <tbody>
-            {pipelineStages.map((stage) => (
-              <tr key={stage.key}>
-                <td>{stage.label}</td>
-                <td>
-                  <span className={`badge badge--${stage.state}`}>{stateLabel(stage.state)}</span>
-                  {stage.detail && <span className="config-meta">{stage.detail}</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      {/* Connection section */}
-      <section className="config-section">
-        <div className="config-section-header">
-          <span className="config-section-title">Connection Details</span>
-        </div>
-        <table className="config-table">
-          <tbody>
-            {chips.map((chip) => (
-              <tr key={chip.key}>
-                <td>{chip.name}</td>
-                <td>
-                  <span className={`badge badge--${chip.state}`}>{chip.state}</span>
-                  {chip.detail && <span className="config-meta">{chip.detail}</span>}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </section>
-
-      {/* Configuration section */}
       <section className="config-section">
         <div className="config-section-header">
           <span className="config-section-title">Configuration</span>
