@@ -3,6 +3,19 @@ import { useVCoreStore } from '../ws/store'
 import type { ConditionItem, RuleGrammarContract2 } from '../contracts/RuleGrammar'
 import type { ObjectDeclaration } from '../contracts/ObjectStatusManifest'
 
+const TYPE_COLORS = 5  // cycles through .rule-card__type--0..4
+
+function ruleTypeIndex(id: string): number {
+  let hash = 0
+  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0
+  return Math.abs(hash) % TYPE_COLORS
+}
+
+function formatCondition(c: ConditionItem): string {
+  const val = c.threshold !== undefined ? c.threshold : (c.value ?? '')
+  return `${c.signal} ${c.op} ${val}`
+}
+
 export function RuleManager() {
   const rules = useVCoreStore((s) => s.rules)
   const disabledRules = useVCoreStore((s) => s.disabledRules)
@@ -15,7 +28,6 @@ export function RuleManager() {
   const channels = signalManifest?.channels ?? []
   const objects: ObjectDeclaration[] = objectStatusManifest?.objects ?? []
 
-  // Rule builder state
   const [ruleId, setRuleId] = useState('')
   const [description, setDescription] = useState('')
   const [signal, setSignal] = useState(channels[0]?.name ?? '')
@@ -90,7 +102,12 @@ export function RuleManager() {
   return (
     <div className="screen">
       <div className="screen-header">
-        <h2>Rule Manager</h2>
+        <div style={{ flex: 1 }}>
+          <div className="screen-title">Adaptation Rules</div>
+          {rules.length > 0 && (
+            <div className="screen-subtitle">{rules.length} rule{rules.length !== 1 ? 's' : ''} loaded</div>
+          )}
+        </div>
         <button className="btn" onClick={() => setShowBuilder(!showBuilder)}>
           {showBuilder ? 'Cancel' : '+ New Rule'}
         </button>
@@ -111,7 +128,7 @@ export function RuleManager() {
           </div>
 
           <fieldset className="form-section">
-            <legend>IF</legend>
+            <legend>IF [TRIGGER]</legend>
             <div className="form-row">
               <label>Signal</label>
               <select value={signal} onChange={(e) => setSignal(e.target.value)}>
@@ -120,7 +137,7 @@ export function RuleManager() {
               </select>
             </div>
             <div className="form-row">
-              <label>Op</label>
+              <label>Operator</label>
               <select value={op} onChange={(e) => setOp(e.target.value as ConditionItem['op'])}>
                 {(['>', '>=', '<', '<=', '==', '!='] as const).map((o) => <option key={o} value={o}>{o}</option>)}
               </select>
@@ -130,13 +147,13 @@ export function RuleManager() {
               <input value={threshold} onChange={(e) => setThreshold(e.target.value)} />
             </div>
             <div className="form-row">
-              <label>Sustain (s)</label>
+              <label>Sustained (s)</label>
               <input type="number" min="0" value={sustainS} onChange={(e) => setSustainS(e.target.value)} placeholder="0" />
             </div>
           </fieldset>
 
           <fieldset className="form-section">
-            <legend>THEN set</legend>
+            <legend>THEN [ACTION]</legend>
             <div className="form-row">
               <label>Target type</label>
               <select value={targetType} onChange={(e) => setTargetType(e.target.value as 'tag' | 'id')}>
@@ -211,25 +228,85 @@ export function RuleManager() {
       {/* Rule list */}
       <div className="rule-list">
         {rules.length === 0 ? (
-          <p className="empty-state">No rules yet. Drop YAML files in <code>backend/rules/</code> or use the builder above.</p>
+          <p className="empty-state">
+            No rules yet. Drop YAML files in <code>backend/rules/</code> or use the builder above.
+          </p>
         ) : (
-          rules.map((r) => {
-            const reason = disabledRules[r.id]
-            return (
-              <div key={r.id} className={`rule-card ${reason ? 'rule-card--disabled' : ''}`}>
-                <div className="rule-card__header">
-                  <span className="rule-card__id">{r.id}</span>
-                  <span className={`rule-card__badge ${reason ? 'rule-card__badge--warn' : 'rule-card__badge--ok'}`}>
-                    {reason ? 'disabled' : 'active'}
-                  </span>
-                  <button className="btn btn--small btn--danger" onClick={() => deleteRule(r.id)}>Delete</button>
-                </div>
-                {r.description && <p className="rule-card__desc">{r.description}</p>}
-                {reason && <p className="rule-card__reason">⚠ {reason}</p>}
-              </div>
-            )
-          })
+          rules.map((r) => <RuleCard key={r.id} rule={r} disabled={disabledRules[r.id]} onDelete={deleteRule} />)
         )}
+      </div>
+    </div>
+  )
+}
+
+function RuleCard({
+  rule: r,
+  disabled,
+  onDelete,
+}: {
+  rule: RuleGrammarContract2
+  disabled?: string
+  onDelete: (id: string) => void
+}) {
+  const typeIdx = ruleTypeIndex(r.id)
+  const conditions = 'all' in r.when ? [...r.when.all] : [...r.when.any]
+  const action = r.then?.set
+  const sustain = conditions[0]?.sustain_s
+
+  // Use first 3 chars of id as a type tag
+  const typeTag = r.id.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || '???'
+
+  return (
+    <div className={`rule-card ${disabled ? 'rule-card--disabled' : ''}`}>
+      <div className="rule-card__header">
+        <span className={`rule-card__type rule-card__type--${typeIdx}`}>{typeTag}</span>
+        <span className="rule-card__title">{r.description || r.id}</span>
+        <span className="rule-card__id-label">Id: {r.id}</span>
+        <span className={`rule-card__state rule-card__state--${disabled ? 'disabled' : 'active'}`}>
+          {disabled ? 'disabled' : 'active'}
+        </span>
+      </div>
+
+      <div className="rule-card__body">
+        {conditions.length > 0 && (
+          <div>
+            <div className="rule-card__section-label">IF [TRIGGER]</div>
+            {conditions.map((c, i) => (
+              <div key={i} className="rule-card__condition">
+                {formatCondition(c)}
+              </div>
+            ))}
+            {sustain !== undefined && (
+              <div className="rule-card__sustain">Sustained for {sustain}s</div>
+            )}
+          </div>
+        )}
+
+        {action && (
+          <div>
+            <div className="rule-card__section-label">THEN [ACTION]</div>
+            <div className="rule-card__action">
+              <span>
+                {action.status} = <strong>{String(action.value)}</strong>
+                {' '}on{' '}
+                {'tag' in action.target ? `tag:${action.target.tag}` : `id:${action.target.id}`}
+              </span>
+              {r.then.cooldown_s !== undefined && (
+                <span className="rule-card__action-tag">cooldown {r.then.cooldown_s}s</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {disabled && (
+          <div style={{ fontSize: 12, color: '#f59e0b', marginTop: 2 }}>
+            ⚠ {disabled}
+          </div>
+        )}
+      </div>
+
+      <div className="rule-card__footer">
+        <button className="btn btn--small btn--danger" onClick={() => onDelete(r.id)}>Delete</button>
       </div>
     </div>
   )
