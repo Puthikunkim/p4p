@@ -11,7 +11,7 @@ import pytest
 import websockets
 
 from vcore.core.eventbus import EventBus, Topics
-from vcore.core.models import LinkStatusEvent, StatusRequest, WarningEvent
+from vcore.core.models import LinkStatusEvent, StatusRequest, VrContextEvent, WarningEvent
 from vcore.core.schema import ActiveManifests
 from vcore.outbound.ws_sink import WsSink, _validate_request
 
@@ -213,6 +213,80 @@ async def test_invalid_discrete_value_emits_warning() -> None:
     await sink.stop()
 
     assert any("extreme" in w.message for w in warnings)
+
+
+# ── inbound vr_context (Unity → backend) ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_vr_context_message_publishes_event() -> None:
+    sink, bus, _ = await _make_sink()
+    port = sink.bound_port
+    events: list[VrContextEvent] = []
+
+    async def on_ctx(p: object) -> None:
+        if isinstance(p, VrContextEvent):
+            events.append(p)
+
+    bus.subscribe(Topics.VR_CONTEXT, on_ctx)
+
+    async with websockets.connect(f"ws://localhost:{port}") as ws:
+        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await asyncio.sleep(0.05)
+        await ws.send(json.dumps({
+            "type": "vr_context",
+            "payload": {"scene": "Aisle 2", "step": "3 / 8", "items_left": 4, "assist": True},
+        }))
+        await asyncio.sleep(0.1)
+
+    await sink.stop()
+
+    assert len(events) == 1
+    assert events[0].fields == {"scene": "Aisle 2", "step": "3 / 8", "items_left": 4, "assist": True}
+
+
+@pytest.mark.asyncio
+async def test_vr_context_without_scalar_fields_is_dropped_with_warning() -> None:
+    sink, bus, _ = await _make_sink()
+    port = sink.bound_port
+    events: list[object] = []
+    warnings: list[WarningEvent] = []
+    bus.subscribe(Topics.VR_CONTEXT, lambda p: events.append(p))
+    bus.subscribe(Topics.WARNING, lambda p: warnings.append(p) if isinstance(p, WarningEvent) else None)
+
+    async with websockets.connect(f"ws://localhost:{port}") as ws:
+        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await asyncio.sleep(0.05)
+        # Nested object is not a scalar field, so nothing survives → dropped.
+        await ws.send(json.dumps({"type": "vr_context", "payload": {"nested": {"a": 1}}}))
+        await asyncio.sleep(0.1)
+
+    await sink.stop()
+
+    assert events == []
+    assert any("vr_context" in w.message for w in warnings)
+
+
+@pytest.mark.asyncio
+async def test_unknown_inbound_type_is_ignored() -> None:
+    """A message Unity sends that isn't a known type must not crash the read loop."""
+    sink, bus, _ = await _make_sink()
+    port = sink.bound_port
+    events: list[object] = []
+    bus.subscribe(Topics.VR_CONTEXT, lambda p: events.append(p))
+
+    async with websockets.connect(f"ws://localhost:{port}") as ws:
+        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await asyncio.sleep(0.05)
+        await ws.send(json.dumps({"type": "something_else", "payload": {"x": 1}}))
+        await ws.send("not json at all")
+        await asyncio.sleep(0.1)
+        # Still alive: a following vr_context still gets through.
+        await ws.send(json.dumps({"type": "vr_context", "payload": {"step": "1"}}))
+        await asyncio.sleep(0.1)
+
+    await sink.stop()
+
+    assert len(events) == 1
 
 
 # ── reconnect ─────────────────────────────────────────────────────────────────

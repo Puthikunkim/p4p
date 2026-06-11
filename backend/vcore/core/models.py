@@ -163,3 +163,17 @@ class WarningEvent(BaseModel):
     model_config = {"extra": "forbid"}
     source: str
     message: str
+
+
+# ── Contract 4 — VR Context (Unity → backend) ────────────────────────────────
+
+class VrContextEvent(BaseModel):
+    """Free-form study/scene context pushed by Unity on each step change.
+
+    `fields` is an open map of label → scalar value; the dashboard renders
+    whatever keys arrive, so any scene can describe its own context without a
+    fixed schema. `ts` is the optional Unity-supplied timestamp.
+    """
+    model_config = {"extra": "forbid"}
+    fields: dict[str, str | float | int | bool]
+    ts: float | None = None

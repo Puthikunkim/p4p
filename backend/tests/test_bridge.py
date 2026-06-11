@@ -69,7 +69,9 @@ def test_dashboard_receives_object_status_manifest_on_connect(app) -> None:  # t
 
 def test_dashboard_receives_rule_list_on_connect(app) -> None:  # type: ignore[no-untyped-def]
     with TestClient(app) as client, client.websocket_connect("/ws/dashboard") as ws:
-        messages = _collect(ws, count=1, looking_for="rule_list")
+        # rule_list arrives within the on-connect snapshot (after any manifests);
+        # read enough of it to find rule_list (_collect breaks early on match).
+        messages = _collect(ws, count=8, looking_for="rule_list")
     assert any(m["type"] == "rule_list" for m in messages)
     rl = next(m for m in messages if m["type"] == "rule_list")
     assert "rules" in rl["payload"]

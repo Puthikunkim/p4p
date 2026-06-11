@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -49,6 +49,7 @@ class DashboardBridge:
         self._signal_source = signal_source
         self._clients: set[WebSocket] = set()
         self._cached_link_states: dict[str, object] = {}
+        self._cached_vr_context: object | None = None
 
     @property
     def signal_source(self) -> SignalSource | None:
@@ -67,6 +68,7 @@ class DashboardBridge:
         self._bus.subscribe(Topics.RULES_UPDATED, self._on_rules_updated)
         self._bus.subscribe(Topics.STALE, self._on_stale)
         self._bus.subscribe(Topics.RULE_FIRED, self._on_rule_fired)
+        self._bus.subscribe(Topics.VR_CONTEXT, self._on_vr_context)
 
     async def stop(self) -> None:
         self._bus.unsubscribe(Topics.MANIFEST_UPDATED, self._on_manifest)
@@ -77,6 +79,7 @@ class DashboardBridge:
         self._bus.unsubscribe(Topics.RULES_UPDATED, self._on_rules_updated)
         self._bus.unsubscribe(Topics.STALE, self._on_stale)
         self._bus.unsubscribe(Topics.RULE_FIRED, self._on_rule_fired)
+        self._bus.unsubscribe(Topics.VR_CONTEXT, self._on_vr_context)
 
     # ── connection handler (called from FastAPI route) ────────────────────────
 
@@ -85,10 +88,12 @@ class DashboardBridge:
         await ws.accept()
         self._clients.add(ws)
         log.info("bridge: dashboard client connected (%d total)", len(self._clients))
-        if len(self._clients) == 1:
-            await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="browser-ws", state="up"))
         try:
+            # Send the full state snapshot before any incremental link events, so a
+            # connecting client always receives the manifests/rule list first.
             await self._push_current_state(ws)
+            if len(self._clients) == 1:
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="browser-ws", state="up"))
             while True:
                 try:
                     await ws.receive_text()  # keep-alive; ignore client messages
@@ -114,7 +119,7 @@ class DashboardBridge:
         if self._manifests.object_status_manifest is not None:
             await _send(ws, "object_status_manifest", self._manifests.object_status_manifest)
         await _send(ws, "rule_list", self._rule_list_payload())
-        unity_state = "up" if self._ws_sink.is_connected else "down"
+        unity_state: Literal["up", "down"] = "up" if self._ws_sink.is_connected else "down"
         await _send(ws, "link_status", LinkStatusEvent(link="unity-ws", state=unity_state).model_dump(mode="json"))
         if self._signal_source is not None:
             await _send(ws, "link_status", LinkStatusEvent(link="om-lsl", state=self._signal_source.link_state).model_dump(mode="json"))
@@ -122,6 +127,8 @@ class DashboardBridge:
             if key == "om-lsl" and self._signal_source is not None:
                 continue  # already pushed live state above
             await _send(ws, "link_status", payload)
+        if self._cached_vr_context is not None:
+            await _send(ws, "vr_context", self._cached_vr_context)
 
     # ── bus event handlers ────────────────────────────────────────────────────
 
@@ -168,6 +175,13 @@ class DashboardBridge:
         from vcore.core.models import StatusRequest
         if isinstance(payload, StatusRequest):
             await self._broadcast("rule_fired", payload.model_dump(mode="json"))
+
+    async def _on_vr_context(self, payload: object) -> None:
+        from vcore.core.models import VrContextEvent
+        if isinstance(payload, VrContextEvent):
+            data = payload.model_dump(mode="json")
+            self._cached_vr_context = data
+            await self._broadcast("vr_context", data)
 
     # ── helpers ───────────────────────────────────────────────────────────────
 

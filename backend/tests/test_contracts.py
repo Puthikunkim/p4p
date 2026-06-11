@@ -61,6 +61,19 @@ def test_valid_golden_round_trips_pydantic(contract: str, model_cls: type) -> No
     assert instance.schema_version == "1.0.0"
 
 
+# ── Contract 4 (VR Context) — envelope without schema_version ─────────────────
+
+def test_vr_context_valid_golden_passes_jsonschema() -> None:
+    payload = _load("vr_context.valid.json")
+    vschema.validate(payload, "vr_context")  # must not raise
+
+
+def test_vr_context_invalid_golden_fails_jsonschema() -> None:
+    payload = _load("vr_context.invalid.json")
+    with pytest.raises(jsonschema.ValidationError):
+        vschema.validate(payload, "vr_context")
+
+
 # ── version-skew checks ───────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("contract", list(CONTRACT_MAP))

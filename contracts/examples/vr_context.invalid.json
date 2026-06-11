@@ -1,0 +1,7 @@
+{
+  "type": "vr_context",
+  "payload": {
+    "scene": "Aisle 2 – Bakery",
+    "nested": { "not": "allowed" }
+  }
+}

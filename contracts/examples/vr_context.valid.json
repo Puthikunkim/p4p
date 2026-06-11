@@ -1,0 +1,10 @@
+{
+  "type": "vr_context",
+  "payload": {
+    "scene": "Aisle 2 – Bakery",
+    "step": "3 / 8",
+    "instruction": "Select the milk",
+    "items_left": 4,
+    "assistance_active": true
+  }
+}

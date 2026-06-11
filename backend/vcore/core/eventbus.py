@@ -20,6 +20,7 @@ class Topics:
     WARNING = "warning"
     LINK_STATUS = "link.status"
     STALE = "signal.stale"
+    VR_CONTEXT = "vr.context"
 
 
 class EventBus:

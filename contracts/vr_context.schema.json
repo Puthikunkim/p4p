@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcore/contracts/vr_context",
+  "title": "VR Context — Contract 4",
+  "description": "Pushed by the Unity runtime over /ws/runtime whenever the participant advances to a new step/part of the study session. The dashboard renders whatever fields arrive, so any scene can describe its own context without a fixed schema. Sent after the object-status manifest handshake.",
+  "type": "object",
+  "required": ["type", "payload"],
+  "additionalProperties": false,
+  "properties": {
+    "type": { "const": "vr_context" },
+    "payload": {
+      "type": "object",
+      "description": "Open map of field label → scalar value. Keys are arbitrary; the dashboard prettifies them into labels and preserves order. A conventional 'scene' key, if present, is used to label the recorded event. Each new message fully replaces the previously displayed context.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": ["string", "number", "boolean"]
+      }
+    }
+  }
+}

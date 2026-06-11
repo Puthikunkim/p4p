@@ -11,7 +11,13 @@ from fastapi.testclient import TestClient
 
 from vcore.app import create_app
 from vcore.core.eventbus import EventBus, Topics
-from vcore.core.models import SampleEvent, SignalManifest, StatusRequest, WarningEvent
+from vcore.core.models import (
+    SampleEvent,
+    SignalManifest,
+    StatusRequest,
+    VrContextEvent,
+    WarningEvent,
+)
 from vcore.core.schema import ActiveManifests
 from vcore.recording.recorder import Recorder
 from vcore.recording.sqlite_store import SqliteStore
@@ -213,6 +219,22 @@ async def test_recorder_records_warning(rec_fixture: tuple[EventBus, Recorder]) 
     s = rec.store.get_session(sid)
     assert s is not None
     assert s["events"][0]["event_type"] == "warning"
+
+
+async def test_recorder_records_vr_context(rec_fixture: tuple[EventBus, Recorder]) -> None:
+    bus, rec = rec_fixture
+    sid = rec.start_session("P01")
+    await bus.publish(Topics.VR_CONTEXT, VrContextEvent(
+        fields={"scene": "Aisle 2", "step": "3 / 8", "items_left": 4},
+    ))
+    await rec.stop_session()
+    s = rec.store.get_session(sid)
+    assert s is not None
+    ev = s["events"][0]
+    assert ev["event_type"] == "vr_context"
+    assert ev["source"] == "Aisle 2"  # scene used as the event source label
+    import json as _json
+    assert _json.loads(ev["payload"])["fields"]["step"] == "3 / 8"
 
 
 async def test_recorder_ignores_events_outside_session(

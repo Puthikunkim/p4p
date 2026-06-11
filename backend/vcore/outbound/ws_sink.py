@@ -14,6 +14,7 @@ from vcore.core.models import (
     LinkStatusEvent,
     StatusRequest,
     TagTarget,
+    VrContextEvent,
     WarningEvent,
 )
 from vcore.core.schema import ActiveManifests
@@ -30,7 +31,9 @@ class WsSink(ActionSink):
       2. Unity sends the Object-Status Manifest as a JSON string.
       3. V-CORE validates + stores the manifest and publishes OBJECT_STATUS_UPDATED.
       4. V-CORE sends a StatusRequest JSON string whenever the rule engine fires.
-      5. Unity closes the connection to signal a scene change or shutdown.
+      5. Unity may push typed envelopes (e.g. {"type": "vr_context", "payload": …})
+         on step/scene changes; these are routed onto the event bus.
+      6. Unity closes the connection to signal a scene change or shutdown.
 
     Link status events are published on connect, disconnect, and manifest failure.
     Incoming StatusRequests are validated against the active manifest before delivery;
@@ -130,12 +133,15 @@ class WsSink(ActionSink):
             )
             log.info("ws_sink: object-status manifest accepted")
 
-            # Keep alive: read until Unity closes the connection.
+            # Read inbound messages until Unity closes the connection. After the
+            # manifest handshake, Unity may push typed envelopes such as
+            # {"type": "vr_context", "payload": {...}}; unknown types are ignored.
             while True:
                 try:
-                    await ws.recv()
+                    msg = await ws.recv()
                 except Exception:
                     break
+                await self._handle_inbound(msg)
 
         except Exception as exc:
             log.debug("ws_sink: connection closed: %s", type(exc).__name__)
@@ -146,6 +152,34 @@ class WsSink(ActionSink):
                 Topics.LINK_STATUS,
                 LinkStatusEvent(link="unity-ws", state="down"),
             )
+
+    async def _handle_inbound(self, raw: str) -> None:
+        """Route a post-handshake message from Unity to the right bus topic."""
+        try:
+            msg = json.loads(raw)
+        except (ValueError, TypeError):
+            return
+        if not isinstance(msg, dict):
+            return
+        if msg.get("type") == "vr_context":
+            await self._handle_vr_context(msg.get("payload"))
+
+    async def _handle_vr_context(self, payload: Any) -> None:
+        if not isinstance(payload, dict) or not payload:
+            await self._bus.publish(
+                Topics.WARNING,
+                WarningEvent(source="ws_sink", message="vr_context dropped: payload must be a non-empty object"),
+            )
+            return
+        # Keep only scalar field values; the dashboard renders whatever survives.
+        fields = {k: v for k, v in payload.items() if isinstance(v, (str, int, float, bool))}
+        if not fields:
+            await self._bus.publish(
+                Topics.WARNING,
+                WarningEvent(source="ws_sink", message="vr_context dropped: no scalar fields"),
+            )
+            return
+        await self._bus.publish(Topics.VR_CONTEXT, VrContextEvent(fields=fields))
 
     # ── bus handler ───────────────────────────────────────────────────────────
 

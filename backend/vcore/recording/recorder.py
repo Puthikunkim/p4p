@@ -5,7 +5,13 @@ import logging
 from pathlib import Path
 
 from vcore.core.eventbus import EventBus, Topics
-from vcore.core.models import SampleEvent, SignalManifest, StatusRequest, WarningEvent
+from vcore.core.models import (
+    SampleEvent,
+    SignalManifest,
+    StatusRequest,
+    VrContextEvent,
+    WarningEvent,
+)
 from vcore.core.schema import ActiveManifests
 from vcore.recording.sqlite_store import SqliteStore
 from vcore.recording.xdf_writer import XdfWriter
@@ -29,11 +35,13 @@ class Recorder:
         self._bus.subscribe(Topics.SAMPLE, self._on_sample)
         self._bus.subscribe(Topics.RULE_FIRED, self._on_rule_fired)
         self._bus.subscribe(Topics.WARNING, self._on_warning)
+        self._bus.subscribe(Topics.VR_CONTEXT, self._on_vr_context)
 
     async def stop(self) -> None:
         self._bus.unsubscribe(Topics.SAMPLE, self._on_sample)
         self._bus.unsubscribe(Topics.RULE_FIRED, self._on_rule_fired)
         self._bus.unsubscribe(Topics.WARNING, self._on_warning)
+        self._bus.unsubscribe(Topics.VR_CONTEXT, self._on_vr_context)
         if self._session_id:
             await self.stop_session()
         self._store.close()
@@ -102,6 +110,17 @@ class Recorder:
             "warning",
             event.source,
             {"message": event.message},
+        )
+
+    async def _on_vr_context(self, event: VrContextEvent) -> None:
+        if not self._session_id:
+            return
+        scene = event.fields.get("scene", "unity")
+        self._store.record_event(
+            self._session_id,
+            "vr_context",
+            str(scene),
+            event.model_dump(mode="json"),
         )
 
     # ── helpers ───────────────────────────────────────────────────────────────
