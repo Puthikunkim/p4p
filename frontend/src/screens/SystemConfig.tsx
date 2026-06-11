@@ -10,9 +10,6 @@ function stateLabel(state: string): string {
   const map: Record<string, string> = {
     up: 'Online',
     down: 'Offline',
-    connecting: 'Connecting',
-    connected: 'Online',
-    disconnected: 'Offline',
     stale: 'Stale',
     reconnecting: 'Reconnecting',
     unknown: 'Unknown',
