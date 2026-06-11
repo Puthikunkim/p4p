@@ -43,6 +43,7 @@ function _connect(url: string): void {
     if (ws !== socket) return  // stale socket from a previous connect cycle; ignore
     ws = null
     setWsState('disconnected')
+    useVCoreStore.getState().clearLinkStatuses()
     if (!stopped) {
       setTimeout(() => {
         reconnectDelay = Math.min(reconnectDelay * 2, RECONNECT_MAX_MS)

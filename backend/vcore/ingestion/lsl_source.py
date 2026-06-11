@@ -59,6 +59,16 @@ class LSLSource(SignalSource):
     def stream_name(self) -> str:
         return self._stream_name
 
+    @property
+    def link_state(self) -> str:
+        if self._is_offline:
+            return 'down'
+        if self._is_stale:
+            return 'stale'
+        if self._last_sample_at > 0:
+            return 'up'
+        return 'down'
+
     async def start(self) -> None:
         raw: dict[str, Any] = json.loads(self._manifest_path.read_text())
         result = self._manifests.update_signal_manifest(raw)

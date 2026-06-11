@@ -16,6 +16,11 @@ class SignalSource(ABC):
     def stream_name(self) -> str:
         """Human-readable identifier for this source (used in warnings/logs)."""
 
+    @property
+    def link_state(self) -> str:
+        """Current om-lsl link state: 'up', 'stale', or 'down'."""
+        return 'down'
+
     @abstractmethod
     async def start(self) -> None:
         """Begin streaming. Returns immediately; streaming runs as a background task."""

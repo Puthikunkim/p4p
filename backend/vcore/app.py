@@ -74,6 +74,7 @@ def create_app(
                 bus=bus,
                 manifests=manifests,
             )
+            bridge.signal_source = lsl_source
             await lsl_source.start()
             log.info("V-CORE LSL source started (stream=%s)", _DEFAULT_STREAM)
 

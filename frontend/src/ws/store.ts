@@ -36,6 +36,7 @@ export interface VCoreStore {
   // actions
   applyMessage: (msg: ServerMessage) => void
   setWsState: (state: VCoreStore['wsState']) => void
+  clearLinkStatuses: () => void
   clearWarnings: () => void
   setActiveSession: (id: string | null) => void
 }
@@ -117,6 +118,8 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
     }),
 
   setWsState: (wsState) => set({ wsState }),
+
+  clearLinkStatuses: () => set({ linkStatuses: {} }),
 
   clearWarnings: () => set({ warnings: [] }),
 

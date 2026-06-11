@@ -11,6 +11,7 @@ from vcore.core.models import SampleEvent
 from vcore.core.schema import ActiveManifests
 from vcore.engine.evaluator import RuleEvaluator
 from vcore.engine.registry import RuleRegistry
+from vcore.ingestion.base import SignalSource
 from vcore.outbound.ws_sink import WsSink
 
 log = logging.getLogger(__name__)
@@ -38,14 +39,24 @@ class DashboardBridge:
         registry: RuleRegistry,
         evaluator: RuleEvaluator,
         ws_sink: WsSink,
+        signal_source: SignalSource | None = None,
     ) -> None:
         self._bus = bus
         self._manifests = manifests
         self._registry = registry
         self._evaluator = evaluator
         self._ws_sink = ws_sink
+        self._signal_source = signal_source
         self._clients: set[WebSocket] = set()
         self._cached_link_states: dict[str, object] = {}
+
+    @property
+    def signal_source(self) -> SignalSource | None:
+        return self._signal_source
+
+    @signal_source.setter
+    def signal_source(self, source: SignalSource) -> None:
+        self._signal_source = source
 
     async def start(self) -> None:
         self._bus.subscribe(Topics.MANIFEST_UPDATED, self._on_manifest)
@@ -105,7 +116,11 @@ class DashboardBridge:
         await _send(ws, "rule_list", self._rule_list_payload())
         unity_state = "up" if self._ws_sink.is_connected else "down"
         await _send(ws, "link_status", LinkStatusEvent(link="unity-ws", state=unity_state).model_dump(mode="json"))
-        for payload in self._cached_link_states.values():
+        if self._signal_source is not None:
+            await _send(ws, "link_status", LinkStatusEvent(link="om-lsl", state=self._signal_source.link_state).model_dump(mode="json"))
+        for key, payload in self._cached_link_states.items():
+            if key == "om-lsl" and self._signal_source is not None:
+                continue  # already pushed live state above
             await _send(ws, "link_status", payload)
 
     # ── bus event handlers ────────────────────────────────────────────────────
