@@ -95,6 +95,7 @@ class ActiveManifests:
 
     def __init__(self) -> None:
         self._signal: dict[str, Any] | None = None
+        self._behaviour_channels: list[dict[str, Any]] = []
         self._object_status: dict[str, Any] | None = None
 
     # ── Signal Schema (Contract 1) ────────────────────────────────────────
@@ -108,9 +109,33 @@ class ActiveManifests:
         warning = f"signal_schema minor version skew: {payload['schema_version']}" if skew == VersionSkew.WARN else None
         return AcceptResult(skew, warning)
 
+    def update_behaviour_channels(self, channels: list[dict[str, Any]]) -> None:
+        """Merge Unity-declared behavioural channels (Contract 1 channel shape).
+
+        These augment the active signal manifest so the dashboard renders them,
+        the rule engine can reference them, and degradation keeps the matching
+        rules enabled. Raises on a malformed channel. Channel names already
+        present in the base (Om) manifest are ignored to avoid duplicates.
+        """
+        from vcore.core.models import Channel  # local import avoids import cycle
+        for ch in channels:
+            Channel.model_validate(ch)  # structural validation; raises on bad shape
+        self._behaviour_channels = channels
+
     @property
     def signal_manifest(self) -> dict[str, Any] | None:
-        return self._signal
+        """Active signal manifest = base (Om) manifest ⊕ Unity behavioural channels."""
+        if self._signal is None:
+            return None
+        if not self._behaviour_channels:
+            return self._signal
+        base_names = {ch["name"] for ch in self._signal.get("channels", [])}
+        extra = [ch for ch in self._behaviour_channels if ch["name"] not in base_names]
+        if not extra:
+            return self._signal
+        merged = dict(self._signal)
+        merged["channels"] = [*self._signal.get("channels", []), *extra]
+        return merged
 
     # ── Object-Status Manifest (Contract 3b) ─────────────────────────────
 

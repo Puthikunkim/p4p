@@ -11,7 +11,13 @@ import pytest
 import websockets
 
 from vcore.core.eventbus import EventBus, Topics
-from vcore.core.models import LinkStatusEvent, StatusRequest, VrContextEvent, WarningEvent
+from vcore.core.models import (
+    LinkStatusEvent,
+    SampleEvent,
+    StatusRequest,
+    VrContextEvent,
+    WarningEvent,
+)
 from vcore.core.schema import ActiveManifests
 from vcore.outbound.ws_sink import WsSink, _validate_request
 
@@ -287,6 +293,87 @@ async def test_unknown_inbound_type_is_ignored() -> None:
     await sink.stop()
 
     assert len(events) == 1
+
+
+# ── inbound behavioural signals (Unity → backend) ─────────────────────────────
+
+_PHYS_MANIFEST: dict[str, Any] = {
+    "schema_version": "1.0.0",
+    "stream": {"name": "om.cognitive", "source_id": "t", "nominal_srate": 10},
+    "channels": [
+        {"name": "cognitive_load", "unit": "normalized", "type": "scalar",
+         "range": {"min": 0, "max": 1},
+         "display": {"hint": "stat_card", "label": "Cognitive Load", "group": "physiological"}},
+    ],
+}
+
+_BEHAVIOUR_CH = [
+    {"name": "task_accuracy", "unit": "%", "type": "scalar", "range": {"min": 0, "max": 100},
+     "display": {"hint": "stat_card", "label": "Task Accuracy", "group": "behavioural"}},
+]
+
+
+@pytest.mark.asyncio
+async def test_behaviour_manifest_merges_into_signal_manifest() -> None:
+    sink, bus, manifests = await _make_sink()
+    manifests.update_signal_manifest(_PHYS_MANIFEST)
+    port = sink.bound_port
+    updates: list[object] = []
+    bus.subscribe(Topics.MANIFEST_UPDATED, lambda p: updates.append(p))
+
+    async with websockets.connect(f"ws://localhost:{port}") as ws:
+        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await asyncio.sleep(0.05)
+        await ws.send(json.dumps({"type": "behaviour_manifest", "payload": {"channels": _BEHAVIOUR_CH}}))
+        await asyncio.sleep(0.1)
+
+    await sink.stop()
+
+    names = [c["name"] for c in manifests.signal_manifest["channels"]]
+    assert "task_accuracy" in names
+    assert len(updates) >= 1
+
+
+@pytest.mark.asyncio
+async def test_behaviour_sample_emitted_as_signal_event() -> None:
+    sink, bus, _ = await _make_sink()
+    port = sink.bound_port
+    samples: list[SampleEvent] = []
+
+    async def on_sample(p: object) -> None:
+        if isinstance(p, SampleEvent):
+            samples.append(p)
+
+    bus.subscribe(Topics.SAMPLE, on_sample)
+
+    async with websockets.connect(f"ws://localhost:{port}") as ws:
+        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await asyncio.sleep(0.05)
+        await ws.send(json.dumps({"type": "behaviour_sample", "payload": {"response_latency": 9.2, "idle_time": 3}}))
+        await asyncio.sleep(0.1)
+
+    await sink.stop()
+
+    assert len(samples) == 1
+    assert samples[0].stream_name == "unity.behaviour"
+    assert samples[0].values == {"response_latency": 9.2, "idle_time": 3.0}
+
+
+@pytest.mark.asyncio
+async def test_behaviour_sample_non_numeric_dropped() -> None:
+    sink, bus, _ = await _make_sink()
+    port = sink.bound_port
+    samples: list[object] = []
+    bus.subscribe(Topics.SAMPLE, lambda p: samples.append(p))
+
+    async with websockets.connect(f"ws://localhost:{port}") as ws:
+        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await asyncio.sleep(0.05)
+        await ws.send(json.dumps({"type": "behaviour_sample", "payload": {"response_latency": "slow"}}))
+        await asyncio.sleep(0.1)
+
+    await sink.stop()
+    assert samples == []
 
 
 # ── reconnect ─────────────────────────────────────────────────────────────────

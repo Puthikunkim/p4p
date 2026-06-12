@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import time
 from typing import Any
 
 import websockets
@@ -12,6 +13,7 @@ from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import (
     IdTarget,
     LinkStatusEvent,
+    SampleEvent,
     StatusRequest,
     TagTarget,
     VrContextEvent,
@@ -161,8 +163,14 @@ class WsSink(ActionSink):
             return
         if not isinstance(msg, dict):
             return
-        if msg.get("type") == "vr_context":
-            await self._handle_vr_context(msg.get("payload"))
+        mtype = msg.get("type")
+        payload = msg.get("payload")
+        if mtype == "vr_context":
+            await self._handle_vr_context(payload)
+        elif mtype == "behaviour_manifest":
+            await self._handle_behaviour_manifest(payload)
+        elif mtype == "behaviour_sample":
+            await self._handle_behaviour_sample(payload)
 
     async def _handle_vr_context(self, payload: Any) -> None:
         if not isinstance(payload, dict) or not payload:
@@ -180,6 +188,45 @@ class WsSink(ActionSink):
             )
             return
         await self._bus.publish(Topics.VR_CONTEXT, VrContextEvent(fields=fields))
+
+    async def _handle_behaviour_manifest(self, payload: Any) -> None:
+        """Unity declares the behavioural channels it tracks; merge them into the
+        active signal manifest so they render, feed rules, and re-enable any
+        rules that reference them."""
+        channels = payload.get("channels") if isinstance(payload, dict) else None
+        if not isinstance(channels, list) or not channels:
+            await self._bus.publish(
+                Topics.WARNING,
+                WarningEvent(source="ws_sink", message="behaviour_manifest dropped: 'channels' must be a non-empty list"),
+            )
+            return
+        try:
+            self._manifests.update_behaviour_channels(channels)
+        except Exception as exc:
+            await self._bus.publish(
+                Topics.WARNING,
+                WarningEvent(source="ws_sink", message=f"behaviour_manifest rejected: {exc}"),
+            )
+            return
+        log.info("ws_sink: merged %d behavioural channel(s) from Unity", len(channels))
+        await self._bus.publish(Topics.MANIFEST_UPDATED, self._manifests.signal_manifest)
+
+    async def _handle_behaviour_sample(self, payload: Any) -> None:
+        """One frame of behavioural metrics from Unity, emitted as a SAMPLE event
+        so it flows to the rule engine, dashboard, and recorder like any signal."""
+        if not isinstance(payload, dict) or not payload:
+            return
+        values: dict[str, float | str] = {
+            k: float(v)
+            for k, v in payload.items()
+            if isinstance(v, (int, float)) and not isinstance(v, bool)
+        }
+        if not values:
+            return
+        await self._bus.publish(
+            Topics.SAMPLE,
+            SampleEvent(stream_name="unity.behaviour", timestamp=_lsl_now(), values=values),
+        )
 
     # ── bus handler ───────────────────────────────────────────────────────────
 
@@ -207,6 +254,15 @@ class WsSink(ActionSink):
             await ws.send(event.model_dump_json())
         except Exception:
             log.warning("ws_sink: connection closed while sending StatusRequest")
+
+
+def _lsl_now() -> float:
+    """Best-effort LSL clock so Unity samples share the Om stream's time domain."""
+    try:
+        import pylsl
+        return float(pylsl.local_clock())
+    except Exception:
+        return time.time()
 
 
 # ── target validation ─────────────────────────────────────────────────────────

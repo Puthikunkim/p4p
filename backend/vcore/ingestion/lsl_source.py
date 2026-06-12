@@ -46,6 +46,7 @@ class LSLSource(SignalSource):
         self._stale_timeout_s = stale_timeout_s
         self._offline_timeout_s = offline_timeout_s
         self._resolve_timeout = resolve_timeout
+        self._own_manifest: dict[str, Any] | None = None
         self._inlet: pylsl.StreamInlet | None = None
         self._stream_task: asyncio.Task[None] | None = None
         self._watchdog_task: asyncio.Task[None] | None = None
@@ -71,6 +72,7 @@ class LSLSource(SignalSource):
 
     async def start(self) -> None:
         raw: dict[str, Any] = json.loads(self._manifest_path.read_text())
+        self._own_manifest = raw  # map the LSL stream by *our* channels, not the merged manifest
         result = self._manifests.update_signal_manifest(raw)
 
         if result.warning:
@@ -121,7 +123,7 @@ class LSLSource(SignalSource):
             return
 
         self._inlet = pylsl.StreamInlet(streams[0], processing_flags=pylsl.proc_clocksync)
-        manifest = self._manifests.signal_manifest
+        manifest = self._own_manifest
         assert manifest is not None
 
         channel_names = [ch["name"] for ch in manifest["channels"]]

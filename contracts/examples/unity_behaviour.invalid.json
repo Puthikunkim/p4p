@@ -1,0 +1,6 @@
+{
+  "type": "behaviour_sample",
+  "payload": {
+    "response_latency": "slow"
+  }
+}

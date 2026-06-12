@@ -74,6 +74,19 @@ def test_vr_context_invalid_golden_fails_jsonschema() -> None:
         vschema.validate(payload, "vr_context")
 
 
+# ── Contract 5 (Unity Behaviour) — manifest + sample envelopes ────────────────
+
+def test_unity_behaviour_valid_golden_passes_jsonschema() -> None:
+    payload = _load("unity_behaviour.valid.json")
+    vschema.validate(payload, "unity_behaviour")  # must not raise
+
+
+def test_unity_behaviour_invalid_golden_fails_jsonschema() -> None:
+    payload = _load("unity_behaviour.invalid.json")
+    with pytest.raises(jsonschema.ValidationError):
+        vschema.validate(payload, "unity_behaviour")
+
+
 # ── version-skew checks ───────────────────────────────────────────────────────
 
 @pytest.mark.parametrize("contract", list(CONTRACT_MAP))

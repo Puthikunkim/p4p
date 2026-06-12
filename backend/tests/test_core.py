@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.schema import ActiveManifests, VersionSkew
@@ -159,3 +160,60 @@ def test_previous_manifest_kept_on_refuse() -> None:
     m.update_signal_manifest(bad)
 
     assert m.signal_manifest is good  # untouched
+
+
+# ── behavioural channel merge (Unity-declared) ────────────────────────────────
+
+_BEHAVIOUR_CH = [{
+    "name": "response_latency", "unit": "s", "type": "scalar",
+    "range": {"min": 0, "max": 15},
+    "display": {"hint": "stat_card", "label": "Response Latency", "group": "behavioural"},
+}]
+
+
+def test_behaviour_channels_merge_into_signal_manifest() -> None:
+    m = ActiveManifests()
+    m.update_signal_manifest(_load("signal_schema.valid.json"))
+    base_count = len(m.signal_manifest["channels"])
+    m.update_behaviour_channels(_BEHAVIOUR_CH)
+    names = [c["name"] for c in m.signal_manifest["channels"]]
+    assert "response_latency" in names
+    assert len(m.signal_manifest["channels"]) == base_count + 1
+
+
+def test_behaviour_channels_need_a_base_manifest() -> None:
+    m = ActiveManifests()
+    m.update_behaviour_channels(_BEHAVIOUR_CH)
+    assert m.signal_manifest is None  # nothing to merge into yet
+
+
+def test_behaviour_channels_reject_malformed() -> None:
+    m = ActiveManifests()
+    m.update_signal_manifest(_load("signal_schema.valid.json"))
+    with pytest.raises(ValidationError):
+        m.update_behaviour_channels([{"name": "broken"}])  # missing unit/type/display
+
+
+def test_merged_manifest_keeps_behavioural_rule_enabled() -> None:
+    """A rule on a behavioural signal must not be degraded once Unity declares it."""
+    from vcore.core.models import Rule
+    from vcore.engine import degradation
+
+    rule = Rule.model_validate({
+        "id": "fog-idle", "schema_version": "1.0.0", "enabled": True,
+        "when": {"all": [{"signal": "response_latency", "op": ">=", "threshold": 8}]},
+        "then": {"set": {"target": {"tag": "fog"}, "status": "density", "value": "medium"}},
+    })
+    obj_manifest = _load("object_status_manifest.valid.json")
+
+    m = ActiveManifests()
+    m.update_signal_manifest(_load("signal_schema.valid.json"))
+    # Before Unity declares it, the signal is unknown → rule disabled.
+    disabled_before = degradation.reconcile({rule.id: rule}, m.signal_manifest, obj_manifest)
+    assert rule.id in disabled_before
+    assert "response_latency" in disabled_before[rule.id]
+
+    # After the merge the signal is known, so the rule is no longer degraded for it.
+    m.update_behaviour_channels(_BEHAVIOUR_CH)
+    disabled_after = degradation.reconcile({rule.id: rule}, m.signal_manifest, obj_manifest)
+    assert rule.id not in disabled_after or "response_latency" not in disabled_after.get(rule.id, "")

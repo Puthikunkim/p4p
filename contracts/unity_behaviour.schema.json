@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcore/contracts/unity_behaviour",
+  "title": "Unity Behaviour — Contract 5",
+  "description": "Behavioural telemetry the Unity runtime tracks over a session and pushes over /ws/runtime. Two message types: 'behaviour_manifest' declares the behavioural channels once (merged into the active signal manifest), and 'behaviour_sample' streams their values as signal frames that feed the dashboard, rule engine, and recorder. Sent after the object-status manifest handshake.",
+  "oneOf": [
+    { "$ref": "#/$defs/behaviour_manifest" },
+    { "$ref": "#/$defs/behaviour_sample" }
+  ],
+  "$defs": {
+    "behaviour_manifest": {
+      "type": "object",
+      "required": ["type", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "behaviour_manifest" },
+        "payload": {
+          "type": "object",
+          "required": ["channels"],
+          "additionalProperties": false,
+          "properties": {
+            "channels": {
+              "type": "array",
+              "minItems": 1,
+              "description": "Channel definitions in the Contract 1 (signal_schema) channel shape, with display.group typically 'behavioural'.",
+              "items": { "type": "object" }
+            }
+          }
+        }
+      }
+    },
+    "behaviour_sample": {
+      "type": "object",
+      "required": ["type", "payload"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "const": "behaviour_sample" },
+        "payload": {
+          "type": "object",
+          "description": "Map of behavioural channel name → numeric value for this frame. Non-numeric values are ignored by the backend.",
+          "minProperties": 1,
+          "additionalProperties": { "type": "number" }
+        }
+      }
+    }
+  }
+}

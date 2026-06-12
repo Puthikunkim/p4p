@@ -1,0 +1,9 @@
+{
+  "type": "behaviour_sample",
+  "payload": {
+    "response_latency": 9.2,
+    "idle_time": 3.5,
+    "task_accuracy": 84,
+    "clarification_reqs": 1
+  }
+}
