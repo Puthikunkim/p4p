@@ -26,48 +26,6 @@
       "type": "categorical",
       "categories": ["calm", "stressed", "bored", "engaged"],
       "display": { "hint": "quadrant", "label": "Affective State", "group": "physiological" }
-    },
-    {
-      "name": "response_latency",
-      "unit": "s",
-      "type": "scalar",
-      "range": { "min": 0, "max": 15 },
-      "display": { "hint": "stat_card", "label": "Response Latency", "precision": 1, "group": "behavioural" }
-    },
-    {
-      "name": "response_accuracy",
-      "unit": "%",
-      "type": "scalar",
-      "range": { "min": 0, "max": 100 },
-      "display": { "hint": "stat_card", "label": "Response Accuracy", "precision": 0, "group": "behavioural" }
-    },
-    {
-      "name": "clarification_reqs",
-      "unit": "/task",
-      "type": "scalar",
-      "range": { "min": 0, "max": 10 },
-      "display": { "hint": "stat_card", "label": "Clarification Reqs", "precision": 1, "group": "behavioural" }
-    },
-    {
-      "name": "idle_time",
-      "unit": "s",
-      "type": "scalar",
-      "range": { "min": 0, "max": 30 },
-      "display": { "hint": "stat_card", "label": "Idle Time", "precision": 1, "group": "behavioural" }
-    },
-    {
-      "name": "gaze_dwell_time",
-      "unit": "s",
-      "type": "scalar",
-      "range": { "min": 0, "max": 30 },
-      "display": { "hint": "stat_card", "label": "Gaze Dwell Time", "precision": 1, "group": "behavioural" }
-    },
-    {
-      "name": "gaze_switching_rate",
-      "unit": "/s",
-      "type": "scalar",
-      "range": { "min": 0, "max": 2 },
-      "display": { "hint": "stat_card", "label": "Gaze Switching Rate", "precision": 2, "group": "behavioural" }
     }
   ]
 }
