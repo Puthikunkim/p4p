@@ -14,11 +14,11 @@ The system is **plug-and-play along three axes** — indicators, rules, and VR e
 with no core-code changes required to exercise any of them. That modularity is enforced by
 three versioned contracts:
 
-| # | Contract | Between | Carries |
-|---|----------|---------|---------|
-| 1 | **Signal Schema** | Pipeline → Dashboard/Engine | self-describing channels (name · unit · type · range · display hint) |
-| 2 | **Rule Grammar** | Rule files ↔ Engine/UI | declarative `IF (signal) → THEN (set object status)`; authored in the UI or dropped in as files |
-| 3 | **Object-Status & Status-Request** | Engine ↔ VR Runtime | runtime declares each object's settable statuses (over WebSocket); engine sends `{target, status, value}` matched against them |
+| #   | Contract                           | Between                     | Carries                                                                                                                        |
+| --- | ---------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 1   | **Signal Schema**                  | Pipeline → Dashboard/Engine | self-describing channels (name · unit · type · range · display hint)                                                           |
+| 2   | **Rule Grammar**                   | Rule files ↔ Engine/UI      | declarative `IF (signal) → THEN (set object status)`; authored in the UI or dropped in as files                                |
+| 3   | **Object-Status & Status-Request** | Engine ↔ VR Runtime         | runtime declares each object's settable statuses (over WebSocket); engine sends `{target, status, value}` matched against them |
 
 ## Status
 
@@ -91,7 +91,7 @@ WsSink bind address, and (optional) auth token for multi-machine deployments.
 - **[`TODO.md`](./TODO.md)** — sequenced, atomic implementation checklist (contracts and
   validators first).
 - **[`contracts/`](./contracts)** — language-neutral JSON Schemas for the three contracts
-  *(created in Phase 1)*.
+  _(created in Phase 1)_.
 
 ## Tech stack (summary)
 
@@ -101,3 +101,14 @@ Vite — schema-driven browser dashboard with a rule builder and a live particip
 A thin Unity reference POC (`unity-poc/`). Participant video over **WebRTC** (peer-to-peer;
 V-CORE brokers signaling only). Contracts as JSON Schema, validated on both sides.
 See [`ARCHITECTURE.md §3`](./ARCHITECTURE.md#3-tech-stack--rationale).
+
+Backend (from backend/ directory):
+
+uv run uvicorn vcore.app:app --reload --host 0.0.0.0 --port 8000
+Frontend (from frontend/ directory):
+
+npm run dev
+
+uv run python tools/mock_unity.py
+
+uv run python tools/mock_pipeline.py
