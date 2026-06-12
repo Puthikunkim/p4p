@@ -32,6 +32,22 @@ public class StatusCollector : MonoBehaviour
         return JsonConvert.SerializeObject(manifest, _settings);
     }
 
+    /// <summary>
+    /// The manifest wrapped in its typed envelope
+    /// (<c>{"type":"object_status_manifest","payload":…}</c>) — the wire format
+    /// V-CORE expects for the initial handshake and any mid-session re-send
+    /// (e.g. on a scene change).
+    /// </summary>
+    public string BuildManifestEnvelopeJson()
+    {
+        var envelope = new Dictionary<string, object>
+        {
+            ["type"] = "object_status_manifest",
+            ["payload"] = BuildManifest(),
+        };
+        return JsonConvert.SerializeObject(envelope, _settings);
+    }
+
     // ── internal ────────────────────────────────────────────────────────────────
 
     private static readonly JsonSerializerSettings _settings = new()

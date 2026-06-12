@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// WebSocket client that connects to V-CORE <c>/ws/runtime</c>.
@@ -72,7 +73,25 @@ public class VCoreConnection : MonoBehaviour
         _dispatcher = GetComponent<RequestDispatcher>();
     }
 
-    void Start() => StartCoroutine(ConnectLoop());
+    void Start()
+    {
+        // Re-handshake on scene changes so adaptation targets track the live scene.
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        SceneManager.sceneUnloaded += OnSceneUnloaded;
+        StartCoroutine(ConnectLoop());
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode) => ResyncScene();
+    private void OnSceneUnloaded(Scene scene) => ResyncScene();
+
+    // Re-index the dispatcher for the new scene's objects and re-send the typed
+    // object-status manifest so the backend re-resolves targets against it too.
+    private void ResyncScene()
+    {
+        if (!IsConnected) return;
+        _dispatcher.RebuildIndex();
+        Send(_collector.BuildManifestEnvelopeJson());
+    }
 
     void Update()
     {
@@ -87,6 +106,8 @@ public class VCoreConnection : MonoBehaviour
 
     void OnDestroy()
     {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneUnloaded -= OnSceneUnloaded;
         if (_instance == this) _instance = null;
         _cts?.Cancel();
         _ws?.Dispose();
@@ -131,7 +152,7 @@ public class VCoreConnection : MonoBehaviour
         // Manifest handshake, so flush it before marking the link ready. Reporter
         // components gate their messages on IsConnected, so this guarantees the
         // manifest is always the first frame on the wire.
-        var manifestTask = SendRawAsync(_collector.BuildManifestJson());
+        var manifestTask = SendRawAsync(_collector.BuildManifestEnvelopeJson());
         yield return new WaitUntil(() => manifestTask.IsCompleted);
         IsConnected = true;
 

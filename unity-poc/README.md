@@ -230,11 +230,12 @@ This gives you two natural scopes for behavioural metrics:
   and re-declares on `sceneLoaded` / `sceneUnloaded`, so these channels join and leave the
   dashboard as scenes swap.
 
-> **Note:** the *object-status* side (`StatusCollector` / `RequestDispatcher`) does **not** yet
-> re-handshake on scene change — adaptation targets are still resolved against the scene that
-> was loaded at connect time. Re-sending the object-status manifest mid-session needs a typed
-> update message on the backend too (today only the first frame is treated as the manifest).
-> The behaviour/context path above works mid-session because those are post-handshake messages.
+The **object-status side** tracks scenes too: on `sceneLoaded` / `sceneUnloaded`
+`VCoreConnection` rebuilds `RequestDispatcher`'s target index and re-sends the
+object-status manifest, so adaptations resolve against the live scene. Every
+Unity → V-CORE frame — `object_status_manifest`, `vr_context`, `behaviour_manifest`,
+`behaviour_sample` — is a typed `{"type", "payload"}` envelope, so any of them can be
+(re)sent at any point in the session.
 
 ---
 
