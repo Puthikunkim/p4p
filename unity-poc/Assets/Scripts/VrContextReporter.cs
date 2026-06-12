@@ -31,22 +31,47 @@ public class VrContextReporter : MonoBehaviour
     [Tooltip("Seconds between automatic step changes.")]
     public float stepInterval = 6f;
 
-    [Tooltip("Scripted steps sent while autoPlay is on. Keys render as-is on the dashboard.")]
+    [Tooltip("Scripted steps sent while autoPlay is on. Each step is a free-form set of " +
+             "key/value fields; keys render as-is on the dashboard, so any scene can author its own.")]
     public Step[] steps =
     {
-        new() { scene = "Aisle 1 – Produce", step = "1 / 4", instruction = "Pick up the apples", itemsLeft = 3 },
-        new() { scene = "Aisle 2 – Bakery",  step = "2 / 4", instruction = "Select the milk",     itemsLeft = 2 },
-        new() { scene = "Aisle 3 – Dairy",   step = "3 / 4", instruction = "Find the cheese",      itemsLeft = 1 },
-        new() { scene = "Checkout",          step = "4 / 4", instruction = "Pay for your items",   itemsLeft = 0 },
+        new() { fields = new[] {
+            new ContextField { key = "scene", value = "Aisle 1 – Produce" },
+            new ContextField { key = "step", value = "1 / 4" },
+            new ContextField { key = "instruction", value = "Pick up the apples" },
+            new ContextField { key = "items_left", value = "3" },
+        }},
+        new() { fields = new[] {
+            new ContextField { key = "scene", value = "Aisle 2 – Bakery" },
+            new ContextField { key = "step", value = "2 / 4" },
+            new ContextField { key = "instruction", value = "Select the milk" },
+            new ContextField { key = "items_left", value = "2" },
+        }},
+        new() { fields = new[] {
+            new ContextField { key = "scene", value = "Aisle 3 – Dairy" },
+            new ContextField { key = "step", value = "3 / 4" },
+            new ContextField { key = "instruction", value = "Find the cheese" },
+            new ContextField { key = "items_left", value = "1" },
+        }},
+        new() { fields = new[] {
+            new ContextField { key = "scene", value = "Checkout" },
+            new ContextField { key = "step", value = "4 / 4" },
+            new ContextField { key = "instruction", value = "Pay for your items" },
+            new ContextField { key = "items_left", value = "0" },
+        }},
     };
+
+    [Serializable]
+    public class ContextField
+    {
+        public string key;
+        public string value;
+    }
 
     [Serializable]
     public class Step
     {
-        public string scene;
-        public string step;
-        public string instruction;
-        public int itemsLeft;
+        public ContextField[] fields = Array.Empty<ContextField>();
     }
 
     void Awake()
@@ -82,17 +107,14 @@ public class VrContextReporter : MonoBehaviour
 
     // ── public API (call from gameplay to push real context) ─────────────────────
 
-    /// <summary>Report one scripted step as VR context.</summary>
+    /// <summary>Report one scripted step (its free-form fields) as VR context.</summary>
     public void ReportStep(Step step)
     {
-        if (step == null) return;
-        ReportContext(new Dictionary<string, object>
-        {
-            ["scene"] = step.scene,
-            ["step"] = step.step,
-            ["instruction"] = step.instruction,
-            ["items_left"] = step.itemsLeft,
-        });
+        if (step?.fields == null) return;
+        var fields = new Dictionary<string, object>();
+        foreach (var f in step.fields)
+            if (f != null && !string.IsNullOrEmpty(f.key)) fields[f.key] = f.value;
+        ReportContext(fields);
     }
 
     /// <summary>
