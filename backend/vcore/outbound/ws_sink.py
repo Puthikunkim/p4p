@@ -28,17 +28,16 @@ log = logging.getLogger(__name__)
 class WsSink(ActionSink):
     """WebSocket server that the Unity runtime connects to.
 
-    Protocol (one connection at a time):
-      1. Unity connects to ws://<host>:<port>.
-      2. Unity sends the Object-Status Manifest as a JSON string.
-      3. V-CORE validates + stores the manifest and publishes OBJECT_STATUS_UPDATED.
-      4. V-CORE sends a StatusRequest JSON string whenever the rule engine fires.
-      5. Unity may push typed envelopes (e.g. {"type": "vr_context", "payload": …})
-         on step/scene changes; these are routed onto the event bus.
-      6. Unity closes the connection to signal a scene change or shutdown.
+    Protocol (one connection at a time): every Unity → V-CORE frame is a typed
+    JSON envelope ``{"type": ..., "payload": ...}``, routed through _handle_inbound:
+      - ``object_status_manifest`` (Contract 3b) — sent on connect and re-sent on
+        scene changes; validated, stored, published as OBJECT_STATUS_UPDATED.
+      - ``vr_context`` (Contract 4), ``behaviour_manifest`` / ``behaviour_sample``
+        (Contract 5) — routed onto the event bus.
+    V-CORE sends a StatusRequest JSON string whenever the rule engine fires.
 
-    Link status events are published on connect, disconnect, and manifest failure.
-    Incoming StatusRequests are validated against the active manifest before delivery;
+    Link status events are published on connect and disconnect. Incoming
+    StatusRequests are validated against the active manifest before delivery;
     unresolvable targets or out-of-range values are dropped with a WARNING.
     """
 
@@ -114,35 +113,12 @@ class WsSink(ActionSink):
             LinkStatusEvent(link="unity-ws", state="up"),
         )
         try:
-            raw = await ws.recv()
-            payload: dict[str, Any] = json.loads(raw)
-            result = self._manifests.update_object_status_manifest(payload)
-            if result.warning:
-                await self._bus.publish(
-                    Topics.WARNING,
-                    WarningEvent(source="ws_sink", message=result.warning),
-                )
-            if not result.accepted:
-                log.error("ws_sink: manifest refused — %s", result.warning)
-                await self._bus.publish(
-                    Topics.LINK_STATUS,
-                    LinkStatusEvent(link="unity-ws", state="down", detail="manifest refused"),
-                )
-                return
-            await self._bus.publish(
-                Topics.OBJECT_STATUS_UPDATED,
-                self._manifests.object_status_manifest,
-            )
-            log.info("ws_sink: object-status manifest accepted")
-
-            # Read inbound messages until Unity closes the connection. After the
-            # manifest handshake, Unity may push typed envelopes such as
-            # {"type": "vr_context", "payload": {...}}; unknown types are ignored.
+            # Every Unity → V-CORE frame is a typed envelope routed through
+            # _handle_inbound. The object-status manifest is the expected first
+            # frame but may also be re-sent later (e.g. on a Unity scene change);
+            # unknown types are ignored.
             while True:
-                try:
-                    msg = await ws.recv()
-                except Exception:
-                    break
+                msg = await ws.recv()
                 await self._handle_inbound(msg)
 
         except Exception as exc:
@@ -156,7 +132,7 @@ class WsSink(ActionSink):
             )
 
     async def _handle_inbound(self, raw: str) -> None:
-        """Route a post-handshake message from Unity to the right bus topic."""
+        """Route one typed Unity frame to the right handler / bus topic."""
         try:
             msg = json.loads(raw)
         except (ValueError, TypeError):
@@ -165,12 +141,47 @@ class WsSink(ActionSink):
             return
         mtype = msg.get("type")
         payload = msg.get("payload")
-        if mtype == "vr_context":
+        if mtype == "object_status_manifest":
+            await self._handle_object_status_manifest(payload)
+        elif mtype == "vr_context":
             await self._handle_vr_context(payload)
         elif mtype == "behaviour_manifest":
             await self._handle_behaviour_manifest(payload)
         elif mtype == "behaviour_sample":
             await self._handle_behaviour_sample(payload)
+
+    async def _handle_object_status_manifest(self, payload: Any) -> None:
+        """Accept the Object-Status Manifest (Contract 3b) — the connection's first
+        frame and any later re-send (e.g. a Unity scene change). Replaces the active
+        manifest and republishes it so the rule engine and dashboard re-resolve
+        targets against the current scene. A refused/invalid manifest is warned and
+        the previous one kept; the connection is never dropped for it."""
+        if not isinstance(payload, dict):
+            await self._bus.publish(
+                Topics.WARNING,
+                WarningEvent(source="ws_sink", message="object_status_manifest dropped: payload must be an object"),
+            )
+            return
+        try:
+            result = self._manifests.update_object_status_manifest(payload)
+        except Exception as exc:
+            await self._bus.publish(
+                Topics.WARNING,
+                WarningEvent(source="ws_sink", message=f"object_status_manifest rejected: {exc}"),
+            )
+            return
+        if result.warning:
+            await self._bus.publish(
+                Topics.WARNING,
+                WarningEvent(source="ws_sink", message=result.warning),
+            )
+        if not result.accepted:
+            return
+        await self._bus.publish(
+            Topics.OBJECT_STATUS_UPDATED,
+            self._manifests.object_status_manifest,
+        )
+        log.info("ws_sink: object-status manifest accepted")
 
     async def _handle_vr_context(self, payload: Any) -> None:
         if not isinstance(payload, dict) or not payload:

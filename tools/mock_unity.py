@@ -129,7 +129,7 @@ async def run(host: str, port: int, context_interval: float, behaviour_interval:
     uri = f"ws://{host}:{port}"
     print(f"[mock_unity] connecting to {uri}", flush=True)
     async with websockets.connect(uri) as ws:
-        await ws.send(json.dumps(MANIFEST))
+        await ws.send(json.dumps({"type": "object_status_manifest", "payload": MANIFEST}))
         print("[mock_unity] sent Object-Status Manifest", flush=True)
         tasks = [asyncio.create_task(_recv_loop(ws))]
         if context_interval > 0:

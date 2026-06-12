@@ -47,6 +47,14 @@ OBJECT_MANIFEST: dict[str, Any] = {
 }
 
 
+def _frame(manifest: dict[str, Any]) -> str:
+    """Wrap an object-status manifest in its typed envelope (the wire format)."""
+    return json.dumps({"type": "object_status_manifest", "payload": manifest})
+
+
+_OBJECT_FRAME = _frame(OBJECT_MANIFEST)
+
+
 def _make_req(
     *,
     tag: str = "ambient_light",
@@ -84,7 +92,7 @@ async def test_handshake_publishes_manifest() -> None:
     bus.subscribe(Topics.OBJECT_STATUS_UPDATED, lambda p: received.append(p))
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.1)
 
     await sink.stop()
@@ -107,7 +115,7 @@ async def test_handshake_publishes_link_up_and_down() -> None:
     bus.subscribe(Topics.LINK_STATUS, on_link)
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.1)
     # connection is now closed
     await asyncio.sleep(0.1)
@@ -129,7 +137,7 @@ async def test_status_request_delivered_to_unity() -> None:
 
     async def client() -> None:
         async with websockets.connect(f"ws://localhost:{port}") as ws:
-            await ws.send(json.dumps(OBJECT_MANIFEST))
+            await ws.send(_OBJECT_FRAME)
             await asyncio.sleep(0.05)  # let manifest be processed
             # Fire a StatusRequest on the bus
             req = _make_req(tag="ambient_light", status="brightness", value=30.0)
@@ -172,7 +180,7 @@ async def test_unresolved_tag_emits_warning() -> None:
     bus.subscribe(Topics.WARNING, on_warn)
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         req = _make_req(tag="nonexistent_tag")
         await bus.publish(Topics.RULE_FIRED, req)
@@ -191,7 +199,7 @@ async def test_out_of_range_value_emits_warning() -> None:
     bus.subscribe(Topics.WARNING, lambda p: warnings.append(p) if isinstance(p, WarningEvent) else None)
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         req = _make_req(tag="ambient_light", status="brightness", value=999.0)
         await bus.publish(Topics.RULE_FIRED, req)
@@ -210,7 +218,7 @@ async def test_invalid_discrete_value_emits_warning() -> None:
     bus.subscribe(Topics.WARNING, lambda p: warnings.append(p) if isinstance(p, WarningEvent) else None)
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         req = _make_req(tag="fog", status="density", value="extreme")
         await bus.publish(Topics.RULE_FIRED, req)
@@ -236,7 +244,7 @@ async def test_vr_context_message_publishes_event() -> None:
     bus.subscribe(Topics.VR_CONTEXT, on_ctx)
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         await ws.send(json.dumps({
             "type": "vr_context",
@@ -260,7 +268,7 @@ async def test_vr_context_without_scalar_fields_is_dropped_with_warning() -> Non
     bus.subscribe(Topics.WARNING, lambda p: warnings.append(p) if isinstance(p, WarningEvent) else None)
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         # Nested object is not a scalar field, so nothing survives → dropped.
         await ws.send(json.dumps({"type": "vr_context", "payload": {"nested": {"a": 1}}}))
@@ -281,7 +289,7 @@ async def test_unknown_inbound_type_is_ignored() -> None:
     bus.subscribe(Topics.VR_CONTEXT, lambda p: events.append(p))
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         await ws.send(json.dumps({"type": "something_else", "payload": {"x": 1}}))
         await ws.send("not json at all")
@@ -293,6 +301,38 @@ async def test_unknown_inbound_type_is_ignored() -> None:
     await sink.stop()
 
     assert len(events) == 1
+
+
+@pytest.mark.asyncio
+async def test_object_status_manifest_can_be_resent_mid_session() -> None:
+    """A re-sent manifest (e.g. on a Unity scene change) replaces the active one."""
+    sink, bus, manifests = await _make_sink()
+    port = sink.bound_port
+    updates: list[object] = []
+    bus.subscribe(Topics.OBJECT_STATUS_UPDATED, lambda p: updates.append(p))
+
+    scene_two = {
+        "schema_version": "1.0.0",
+        "scene": "scene_two",
+        "runtime": "mock",
+        "objects": [
+            {"id": "door-1", "tags": ["door"],
+             "statuses": [{"name": "open", "type": "discrete", "values": ["yes", "no"]}]},
+        ],
+        "abstract_actions": [],
+    }
+
+    async with websockets.connect(f"ws://localhost:{port}") as ws:
+        await ws.send(_OBJECT_FRAME)        # initial handshake
+        await asyncio.sleep(0.05)
+        await ws.send(_frame(scene_two))    # scene-change re-send
+        await asyncio.sleep(0.1)
+
+    await sink.stop()
+
+    assert len(updates) == 2
+    assert manifests.object_status_manifest["scene"] == "scene_two"
+    assert manifests.object_status_manifest["objects"][0]["id"] == "door-1"
 
 
 # ── inbound behavioural signals (Unity → backend) ─────────────────────────────
@@ -322,7 +362,7 @@ async def test_behaviour_manifest_merges_into_signal_manifest() -> None:
     bus.subscribe(Topics.MANIFEST_UPDATED, lambda p: updates.append(p))
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         await ws.send(json.dumps({"type": "behaviour_manifest", "payload": {"channels": _BEHAVIOUR_CH}}))
         await asyncio.sleep(0.1)
@@ -347,7 +387,7 @@ async def test_behaviour_sample_emitted_as_signal_event() -> None:
     bus.subscribe(Topics.SAMPLE, on_sample)
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         await ws.send(json.dumps({"type": "behaviour_sample", "payload": {"response_latency": 9.2, "idle_time": 3}}))
         await asyncio.sleep(0.1)
@@ -367,7 +407,7 @@ async def test_behaviour_sample_non_numeric_dropped() -> None:
     bus.subscribe(Topics.SAMPLE, lambda p: samples.append(p))
 
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         await ws.send(json.dumps({"type": "behaviour_sample", "payload": {"response_latency": "slow"}}))
         await asyncio.sleep(0.1)
@@ -397,13 +437,13 @@ async def test_reconnect_brings_link_back_up() -> None:
 
     # First connection
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
     await asyncio.sleep(0.05)
 
     # Second connection (reconnect)
     async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps(OBJECT_MANIFEST))
+        await ws.send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
     await asyncio.sleep(0.05)
 

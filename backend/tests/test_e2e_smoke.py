@@ -97,7 +97,7 @@ async def _mock_unity(port: int, received: list[dict[str, Any]]) -> None:
     """Connect to WsSink, send manifest, collect StatusRequests until cancelled."""
     uri = f"ws://127.0.0.1:{port}"
     async with websockets.connect(uri) as ws:
-        await ws.send(json.dumps(_OBJECT_MANIFEST))
+        await ws.send(json.dumps({"type": "object_status_manifest", "payload": _OBJECT_MANIFEST}))
         while True:
             try:
                 msg = await asyncio.wait_for(ws.recv(), timeout=10.0)
