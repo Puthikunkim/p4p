@@ -18,6 +18,7 @@ plus the Amendment 2 WebRTC video plane.
 | `RequestDispatcher.cs` | Resolves incoming `{target, status, value}` requests to the matching `ObjectStatus` and invokes it |
 | `VrContextReporter.cs` | Sends study-step / scene context (`vr_context`, Contract 4) → dashboard VR Context panel |
 | `BehaviourReporter.cs` | Declares behavioural channels and streams their values (`behaviour_manifest` / `behaviour_sample`, Contract 5) → dashboard, rule engine, recorder |
+| `BehaviourMetric.cs` | Per-object behavioural channel declaration, scene-scanned by `BehaviourReporter` (the behaviour analogue of `ObjectStatus`) |
 | `SpectatorCamera.cs` | Mono camera rendering to a `RenderTexture` for WebRTC streaming |
 | `WebRtcSender.cs` | Connects to `/ws/signaling`, negotiates WebRTC, streams spectator-cam video to the dashboard |
 | `VideoRecorder.cs` | Captures the spectator cam to PNG frames stamped with the LSL session start time |
@@ -183,8 +184,16 @@ Out of the box they behave exactly like `tools/mock_unity.py` — no extra wirin
 
 | Component | Sends | Default behaviour |
 |---|---|---|
-| `VrContextReporter` | `vr_context` (Contract 4) | Walks the `Steps` list every `Step Interval` (6 s). Renders in the dashboard's **VR Context** panel. |
-| `BehaviourReporter` | `behaviour_manifest` + `behaviour_sample` (Contract 5) | Declares its `Channels`, then streams each one swept across its range every `Sample Interval` (1 s). Renders in the **Behavioural** panel, feeds the rule engine, and is recorded. |
+| `VrContextReporter` | `vr_context` (Contract 4) | Walks the `Steps` list every `Step Interval` (6 s). Each step is a **free-form list of key/value fields** — any scene authors its own context keys in the Inspector. Renders in the dashboard's **VR Context** panel. |
+| `BehaviourReporter` | `behaviour_manifest` + `behaviour_sample` (Contract 5) | Declares its channels, then streams each one swept across its range every `Sample Interval` (1 s). Renders in the **Behavioural** panel, feeds the rule engine, and is recorded. |
+
+Behavioural channels can be declared in **two interchangeable ways** (merged, deduped by name):
+
+- **Centralised** — the `Channels` list on `BehaviourReporter` (quick; good for a demo).
+- **Per-object** — drop a `BehaviourMetric` component on any GameObject that tracks a metric.
+  `BehaviourReporter` scene-scans them on connect, exactly like `StatusCollector` scans
+  `ObjectStatus`. Call `BehaviourMetric.Report(value)` from that object's own script to feed
+  real data; otherwise it sweeps synthetically like the centralised channels.
 
 Both are **hybrid**: synthetic by default, but you drive them with real data from your own
 scripts whenever you're ready —
@@ -204,6 +213,28 @@ beh.SetMetric("task_accuracy", 84f);
 
 `VCoreConnection` flushes the Object-Status Manifest first and only flips `IsConnected`
 afterward, so the reporters always arrive after the handshake.
+
+### Multi-scene sessions
+
+`VCoreConnection.persistAcrossScenes` (on by default) keeps the **VCoreManager** —
+connection and reporters — alive across scene loads via `DontDestroyOnLoad`, with a
+singleton guard that destroys any duplicate manager a newly-loaded scene brings in. So one
+V-CORE session spans many Unity scenes.
+
+This gives you two natural scopes for behavioural metrics:
+
+- **Session-scoped** (cross-scene): declare on the persistent manager — the `Channels` list,
+  or a `BehaviourMetric` on the manager itself. These stay declared and rendering for the
+  whole session.
+- **Scene-scoped** (local): a `BehaviourMetric` on a scene prop. `BehaviourReporter` re-scans
+  and re-declares on `sceneLoaded` / `sceneUnloaded`, so these channels join and leave the
+  dashboard as scenes swap.
+
+> **Note:** the *object-status* side (`StatusCollector` / `RequestDispatcher`) does **not** yet
+> re-handshake on scene change — adaptation targets are still resolved against the scene that
+> was loaded at connect time. Re-sending the object-status manifest mid-session needs a typed
+> update message on the backend too (today only the first frame is treated as the manifest).
+> The behaviour/context path above works mid-session because those are post-handshake messages.
 
 ---
 
