@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Declares the behavioural channels Unity tracks and streams their values to
@@ -11,12 +12,16 @@ using UnityEngine;
 /// channels into the active signal manifest, so they render on the dashboard's
 /// Behavioural panel, feed the rule engine, and are recorded like any signal.
 ///
-/// Hybrid by design:
-/// - Out of the box each channel is swept across its declared range (synthetic,
-///   like the mock), so the POC streams plausible data with no extra wiring.
-/// - Call <see cref="SetMetric"/> from your own tracking code to push a real
-///   value for a channel; that value takes precedence over the synthetic one.
-///   Set <see cref="generateSyntheticData"/> = false to send only real values.
+/// Channels come from two places, merged (deduped by name):
+/// - the <see cref="channels"/> list on this component (centralised), and
+/// - every <see cref="BehaviourMetric"/> component in the scene (per-object,
+///   scene-scanned like <see cref="ObjectStatus"/>).
+///
+/// Hybrid by design: each channel is swept across its declared range
+/// (synthetic) until a real value is supplied — via <see cref="SetMetric"/> for
+/// centralised channels or <see cref="BehaviourMetric.Report"/> for per-object
+/// ones. Set <see cref="generateSyntheticData"/> = false to send only real
+/// values.
 ///
 /// Attach to the same GameObject as <see cref="VCoreConnection"/> (or assign the
 /// connection explicitly).
@@ -33,7 +38,8 @@ public class BehaviourReporter : MonoBehaviour
     [Tooltip("Sweep each channel across its range when no real value has been set.")]
     public bool generateSyntheticData = true;
 
-    [Tooltip("Behavioural channels Unity tracks. Merged into the signal manifest on connect.")]
+    [Header("Centralised channels (optional)")]
+    [Tooltip("Channels declared here are merged with any BehaviourMetric components found in the scene.")]
     public BehaviourChannel[] channels =
     {
         new() { name = "response_latency",    label = "Response Latency",    unit = "s",     min = 0, max = 15,  precision = 1 },
@@ -55,7 +61,17 @@ public class BehaviourReporter : MonoBehaviour
         public int precision = 1;
     }
 
+    // One resolved channel from either source, with a provider for its real value.
+    private struct Chan
+    {
+        public string name, unit, label;
+        public float min, max;
+        public int precision, index;
+        public Func<float?> real;  // returns a reported value, or null for synthetic
+    }
+
     private readonly Dictionary<string, float> _overrides = new();
+    private readonly List<Chan> _active = new();
     private float _t0;
 
     void Awake()
@@ -63,7 +79,34 @@ public class BehaviourReporter : MonoBehaviour
         if (connection == null) connection = GetComponent<VCoreConnection>();
     }
 
-    void OnEnable() => StartCoroutine(StreamLoop());
+    void OnEnable()
+    {
+        // Scene-local BehaviourMetric components come and go with scenes, so
+        // re-scan and re-declare whenever the loaded scene set changes.
+        SceneManager.sceneLoaded += OnSceneLoaded;
+        SceneManager.sceneUnloaded += OnSceneUnloaded;
+        StartCoroutine(StreamLoop());
+    }
+
+    void OnDisable()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+        SceneManager.sceneUnloaded -= OnSceneUnloaded;
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode) => Redeclare();
+    private void OnSceneUnloaded(Scene scene) => Redeclare();
+
+    // Re-scan the scene and re-send the manifest (replacing the backend's channel
+    // set). Centralised channels persist; scene-local ones join/leave as scenes swap.
+    private void Redeclare()
+    {
+        if (connection != null && connection.IsConnected)
+        {
+            Rebuild();
+            SendManifest();
+        }
+    }
 
     private IEnumerator StreamLoop()
     {
@@ -74,7 +117,8 @@ public class BehaviourReporter : MonoBehaviour
             {
                 if (!announced)
                 {
-                    SendManifest();   // (re)declare channels on every fresh connection
+                    Rebuild();        // re-scan the scene on every fresh connection
+                    SendManifest();
                     _t0 = Time.time;
                     announced = true;
                 }
@@ -89,39 +133,79 @@ public class BehaviourReporter : MonoBehaviour
         }
     }
 
-    // ── public API (call from tracking code to push real values) ─────────────────
+    // ── public API (centralised channels) ─────────────────────────────────────────
 
-    /// <summary>Push a real value for a channel; overrides synthetic generation.</summary>
+    /// <summary>Push a real value for a centralised channel; overrides synthetic generation.</summary>
     public void SetMetric(string channelName, float value) => _overrides[channelName] = value;
 
     /// <summary>Clear a real value so the channel reverts to synthetic (if enabled).</summary>
     public void ClearMetric(string channelName) => _overrides.Remove(channelName);
 
+    // ── channel aggregation ───────────────────────────────────────────────────────
+
+    private void Rebuild()
+    {
+        _active.Clear();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        if (channels != null)
+        {
+            foreach (var ch in channels)
+            {
+                if (ch == null || string.IsNullOrEmpty(ch.name) || !seen.Add(ch.name)) continue;
+                var key = ch.name;
+                _active.Add(new Chan
+                {
+                    name = key,
+                    unit = ch.unit ?? "",
+                    label = string.IsNullOrEmpty(ch.label) ? key : ch.label,
+                    min = ch.min, max = ch.max, precision = ch.precision, index = _active.Count,
+                    real = () => _overrides.TryGetValue(key, out var v) ? v : (float?)null,
+                });
+            }
+        }
+
+        foreach (var m in FindObjectsByType<BehaviourMetric>(FindObjectsSortMode.None))
+        {
+            var key = m.EffectiveName;
+            if (string.IsNullOrEmpty(key) || !seen.Add(key)) continue;
+            var metric = m;
+            _active.Add(new Chan
+            {
+                name = key,
+                unit = m.unit ?? "",
+                label = string.IsNullOrEmpty(m.label) ? key : m.label,
+                min = m.min, max = m.max, precision = m.precision, index = _active.Count,
+                // metric != null guards against a component destroyed on scene unload
+                // (Unity overrides == for destroyed objects).
+                real = () => metric != null && metric.HasValue ? metric.Value : (float?)null,
+            });
+        }
+    }
+
     // ── send ──────────────────────────────────────────────────────────────────────
 
     private void SendManifest()
     {
-        if (channels == null || channels.Length == 0) return;
+        if (_active.Count == 0) return;
         var chList = new List<object>();
-        foreach (var ch in channels)
+        foreach (var c in _active)
         {
-            if (string.IsNullOrEmpty(ch.name)) continue;
             chList.Add(new Dictionary<string, object>
             {
-                ["name"] = ch.name,
-                ["unit"] = ch.unit ?? "",
+                ["name"] = c.name,
+                ["unit"] = c.unit,
                 ["type"] = "scalar",
-                ["range"] = new Dictionary<string, object> { ["min"] = ch.min, ["max"] = ch.max },
+                ["range"] = new Dictionary<string, object> { ["min"] = c.min, ["max"] = c.max },
                 ["display"] = new Dictionary<string, object>
                 {
                     ["hint"] = "stat_card",
-                    ["label"] = string.IsNullOrEmpty(ch.label) ? ch.name : ch.label,
-                    ["precision"] = ch.precision,
+                    ["label"] = c.label,
+                    ["precision"] = c.precision,
                     ["group"] = "behavioural",
                 },
             });
         }
-        if (chList.Count == 0) return;
         var msg = new Dictionary<string, object>
         {
             ["type"] = "behaviour_manifest",
@@ -132,19 +216,16 @@ public class BehaviourReporter : MonoBehaviour
 
     private void SendSample(float t)
     {
-        if (channels == null || channels.Length == 0) return;
+        if (_active.Count == 0) return;
         var payload = new Dictionary<string, object>();
-        for (var i = 0; i < channels.Length; i++)
+        foreach (var c in _active)
         {
-            var ch = channels[i];
-            if (string.IsNullOrEmpty(ch.name)) continue;
-
+            var r = c.real();
             float v;
-            if (_overrides.TryGetValue(ch.name, out var real)) v = real;
-            else if (generateSyntheticData) v = Sweep(ch, t, i);
+            if (r.HasValue) v = r.Value;
+            else if (generateSyntheticData) v = Sweep(c.min, c.max, c.index, t);
             else continue;
-
-            payload[ch.name] = Math.Round(v, Mathf.Clamp(ch.precision, 0, 6));
+            payload[c.name] = Math.Round(v, Mathf.Clamp(c.precision, 0, 6));
         }
         if (payload.Count == 0) return;
         var msg = new Dictionary<string, object> { ["type"] = "behaviour_sample", ["payload"] = payload };
@@ -153,9 +234,9 @@ public class BehaviourReporter : MonoBehaviour
 
     // Each channel sweeps its own [min, max] with a per-channel phase offset, so
     // the demo data stays independent of whatever rules happen to be loaded.
-    private static float Sweep(BehaviourChannel ch, float t, int index)
+    private static float Sweep(float min, float max, int index, float t)
     {
         var frac = 0.5f + 0.5f * Mathf.Sin(t / 7f + index * 1.7f);
-        return ch.min + (ch.max - ch.min) * frac;
+        return min + (max - min) * frac;
     }
 }
