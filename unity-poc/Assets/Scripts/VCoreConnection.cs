@@ -32,7 +32,13 @@ public class VCoreConnection : MonoBehaviour
     [Tooltip("Upper bound on reconnect delay (seconds).")]
     public float maxReconnectDelay = 30f;
 
+    [Header("Lifetime")]
+    [Tooltip("Keep this manager (connection + reporters) alive across scene loads so a " +
+             "session can span multiple scenes. A singleton guard destroys duplicates.")]
+    public bool persistAcrossScenes = true;
+
     // ── state ───────────────────────────────────────────────────────────────────
+    private static VCoreConnection _instance;
     private ClientWebSocket _ws;
     private CancellationTokenSource _cts;
     private StatusCollector _collector;
@@ -49,6 +55,19 @@ public class VCoreConnection : MonoBehaviour
 
     void Awake()
     {
+        if (persistAcrossScenes)
+        {
+            if (_instance != null && _instance != this)
+            {
+                Debug.LogWarning("[VCore] Duplicate VCoreConnection in a new scene — destroying it; " +
+                                 "the persistent one keeps the session alive.");
+                Destroy(gameObject);
+                return;
+            }
+            _instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+
         _collector = GetComponent<StatusCollector>();
         _dispatcher = GetComponent<RequestDispatcher>();
     }
@@ -68,6 +87,7 @@ public class VCoreConnection : MonoBehaviour
 
     void OnDestroy()
     {
+        if (_instance == this) _instance = null;
         _cts?.Cancel();
         _ws?.Dispose();
     }
