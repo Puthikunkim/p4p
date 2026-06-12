@@ -71,8 +71,8 @@ STEPS = [
 
 
 # Behavioural channels Unity tracks over the session (Contract 1 channel shape).
-# These are merged into the signal manifest so they render, feed the rule engine
-# (dim-slow-response on response_latency, fog-idle on idle_time), and get recorded.
+# These are merged into the signal manifest so they render, feed the rule engine,
+# and get recorded.
 BEHAVIOUR_CHANNELS = [
     {"name": "response_latency", "unit": "s", "type": "scalar", "range": {"min": 0, "max": 15},
      "display": {"hint": "stat_card", "label": "Response Latency", "precision": 1, "group": "behavioural"}},
@@ -96,21 +96,21 @@ async def _recv_loop(ws: Any) -> None:
 
 
 async def _behaviour_loop(ws: Any, interval: float) -> None:
-    # Declare the behavioural channels once, then stream values. Latency and idle
-    # time oscillate past their rule thresholds so adaptations fire periodically.
+    # Declare the behavioural channels once, then stream values. Each channel just
+    # sweeps across its own declared range with a per-channel phase offset, so the
+    # mock stays independent of whatever rules happen to be loaded.
     await ws.send(json.dumps({"type": "behaviour_manifest", "payload": {"channels": BEHAVIOUR_CHANNELS}}))
     print(f"[mock_unity] declared {len(BEHAVIOUR_CHANNELS)} behavioural channels", flush=True)
     t0 = time.monotonic()
     while True:
         t = time.monotonic() - t0
-        sample = {
-            "response_latency": round(max(0.0, 4 + 7 * (0.5 + 0.5 * math.sin(t / 6))), 1),
-            "idle_time": round(max(0.0, 8 + 12 * (0.5 + 0.5 * math.sin(t / 9 + 1))), 1),
-            "task_accuracy": round(70 + 25 * (0.5 + 0.5 * math.sin(t / 8)), 0),
-            "response_accuracy": round(65 + 25 * (0.5 + 0.5 * math.sin(t / 8)), 0),
-            "clarification_reqs": round(2 * (0.5 + 0.5 * math.sin(t / 5)), 1),
-            "gaze_switching_rate": round(0.5 + 0.5 * math.sin(t / 4), 2),
-        }
+        sample: dict[str, float] = {}
+        for i, ch in enumerate(BEHAVIOUR_CHANNELS):
+            rng = ch.get("range", {})
+            lo, hi = rng.get("min", 0.0), rng.get("max", 1.0)
+            frac = 0.5 + 0.5 * math.sin(t / 7 + i * 1.7)
+            precision = ch.get("display", {}).get("precision", 1)
+            sample[ch["name"]] = round(lo + (hi - lo) * frac, precision)
         await ws.send(json.dumps({"type": "behaviour_sample", "payload": sample}))
         await asyncio.sleep(interval)
 

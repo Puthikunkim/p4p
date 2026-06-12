@@ -200,7 +200,7 @@ def test_merged_manifest_keeps_behavioural_rule_enabled() -> None:
     from vcore.engine import degradation
 
     rule = Rule.model_validate({
-        "id": "fog-idle", "schema_version": "1.0.0", "enabled": True,
+        "id": "behaviour-demo", "schema_version": "1.0.0", "enabled": True,
         "when": {"all": [{"signal": "response_latency", "op": ">=", "threshold": 8}]},
         "then": {"set": {"target": {"tag": "fog"}, "status": "density", "value": "medium"}},
     })
