@@ -40,6 +40,7 @@ public class VCoreConnection : MonoBehaviour
 
     private readonly Queue<string> _inbound = new();
     private readonly object _inboundLock = new();
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
 
     /// <summary>True while the WebSocket connection to V-CORE is open.</summary>
     public bool IsConnected { get; private set; }
@@ -104,12 +105,15 @@ public class VCoreConnection : MonoBehaviour
             yield break;
         }
 
-        IsConnected = true;
         Debug.Log("[VCore] Connected to V-CORE");
 
-        // Send the manifest on the background thread; fire-and-forget is fine
-        // here because the send path serialises through the WS protocol.
-        _ = SendRawAsync(_collector.BuildManifestJson());
+        // The backend treats the first message on this socket as the Object-Status
+        // Manifest handshake, so flush it before marking the link ready. Reporter
+        // components gate their messages on IsConnected, so this guarantees the
+        // manifest is always the first frame on the wire.
+        var manifestTask = SendRawAsync(_collector.BuildManifestJson());
+        yield return new WaitUntil(() => manifestTask.IsCompleted);
+        IsConnected = true;
 
         // Receive loop runs on a thread pool thread; results are queued back to
         // the main thread via _inbound.
@@ -125,13 +129,26 @@ public class VCoreConnection : MonoBehaviour
 
     // ── send / receive ──────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Send a raw JSON message to V-CORE. Safe to call from the main thread by
+    /// reporter components (e.g. VrContextReporter, BehaviourReporter); sends are
+    /// serialised so concurrent callers never overlap on the socket.
+    /// </summary>
+    public void Send(string json) => _ = SendRawAsync(json);
+
     private async Task SendRawAsync(string json)
     {
-        if (_ws == null || _ws.State != WebSocketState.Open) return;
+        var ws = _ws;
+        if (ws == null || ws.State != WebSocketState.Open) return;
+
+        // ClientWebSocket permits only one outstanding SendAsync at a time, so
+        // serialise the manifest send and every reporter send through a lock.
+        await _sendLock.WaitAsync();
         try
         {
+            if (ws.State != WebSocketState.Open) return;
             var bytes = Encoding.UTF8.GetBytes(json);
-            await _ws.SendAsync(
+            await ws.SendAsync(
                 new ArraySegment<byte>(bytes),
                 WebSocketMessageType.Text,
                 endOfMessage: true,
@@ -140,6 +157,10 @@ public class VCoreConnection : MonoBehaviour
         catch (Exception ex) when (ex is OperationCanceledException or WebSocketException)
         {
             // Connection is closing — swallow; the coroutine loop will reconnect.
+        }
+        finally
+        {
+            _sendLock.Release();
         }
     }
 

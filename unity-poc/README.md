@@ -14,8 +14,10 @@ plus the Amendment 2 WebRTC video plane.
 |---|---|
 | `ObjectStatus.cs` | Component that declares one settable status (discrete or continuous) on a GameObject |
 | `StatusCollector.cs` | Scans the scene for all `ObjectStatus` components → builds the manifest JSON |
-| `VCoreConnection.cs` | WebSocket client (`/ws/runtime`): sends manifest on connect, routes incoming requests |
+| `VCoreConnection.cs` | WebSocket client (`/ws/runtime`): sends manifest on connect, routes incoming requests, exposes `Send()` for reporters |
 | `RequestDispatcher.cs` | Resolves incoming `{target, status, value}` requests to the matching `ObjectStatus` and invokes it |
+| `VrContextReporter.cs` | Sends study-step / scene context (`vr_context`, Contract 4) → dashboard VR Context panel |
+| `BehaviourReporter.cs` | Declares behavioural channels and streams their values (`behaviour_manifest` / `behaviour_sample`, Contract 5) → dashboard, rule engine, recorder |
 | `SpectatorCamera.cs` | Mono camera rendering to a `RenderTexture` for WebRTC streaming |
 | `WebRtcSender.cs` | Connects to `/ws/signaling`, negotiates WebRTC, streams spectator-cam video to the dashboard |
 | `VideoRecorder.cs` | Captures the spectator cam to PNG frames stamped with the LSL session start time |
@@ -166,6 +168,42 @@ The THEN side will offer `campfire_01` with `brightness` and `crackle`.
 
 Multiple `ObjectStatus` components on the same GameObject are grouped under one object
 declaration in the manifest (same `id`, multiple `statuses`).
+
+---
+
+## Reporting context & behaviour (Contracts 4 & 5)
+
+These two components push *upstream* telemetry to V-CORE over the same `/ws/runtime`
+socket. Add both to the **VCoreManager** GameObject (the one with `VCoreConnection`):
+
+1. Select **VCoreManager** → **Add Component** → `VrContextReporter`.
+2. **Add Component** → `BehaviourReporter`.
+
+Out of the box they behave exactly like `tools/mock_unity.py` — no extra wiring needed:
+
+| Component | Sends | Default behaviour |
+|---|---|---|
+| `VrContextReporter` | `vr_context` (Contract 4) | Walks the `Steps` list every `Step Interval` (6 s). Renders in the dashboard's **VR Context** panel. |
+| `BehaviourReporter` | `behaviour_manifest` + `behaviour_sample` (Contract 5) | Declares its `Channels`, then streams each one swept across its range every `Sample Interval` (1 s). Renders in the **Behavioural** panel, feeds the rule engine, and is recorded. |
+
+Both are **hybrid**: synthetic by default, but you drive them with real data from your own
+scripts whenever you're ready —
+
+```csharp
+var ctx = FindObjectOfType<VrContextReporter>();
+ctx.autoPlay = false;                       // stop the scripted walk-through
+ctx.ReportContext(new Dictionary<string, object> {
+    ["scene"] = "Aisle 3 – Dairy", ["step"] = "3 / 4", ["instruction"] = "Find the cheese",
+});
+
+var beh = FindObjectOfType<BehaviourReporter>();
+beh.SetMetric("response_latency", 9.2f);    // real value overrides the synthetic sweep
+beh.SetMetric("task_accuracy", 84f);
+// beh.generateSyntheticData = false;        // optional: send only values you supply
+```
+
+`VCoreConnection` flushes the Object-Status Manifest first and only flips `IsConnected`
+afterward, so the reporters always arrive after the handshake.
 
 ---
 
