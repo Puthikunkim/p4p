@@ -54,8 +54,6 @@ export function SessionMonitor() {
       <div className="monitor-layout">
         {/* Left: main content */}
         <div className="monitor-main">
-          <VrContextPanel />
-
           <VideoFeed sessionId={activeSessionId} />
 
           {channels.length === 0 ? (
@@ -84,6 +82,8 @@ export function SessionMonitor() {
                       history={history}
                     />
                   ))}
+                {/* VR context lives alongside the signal groups, fed live from Unity */}
+                <VrContextPanel />
               </div>
               {ungrouped.length > 0 && (
                 <div className="renderer-grid">
