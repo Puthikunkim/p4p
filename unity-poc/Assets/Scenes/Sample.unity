@@ -332,7 +332,7 @@ Transform:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 200}
   serializedVersion: 2
-  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8746197}
+  m_LocalRotation: {x: 0.40821788, y: -0.23456968, z: 0.10938163, w: 0.8754261}
   m_LocalPosition: {x: 0, y: 3, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
@@ -568,8 +568,8 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  width: 1280
-  height: 720
+  width: 1920
+  height: 1080
   followTarget: {fileID: 0}
   positionOffset: {x: 0, y: 0, z: 0}
 --- !u!114 &304
@@ -588,6 +588,8 @@ MonoBehaviour:
   port: 8000
   iceServerUrls:
   - stun:stun.l.google.com:19302
+  maxFramerate: 30
+  maxBitrateKbps: 8000
 --- !u!114 &305
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -854,11 +856,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   min: 0
   max: 100
-  lowColor: {r: 0.2, g: 0.8, b: 0.3, a: 1}
-  highColor: {r: 0.9, g: 0.2, b: 0.2, a: 1}
   minScale: 0.6
   maxScale: 2.2
-  useEmission: 1
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0
