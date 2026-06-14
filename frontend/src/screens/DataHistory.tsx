@@ -196,9 +196,9 @@ function summarizePayload(payload: string): string {
         .join(' · ')
     }
     if (obj.value !== undefined && obj.status) return `Set ${obj.status} → ${obj.value}`
-    if (obj.then?.set) {
-      const s = obj.then.set as Record<string, unknown>
-      return `Set ${s.status} → ${s.value}`
+    const then = obj.then as { set?: Record<string, unknown> } | undefined
+    if (then?.set) {
+      return `Set ${then.set.status} → ${then.set.value}`
     }
     const keys = Object.keys(obj).slice(0, 2)
     return keys.map((k) => `${k}: ${JSON.stringify(obj[k])}`).join(', ')
