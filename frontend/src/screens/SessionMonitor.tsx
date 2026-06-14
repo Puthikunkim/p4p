@@ -118,15 +118,19 @@ export function SessionMonitor() {
             </div>
           )}
 
-          {warnings.length > 0 && (
-            <div className="detail-event-log">
-              <div className="detail-event-log__header">
-                <span className="detail-chart-title">Warnings</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span className="detail-event-count">{warnings.length}</span>
+          <div className="detail-event-log">
+            <div className="detail-event-log__header">
+              <span className="detail-chart-title">Warnings</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span className="detail-event-count">{warnings.length}</span>
+                {warnings.length > 0 && (
                   <button className="btn btn--small btn--ghost" onClick={clearWarnings}>Clear</button>
-                </div>
+                )}
               </div>
+            </div>
+            {warnings.length === 0 ? (
+              <p className="empty-state" style={{ padding: '16px' }}>No warnings — signals and Unity are healthy.</p>
+            ) : (
               <div className="detail-event-log__body">
                 <table className="history-table">
                   <thead>
@@ -149,8 +153,8 @@ export function SessionMonitor() {
                   </tbody>
                 </table>
               </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
 
         {/* Right: Available Rules panel */}
