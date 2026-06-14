@@ -16,11 +16,11 @@ using UnityEngine;
 public class SpectatorCamera : MonoBehaviour
 {
     [Header("Render Texture")]
-    [Tooltip("Render texture width in pixels (default 1280 matches config.yaml 1280x720).")]
-    public int width = 1280;
+    [Tooltip("Render texture width in pixels (1920 = 1080p source for the spectator feed).")]
+    public int width = 1920;
 
-    [Tooltip("Render texture height in pixels.")]
-    public int height = 720;
+    [Tooltip("Render texture height in pixels (1080 = 1080p).")]
+    public int height = 1080;
 
     [Header("VR Mirror (optional)")]
     [Tooltip("Transform to mirror (e.g. the HMD camera). Leave null for a fixed spectator.")]

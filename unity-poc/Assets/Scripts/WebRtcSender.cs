@@ -35,10 +35,18 @@ public class WebRtcSender : MonoBehaviour
     [Tooltip("STUN/TURN servers. Default works on a LAN without NAT traversal.")]
     public string[] iceServerUrls = { "stun:stun.l.google.com:19302" };
 
+    [Header("Encoding")]
+    [Tooltip("Max frame rate the encoder may use (fps). 30 is plenty for monitoring; 0 = uncapped.")]
+    public int maxFramerate = 30;
+
+    [Tooltip("Max bitrate the encoder may use (kbps). Higher = sharper on a busy 1080p scene; 0 = encoder default.")]
+    public int maxBitrateKbps = 8000;
+
     // ── private ──────────────────────────────────────────────────────────────────
     private SpectatorCamera _cam;
     private RTCPeerConnection _pc;
     private VideoStreamTrack _videoTrack;
+    private RTCRtpSender _videoSender;
 
     private ClientWebSocket _sigWs;
     private CancellationTokenSource _cts;
@@ -143,7 +151,7 @@ public class WebRtcSender : MonoBehaviour
 
         // Add the spectator-camera render texture as a video track.
         _videoTrack = new VideoStreamTrack(_cam.RT);
-        _pc.AddTrack(_videoTrack);
+        _videoSender = _pc.AddTrack(_videoTrack);
 
         StartCoroutine(CreateAndSendOffer());
     }
@@ -169,8 +177,33 @@ public class WebRtcSender : MonoBehaviour
             yield break;
         }
 
+        ApplyEncodingLimits();
+
         QueueSignaling(new { type = "offer", sdp = desc.sdp });
         Debug.Log("[WebRTC] SDP offer sent");
+    }
+
+    // Cap the encoder's frame rate / bitrate on the video sender. maxBitrate is a
+    // ceiling the encoder may use (it still adapts down for simple scenes), so a
+    // generous value keeps a busy 1080p scene sharp without forcing constant load.
+    private void ApplyEncodingLimits()
+    {
+        if (_videoSender == null) return;
+
+        var parameters = _videoSender.GetParameters();
+        if (parameters.encodings == null) return;
+
+        foreach (var encoding in parameters.encodings)
+        {
+            encoding.maxFramerate = maxFramerate > 0 ? (uint?)maxFramerate : null;
+            encoding.maxBitrate = maxBitrateKbps > 0 ? (ulong?)((ulong)maxBitrateKbps * 1000UL) : null;
+        }
+
+        var error = _videoSender.SetParameters(parameters);
+        if (error.errorType != RTCErrorType.None)
+            Debug.LogWarning($"[WebRTC] SetParameters failed: {error.message}");
+        else
+            Debug.Log($"[WebRTC] Encoding caps applied: {maxBitrateKbps} kbps, {maxFramerate} fps");
     }
 
     // ── signaling message handling (main thread) ──────────────────────────────────
