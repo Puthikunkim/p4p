@@ -19,7 +19,6 @@ export function SessionMonitor() {
   const clearWarnings = useVCoreStore((s) => s.clearWarnings)
   const rules = useVCoreStore((s) => s.rules)
   const disabledRules = useVCoreStore((s) => s.disabledRules)
-  const activeSessionId = useVCoreStore((s) => s.activeSessionId)
 
   // Partition channels into groups
   const grouped = new Map<string, Channel[]>()
@@ -54,7 +53,7 @@ export function SessionMonitor() {
       <div className="monitor-layout">
         {/* Left: main content */}
         <div className="monitor-main">
-          <VideoFeed sessionId={activeSessionId} />
+          <VideoFeed />
 
           {channels.length === 0 ? (
             <p className="empty-state">Waiting for signal manifest…</p>

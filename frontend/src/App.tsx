@@ -6,6 +6,7 @@ import { RuleManager } from './screens/RuleManager'
 import { NewSession } from './screens/NewSession'
 import { DataHistory } from './screens/DataHistory'
 import { SystemConfig } from './screens/SystemConfig'
+import { VideoSessionProvider } from './video/VideoSessionProvider'
 import './App.css'
 
 type Screen = 'monitor' | 'rules' | 'new-session' | 'history' | 'config'
@@ -65,6 +66,7 @@ function App() {
   }
 
   return (
+    <VideoSessionProvider>
     <div className="app">
       {/* Sidebar */}
       <aside className="sidebar">
@@ -128,6 +130,7 @@ function App() {
         </main>
       </div>
     </div>
+    </VideoSessionProvider>
   )
 }
 
