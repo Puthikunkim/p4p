@@ -1,6 +1,8 @@
 """Tests for XdfWriter, SqliteStore, Recorder, and the sessions API."""
 from __future__ import annotations
 
+import asyncio
+import json
 from collections.abc import AsyncGenerator
 from pathlib import Path
 from typing import Any
@@ -12,6 +14,7 @@ from fastapi.testclient import TestClient
 from vcore.app import create_app
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import (
+    LinkStatusEvent,
     SampleEvent,
     SignalManifest,
     StatusRequest,
@@ -235,6 +238,27 @@ async def test_recorder_records_vr_context(rec_fixture: tuple[EventBus, Recorder
     assert ev["source"] == "Aisle 2"  # scene used as the event source label
     import json as _json
     assert _json.loads(ev["payload"])["fields"]["step"] == "3 / 8"
+
+
+async def test_recorder_records_link_status_baseline_and_changes(
+    rec_fixture: tuple[EventBus, Recorder],
+) -> None:
+    bus, rec = rec_fixture
+    # Observed before the session → becomes the baseline snapshot at session start.
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))
+    sid = rec.start_session("P01")
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))    # dup → skipped
+    await asyncio.sleep(0.01)
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="down"))  # change → recorded
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="down"))  # dup → skipped
+    await asyncio.sleep(0.01)
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))    # change → recorded
+    await rec.stop_session()
+
+    s = rec.store.get_session(sid)
+    assert s is not None
+    states = [json.loads(e["payload"])["state"] for e in s["events"] if e["event_type"] == "link_status"]
+    assert states == ["up", "down", "up"]  # baseline, then deduped transitions
 
 
 async def test_recorder_ignores_events_outside_session(

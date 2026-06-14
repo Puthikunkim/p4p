@@ -174,6 +174,7 @@ function FatigueTrendChart({ session }: { session: SessionDetail }) {
 const EVENT_STYLES: Record<string, { label: string; color: string; bg: string }> = {
   rule_fired:         { label: 'Adaptation Trigger', color: '#7c3aed', bg: 'rgba(124,58,237,0.12)' },
   vr_context:         { label: 'Step Change',        color: '#0e7490', bg: 'rgba(14,116,144,0.12)' },
+  link_status:        { label: 'Connectivity',       color: '#0369a1', bg: 'rgba(3,105,161,0.12)' },
   warning:            { label: 'Warning',            color: '#b45309', bg: 'rgba(180,83,9,0.12)' },
   baseline_establish: { label: 'Baseline Establish', color: '#15803d', bg: 'rgba(21,128,61,0.12)' },
   session_start:      { label: 'Session Start',      color: '#1d4ed8', bg: 'rgba(29,78,216,0.12)' },
@@ -196,6 +197,9 @@ function summarizePayload(payload: string): string {
         .join(' · ')
     }
     if (obj.value !== undefined && obj.status) return `Set ${obj.status} → ${obj.value}`
+    if (obj.link && obj.state) {
+      return obj.detail ? `${String(obj.state)} — ${String(obj.detail)}` : String(obj.state)
+    }
     const then = obj.then as { set?: Record<string, unknown> } | undefined
     if (then?.set) {
       return `Set ${then.set.status} → ${then.set.value}`
