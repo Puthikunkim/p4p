@@ -2,9 +2,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 router = APIRouter()
@@ -74,3 +76,17 @@ async def upload_video(session_id: str, request: Request) -> dict[str, str]:
     path = video_store.save_video(session_id, body, content_type)
     recorder.store.set_video(session_id, str(path))
     return {"video_path": str(path)}
+
+
+@router.get("/api/sessions/{session_id}/video")
+async def get_video(session_id: str, request: Request) -> FileResponse:
+    """Stream the recorded session video for playback in Data History."""
+    recorder: Any = request.app.state.recorder
+    session: dict[str, Any] | None = recorder.store.get_session(session_id)
+    if session is None:
+        raise HTTPException(404, "Session not found")
+    video_path = session.get("video_path")
+    if not video_path or not Path(video_path).exists():
+        raise HTTPException(404, "No video recorded for this session")
+    media_type = "video/mp4" if str(video_path).endswith(".mp4") else "video/webm"
+    return FileResponse(video_path, media_type=media_type)

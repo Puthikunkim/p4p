@@ -330,6 +330,20 @@ export function DataHistory() {
       <div className="detail-layout">
         {/* main content */}
         <div className="detail-main">
+          {/* recorded session video */}
+          {s.video_path && (
+            <div className="detail-chart-card">
+              <div className="detail-chart-header">
+                <span className="detail-chart-title">Session Video</span>
+              </div>
+              <video
+                controls
+                src={`/api/sessions/${s.id}/video`}
+                style={{ width: '100%', borderRadius: 8, display: 'block', background: '#000' }}
+              />
+            </div>
+          )}
+
           {/* chart */}
           <div className="detail-chart-card">
             <div className="detail-chart-header">

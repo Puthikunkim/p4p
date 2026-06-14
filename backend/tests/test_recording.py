@@ -311,3 +311,27 @@ def test_api_get_session_detail(client: TestClient) -> None:
     s = client.get(f"/api/sessions/{sid}").json()
     assert s["id"] == sid
     assert s["events"] == []
+
+
+def test_api_video_upload_then_playback(client: TestClient) -> None:
+    sid = client.post("/api/sessions", json={"participant": "P01"}).json()["session_id"]
+    up = client.post(
+        f"/api/sessions/{sid}/video",
+        content=b"FAKEWEBMDATA",
+        headers={"content-type": "video/webm"},
+    )
+    assert up.status_code == 201
+
+    resp = client.get(f"/api/sessions/{sid}/video")
+    assert resp.status_code == 200
+    assert resp.headers["content-type"].startswith("video/webm")
+    assert resp.content == b"FAKEWEBMDATA"
+
+
+def test_api_get_video_missing(client: TestClient) -> None:
+    sid = client.post("/api/sessions", json={"participant": "P01"}).json()["session_id"]
+    assert client.get(f"/api/sessions/{sid}/video").status_code == 404
+
+
+def test_api_get_video_unknown_session(client: TestClient) -> None:
+    assert client.get("/api/sessions/nope/video").status_code == 404
