@@ -32,7 +32,8 @@ export interface VCoreStore {
   rules: RuleGrammarContract2[]
   disabledRules: Record<string, string>
   // system
-  warnings: Warning[]
+  warnings: Warning[]      // genuine warnings (stale signal, dropped request, …)
+  adaptations: Warning[]   // rule firings (engine + manual)
   linkStatuses: Record<string, LinkStatus>
   vrContext: VrContext | null
   wsState: 'connecting' | 'connected' | 'disconnected'
@@ -44,6 +45,7 @@ export interface VCoreStore {
   setWsState: (state: VCoreStore['wsState']) => void
   clearLinkStatuses: () => void
   clearWarnings: () => void
+  clearAdaptations: () => void
   setActiveSession: (id: string | null) => void
 }
 
@@ -67,6 +69,7 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
   rules: [],
   disabledRules: {},
   warnings: [],
+  adaptations: [],
   linkStatuses: {},
   vrContext: null,
   wsState: 'disconnected',
@@ -120,7 +123,7 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
             message: `${p.status} → ${p.value} on ${target}${p.source === 'manual' ? ' (manual)' : ''}`,
             at: Date.now(),
           }
-          return { warnings: [w, ...state.warnings].slice(0, 50) }
+          return { adaptations: [w, ...state.adaptations].slice(0, 50) }
         }
 
         default:
@@ -133,6 +136,8 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
   clearLinkStatuses: () => set({ linkStatuses: {} }),
 
   clearWarnings: () => set({ warnings: [] }),
+
+  clearAdaptations: () => set({ adaptations: [] }),
 
   setActiveSession: (id) => set({ activeSessionId: id }),
 }))

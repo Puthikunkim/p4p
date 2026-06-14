@@ -15,8 +15,10 @@ export function SessionMonitor() {
   const latestValues = useVCoreStore((s) => s.latestValues)
   const history = useVCoreStore((s) => s.history)
   const warnings = useVCoreStore((s) => s.warnings)
+  const adaptations = useVCoreStore((s) => s.adaptations)
   const linkStatuses = useVCoreStore((s) => s.linkStatuses)
   const clearWarnings = useVCoreStore((s) => s.clearWarnings)
+  const clearAdaptations = useVCoreStore((s) => s.clearAdaptations)
   const rules = useVCoreStore((s) => s.rules)
   const disabledRules = useVCoreStore((s) => s.disabledRules)
 
@@ -117,19 +119,37 @@ export function SessionMonitor() {
           )}
 
           {warnings.length > 0 && (
-            <section className="warnings-section">
-              <div className="warnings-header">
-                <h3>Warnings ({warnings.length})</h3>
-                <button className="btn btn--small btn--ghost" onClick={clearWarnings}>Clear</button>
+            <div className="detail-event-log">
+              <div className="detail-event-log__header">
+                <span className="detail-chart-title">Warnings</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span className="detail-event-count">{warnings.length}</span>
+                  <button className="btn btn--small btn--ghost" onClick={clearWarnings}>Clear</button>
+                </div>
               </div>
-              <ul className="warnings-list">
-                {warnings.map((w, i) => (
-                  <li key={i} className="warning-item">
-                    <span className="warning-source">{w.source}</span>: {w.message}
-                  </li>
-                ))}
-              </ul>
-            </section>
+              <div className="detail-event-log__body">
+                <table className="history-table">
+                  <thead>
+                    <tr><th>TIME</th><th>SOURCE</th><th>MESSAGE</th></tr>
+                  </thead>
+                  <tbody>
+                    {warnings.map((w, i) => (
+                      <tr key={i}>
+                        <td className="detail-ts">
+                          {new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </td>
+                        <td>
+                          <span className="event-type-badge" style={{ color: '#b45309', background: 'rgba(180,83,9,0.12)' }}>
+                            {w.source}
+                          </span>
+                        </td>
+                        <td style={{ fontSize: 12, opacity: 0.85, lineHeight: 1.4 }}>{w.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           )}
         </div>
 
@@ -185,17 +205,17 @@ export function SessionMonitor() {
           <div className="adapt-log">
             <div className="adapt-log__header">
               <span>Adaptation Log</span>
-              {warnings.length > 0 && (
-                <button className="btn btn--small btn--ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={clearWarnings}>
+              {adaptations.length > 0 && (
+                <button className="btn btn--small btn--ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={clearAdaptations}>
                   Clear
                 </button>
               )}
             </div>
             <div className="adapt-log__list">
-              {warnings.length === 0 ? (
+              {adaptations.length === 0 ? (
                 <div className="adapt-log__empty">No events yet — fire a rule to see it here.</div>
               ) : (
-                warnings.slice(0, 20).map((w, i) => (
+                adaptations.slice(0, 20).map((w, i) => (
                   <div key={i} className="adapt-log__entry">
                     <span className="adapt-log__time">
                       {new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
