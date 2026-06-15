@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useVCoreStore } from '../ws/store'
+import { IconPlay } from '../components/icons'
 
 interface Props {
   onStarted?: () => void
@@ -132,7 +133,7 @@ export function NewSession({ onStarted }: Props) {
           onClick={startSession}
           disabled={!participant.trim() || starting}
         >
-          {starting ? 'Starting…' : '▶ Start VR Session'}
+          {starting ? 'Starting…' : <><IconPlay /> Start VR Session</>}
         </button>
       </div>
     </div>

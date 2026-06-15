@@ -17,7 +17,7 @@ export function LineChart({ channel, history }: RendererProps) {
         {},
         {
           label: channel.display.label,
-          stroke: '#4f8ef7',
+          stroke: '#4338ca',
           width: 2,
         },
       ],

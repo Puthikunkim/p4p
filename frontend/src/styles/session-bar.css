@@ -1,20 +1,23 @@
 /* ── Session status bar ── */
 
 .session-bar {
-  height: 44px;
+  height: 50px;
   background: var(--surface);
   border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  padding: 0 20px;
-  gap: 10px;
+  padding: 0 24px;
+  gap: 12px;
   flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .session-bar__indicator {
   display: flex;
   align-items: center;
-  gap: 7px;
+  gap: 8px;
   font-size: 13px;
 }
 
@@ -22,34 +25,42 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #22c55e;
-  animation: pulse-dot 2s infinite;
+  background: var(--ok);
+  box-shadow: 0 0 0 4px var(--ok-bg);
+  animation: pulse-bar 2s var(--ease) infinite;
 }
 
-@keyframes pulse-dot {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+@keyframes pulse-bar {
+  0%, 100% { box-shadow: 0 0 0 3px var(--ok-bg); }
+  50% { box-shadow: 0 0 0 6px var(--ok-bg); }
 }
 
 .session-bar__dot--idle {
-  background: var(--border);
+  background: var(--text-soft);
+  box-shadow: 0 0 0 4px var(--surface-2);
   animation: none;
 }
 
 .session-bar__label {
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-h);
+  letter-spacing: -0.006em;
 }
 
 .session-bar__timer {
   font-family: var(--mono);
-  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--text);
-  opacity: 0.7;
-  margin-left: 2px;
+  letter-spacing: -0.02em;
+  margin-left: 4px;
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  border: 1px solid var(--border);
 }
 
 .session-bar__spacer {
   flex: 1;
 }
-

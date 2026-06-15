@@ -7,15 +7,20 @@ import { NewSession } from './screens/NewSession'
 import { DataHistory } from './screens/DataHistory'
 import { SystemConfig } from './screens/SystemConfig'
 import { VideoSessionProvider } from './video/VideoSessionProvider'
+import {
+  IconMonitor, IconRules, IconHistory, IconConfig,
+  IconPlus, IconStop, IconPause, IconCore,
+} from './components/icons'
+import type { ComponentType, SVGProps } from 'react'
 import './App.css'
 
 type Screen = 'monitor' | 'rules' | 'new-session' | 'history' | 'config'
 
-const NAV: { id: Screen; label: string }[] = [
-  { id: 'monitor', label: 'Session Monitor' },
-  { id: 'rules', label: 'Rule Manager' },
-  { id: 'history', label: 'Data History' },
-  { id: 'config', label: 'System Config' },
+const NAV: { id: Screen; label: string; icon: ComponentType<SVGProps<SVGSVGElement>> }[] = [
+  { id: 'monitor', label: 'Session Monitor', icon: IconMonitor },
+  { id: 'rules', label: 'Rule Manager', icon: IconRules },
+  { id: 'history', label: 'Data History', icon: IconHistory },
+  { id: 'config', label: 'System Config', icon: IconConfig },
 ]
 
 function formatTime(seconds: number): string {
@@ -70,21 +75,28 @@ function App() {
     <div className="app">
       {/* Sidebar */}
       <aside className="sidebar">
+        <div className="sidebar__brand">
+          <span className="sidebar__brand-mark"><IconCore /></span>
+          <span className="sidebar__brand-text">
+            V<span className="sidebar__brand-sep">·</span>CORE
+          </span>
+        </div>
+
         <button
           className="btn btn--primary sidebar__new-session-btn"
           onClick={() => setScreen('new-session')}
         >
-          + New Session
+          <IconPlus /> New Session
         </button>
 
         <nav className="sidebar__nav">
-          {NAV.map(({ id, label }) => (
+          {NAV.map(({ id, label, icon: Icon }) => (
             <button
               key={id}
               className={`sidebar__link ${screen === id ? 'sidebar__link--active' : ''}`}
               onClick={() => setScreen(id)}
             >
-              <span className="sidebar__link-dot" />
+              <span className="sidebar__link-icon"><Icon /></span>
               {label}
             </button>
           ))}
@@ -104,9 +116,9 @@ function App() {
               </div>
               <span className="session-bar__timer">{formatTime(elapsed)}</span>
               <span className="session-bar__spacer" />
-              <button className="btn btn--ghost btn--small">Pause</button>
+              <button className="btn btn--ghost btn--small"><IconPause /> Pause</button>
               <button className="btn btn--danger btn--small" onClick={stopSession}>
-                ● Stop Session
+                <IconStop /> Stop Session
               </button>
             </>
           ) : (

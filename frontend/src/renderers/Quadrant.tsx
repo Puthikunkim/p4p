@@ -1,10 +1,10 @@
 import type { RendererProps } from './registry'
 
 const QUADRANT_COLORS: Record<string, string> = {
-  calm: '#4caf50',
-  engaged: '#2196f3',
-  stressed: '#f44336',
-  bored: '#9e9e9e',
+  calm: '#0e9f6e',
+  engaged: '#4338ca',
+  stressed: '#d4322a',
+  bored: '#8b94a4',
 }
 
 export function Quadrant({ channel, value }: RendererProps) {
@@ -19,7 +19,7 @@ export function Quadrant({ channel, value }: RendererProps) {
           <div
             key={cat}
             className={`renderer__quadrant-cell ${current === cat ? 'renderer__quadrant-cell--active' : ''}`}
-            style={current === cat ? { background: QUADRANT_COLORS[cat] ?? '#607d8b' } : {}}
+            style={current === cat ? { background: QUADRANT_COLORS[cat] ?? '#475063' } : {}}
           >
             {cat}
           </div>

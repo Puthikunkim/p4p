@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { IconWarn, IconCheck, IconArrowLeft } from '../components/icons'
 
 interface Session {
   id: string
@@ -144,25 +145,25 @@ function FatigueTrendChart({ session }: { session: SessionDetail }) {
       {triggerX !== null && (
         <g>
           <line x1={triggerX} x2={triggerX} y1={PAD.top} y2={H - PAD.bottom}
-            stroke="#f59e0b" strokeWidth={1} strokeDasharray="3 2" />
-          <text x={triggerX + 3} y={PAD.top + 9} fontSize={8} fill="#f59e0b" fontWeight={600}>
+            stroke="#b26a07" strokeWidth={1} strokeDasharray="3 2" />
+          <text x={triggerX + 3} y={PAD.top + 9} fontSize={8} fill="#b26a07" fontWeight={600}>
             TRIGGER EVENT
           </text>
         </g>
       )}
 
       {/* error rate line */}
-      <polyline points={polyline(errorRate)} fill="none" stroke="#f87171" strokeWidth={1.5} opacity={0.7} />
+      <polyline points={polyline(errorRate)} fill="none" stroke="#d4322a" strokeWidth={1.5} opacity={0.65} />
 
       {/* fatigue line */}
-      <polyline points={polyline(fatigue)} fill="none" stroke="#3b82f6" strokeWidth={2} />
+      <polyline points={polyline(fatigue)} fill="none" stroke="#4338ca" strokeWidth={2} />
 
       {/* dot at trigger */}
       {triggerX !== null && (() => {
         const idx = Math.round((triggerPct ?? 0) * (N - 1))
         return (
           <circle cx={triggerX} cy={toY(fatigue[idx])} r={4}
-            fill="#3b82f6" stroke="white" strokeWidth={1.5} />
+            fill="#4338ca" stroke="white" strokeWidth={1.5} />
         )
       })()}
     </svg>
@@ -228,7 +229,7 @@ function StatBox({ label, value, sub, warn }: { label: string; value: string; su
       <div className="detail-stat__label">{label}</div>
       <div className={`detail-stat__value ${warn ? 'detail-stat__value--warn' : ''}`}>
         {value}
-        {warn && <span className="detail-stat__warn-icon">⚠</span>}
+        {warn && <span className="detail-stat__warn-icon"><IconWarn /></span>}
       </div>
       {sub && <div className="detail-stat__sub">{sub}</div>}
     </div>
@@ -313,7 +314,7 @@ export function DataHistory() {
     <div className="screen">
       {/* detail header */}
       <div className="screen-header">
-        <button className="btn btn--small" onClick={() => setSelected(null)}>← Back</button>
+        <button className="btn btn--small" onClick={() => setSelected(null)}><IconArrowLeft /> Back</button>
         <div className="detail-session-label">
           <span className="detail-session-id">{s.participant}</span>
           <span className="detail-session-date">{new Date(s.started_at).toLocaleDateString()}</span>
@@ -342,8 +343,8 @@ export function DataHistory() {
               </div>
               <video
                 controls
+                className="detail-video"
                 src={`/api/sessions/${s.id}/video`}
-                style={{ width: '100%', borderRadius: 8, display: 'block', background: '#000' }}
               />
             </div>
           )}
@@ -408,7 +409,7 @@ export function DataHistory() {
             <div className="detail-subject__label">SUBJECT</div>
             <div className="detail-subject__name">{s.participant}</div>
             <span className={`badge badge--${isDone ? 'done' : 'running'}`} style={{ marginTop: 4 }}>
-              {isDone ? '✓ VERIFIED' : '● ACTIVE'}
+              {isDone ? <><IconCheck /> Verified</> : <><span className="status-dot status-dot--up" /> Active</>}
             </span>
           </div>
 

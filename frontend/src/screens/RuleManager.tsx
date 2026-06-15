@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useVCoreStore } from '../ws/store'
+import { IconWarn } from '../components/icons'
 import type { ConditionItem, RuleGrammarContract2 } from '../contracts/RuleGrammar'
 import type { ObjectDeclaration } from '../contracts/ObjectStatusManifest'
 
@@ -376,8 +377,8 @@ function RuleCard({
         )}
 
         {disabled && (
-          <div style={{ fontSize: 12, color: '#f59e0b', marginTop: 2 }}>
-            ⚠ {disabled}
+          <div className="rule-card__disabled-note">
+            <IconWarn /> {disabled}
           </div>
         )}
       </div>
