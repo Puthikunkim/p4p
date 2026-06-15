@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { connectDashboard, disconnectDashboard } from './ws/socket'
 import { useVCoreStore } from './ws/store'
 import { SessionMonitor } from './screens/SessionMonitor'
@@ -35,7 +35,16 @@ function App() {
   const activeSessionId = useVCoreStore((s) => s.activeSessionId)
   const setActiveSession = useVCoreStore((s) => s.setActiveSession)
   const [elapsed, setElapsed] = useState(0)
-  const sessionStartRef = useRef<number | null>(null)
+  const [prevSessionId, setPrevSessionId] = useState<string | null>(activeSessionId)
+
+  // Reset the displayed timer the moment the active session changes. Adjusting
+  // state during render (rather than in an effect) is React's recommended
+  // pattern for "derive state from a changed value" and avoids a stale flash of
+  // the previous session's time before the interval's first tick.
+  if (activeSessionId !== prevSessionId) {
+    setPrevSessionId(activeSessionId)
+    setElapsed(0)
+  }
 
   useEffect(() => {
     const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
@@ -45,21 +54,10 @@ function App() {
   }, [])
 
   useEffect(() => {
-    if (activeSessionId) {
-      sessionStartRef.current = Date.now()
-      setElapsed(0)
-    } else {
-      sessionStartRef.current = null
-      setElapsed(0)
-    }
-  }, [activeSessionId])
-
-  useEffect(() => {
     if (!activeSessionId) return
+    const start = Date.now()
     const id = setInterval(() => {
-      if (sessionStartRef.current) {
-        setElapsed(Math.floor((Date.now() - sessionStartRef.current) / 1000))
-      }
+      setElapsed(Math.floor((Date.now() - start) / 1000))
     }, 1000)
     return () => clearInterval(id)
   }, [activeSessionId])
