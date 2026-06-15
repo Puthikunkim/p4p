@@ -67,7 +67,7 @@ def _write_rule(tmp_path: Path, rule_id: str, data: dict[str, Any], fmt: str = "
 def _signal_manifest(channels: list[dict[str, Any]] | None = None) -> dict[str, Any]:
     return {
         "schema_version": "1.0.0",
-        "stream": {"name": "om.cognitive", "source_id": "test", "nominal_srate": 10},
+        "stream": {"name": "sensor.cognitive", "source_id": "test", "nominal_srate": 10},
         "channels": channels or [
             {
                 "name": "cognitive_load", "unit": "normalized", "type": "scalar",
@@ -247,7 +247,7 @@ def _make_evaluator(tmp_path: Path, rules: list[dict[str, Any]]) -> tuple[RuleEv
 async def _fire_sample(bus: EventBus, **values: float | str) -> None:
     await bus.publish(
         Topics.SAMPLE,
-        SampleEvent(stream_name="om.cognitive", timestamp=0.0, values=dict(values)),
+        SampleEvent(stream_name="sensor.cognitive", timestamp=0.0, values=dict(values)),
     )
 
 
@@ -317,7 +317,7 @@ async def test_evaluator_eq_op_categorical(tmp_path: Path) -> None:
     await ev.start()
     fired: list[object] = []
     bus.subscribe(Topics.RULE_FIRED, lambda p: fired.append(p))
-    await bus.publish(Topics.SAMPLE, SampleEvent(stream_name="om.cognitive", timestamp=0.0, values={"affect": "stressed"}))
+    await bus.publish(Topics.SAMPLE, SampleEvent(stream_name="sensor.cognitive", timestamp=0.0, values={"affect": "stressed"}))
     assert len(fired) == 1
     await ev.stop()
 

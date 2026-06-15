@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useVCoreStore } from '../ws/store'
+import { linkLabel } from '../ws/links'
 import { IconPlay } from '../components/icons'
 
 interface Props {
@@ -52,7 +53,7 @@ export function NewSession({ onStarted }: Props) {
   }
 
   const systemLinks = Object.entries(linkStatuses).map(([key, ls]) => ({
-    name: key,
+    name: linkLabel(key),
     state: ls.state,
     detail: ls.detail ?? null,
   }))
@@ -63,7 +64,6 @@ export function NewSession({ onStarted }: Props) {
     <div className="screen">
       <div style={{ marginBottom: 18 }}>
         <div className="screen-title">Configure New Session</div>
-        <div className="screen-subtitle">Setup parameters for the upcoming VR monitoring sequence.</div>
       </div>
 
       <div className="new-session-grid">

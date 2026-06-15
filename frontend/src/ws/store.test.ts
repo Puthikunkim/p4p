@@ -91,8 +91,8 @@ describe('warning', () => {
 
 describe('link_status', () => {
   it('stores status keyed by link name', () => {
-    apply({ type: 'link_status', payload: { link: 'om-lsl', state: 'up' } })
-    const ls = useVCoreStore.getState().linkStatuses['om-lsl']
+    apply({ type: 'link_status', payload: { link: 'sensor-pipeline', state: 'up' } })
+    const ls = useVCoreStore.getState().linkStatuses['sensor-pipeline']
     expect(ls.state).toBe('up')
   })
 })

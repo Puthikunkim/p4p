@@ -1,4 +1,5 @@
 import { useVCoreStore, useChannels } from '../ws/store'
+import { LINK_ORDER, linkLabel } from '../ws/links'
 import { getRenderer } from '../renderers/registry'
 import { VideoFeed } from '../video/VideoFeed'
 import type { Channel } from '../contracts/SignalSchema'
@@ -40,13 +41,13 @@ export function SessionMonitor() {
     <div className="screen">
       {/* Link status strip */}
       <div className="link-strip">
-        {(['om-lsl', 'unity-ws', 'browser-ws'] as const).map((link) => {
+        {LINK_ORDER.map((link) => {
           const ls = linkStatuses[link]
           const state = ls?.state ?? 'down'
           return (
             <div key={link} className={`link-chip link-chip--${state}`}>
               <span className={`status-dot status-dot--${state}`} />
-              {link}
+              {linkLabel(link)}
             </div>
           )
         })}

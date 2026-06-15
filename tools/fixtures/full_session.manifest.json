@@ -1,7 +1,7 @@
 {
   "schema_version": "1.0.0",
   "stream": {
-    "name": "om.cognitive",
+    "name": "sensor.cognitive",
     "source_id": "fixture-01",
     "nominal_srate": 10
   },

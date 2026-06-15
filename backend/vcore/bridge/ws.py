@@ -122,9 +122,9 @@ class DashboardBridge:
         unity_state: Literal["up", "down"] = "up" if self._ws_sink.is_connected else "down"
         await _send(ws, "link_status", LinkStatusEvent(link="unity-ws", state=unity_state).model_dump(mode="json"))
         if self._signal_source is not None:
-            await _send(ws, "link_status", LinkStatusEvent(link="om-lsl", state=self._signal_source.link_state).model_dump(mode="json"))
+            await _send(ws, "link_status", LinkStatusEvent(link="sensor-pipeline", state=self._signal_source.link_state).model_dump(mode="json"))
         for key, payload in self._cached_link_states.items():
-            if key == "om-lsl" and self._signal_source is not None:
+            if key == "sensor-pipeline" and self._signal_source is not None:
                 continue  # already pushed live state above
             await _send(ws, "link_status", payload)
         if self._cached_vr_context is not None:

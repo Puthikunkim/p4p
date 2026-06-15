@@ -98,7 +98,7 @@ async def test_failing_handler_does_not_block_others() -> None:
 @pytest.mark.asyncio
 async def test_publish_to_topic_with_no_subscribers_is_silent() -> None:
     bus = EventBus()
-    await bus.publish(Topics.LINK_STATUS, {"link": "om-lsl", "state": "up"})
+    await bus.publish(Topics.LINK_STATUS, {"link": "sensor-pipeline", "state": "up"})
 
 
 # ── ActiveManifests ───────────────────────────────────────────────────────────

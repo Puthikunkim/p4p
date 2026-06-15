@@ -2,7 +2,7 @@
   "_invalid_reason": "categorical channel missing required 'categories' field",
   "schema_version": "1.0.0",
   "stream": {
-    "name": "om.cognitive",
+    "name": "sensor.cognitive",
     "source_id": "om-01",
     "nominal_srate": 10
   },

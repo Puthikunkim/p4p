@@ -217,7 +217,7 @@ async def test_rule_not_fired_when_no_object_manifest(
     await bus.publish(
         Topics.SAMPLE,
         SampleEvent(
-            stream_name="om.cognitive",
+            stream_name="sensor.cognitive",
             timestamp=1.0,
             values={"cognitive_load": 0.9, "eeg_alpha_power": 50.0, "affect": "stressed"},
         ),

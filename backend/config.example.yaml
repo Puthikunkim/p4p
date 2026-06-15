@@ -2,11 +2,11 @@
 # Copy to config.yaml (gitignored) and adjust for your deployment.
 # See ARCHITECTURE §10 for the topology overview.
 
-# ── Ingestion (Om / signal pipeline — Machine C) ─────────────────────────────
+# ── Ingestion (signal pipeline — Machine C) ──────────────────────────────────
 ingestion:
   # Name(s) of the LSL streams to resolve. Matches the 'name' field in Contract 1.
   lsl_streams:
-    - om.cognitive
+    - sensor.cognitive
   # Seconds without a sample before the signal is marked stale (rules won't fire).
   stale_timeout_s: 5
   # Path to an XDF or CSV fixture for offline replay (hardware-free dev/test).

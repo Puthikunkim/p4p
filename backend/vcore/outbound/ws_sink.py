@@ -268,7 +268,7 @@ class WsSink(ActionSink):
 
 
 def _lsl_now() -> float:
-    """Best-effort LSL clock so Unity samples share the Om stream's time domain."""
+    """Best-effort LSL clock so Unity samples share the sensor pipeline stream's time domain."""
     try:
         import pylsl
         return float(pylsl.local_clock())

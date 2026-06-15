@@ -245,14 +245,14 @@ async def test_recorder_records_link_status_baseline_and_changes(
 ) -> None:
     bus, rec = rec_fixture
     # Observed before the session → becomes the baseline snapshot at session start.
-    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="up"))
     sid = rec.start_session("P01")
-    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))    # dup → skipped
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="up"))    # dup → skipped
     await asyncio.sleep(0.01)
-    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="down"))  # change → recorded
-    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="down"))  # dup → skipped
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="down"))  # change → recorded
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="down"))  # dup → skipped
     await asyncio.sleep(0.01)
-    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))    # change → recorded
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="up"))    # change → recorded
     await rec.stop_session()
 
     s = rec.store.get_session(sid)

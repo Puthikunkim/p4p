@@ -21,7 +21,7 @@ class SignalSource(ABC):
 
     @property
     def link_state(self) -> LinkState:
-        """Current om-lsl link state: 'up', 'stale', or 'down'."""
+        """Current sensor-pipeline link state: 'up', 'stale', or 'down'."""
         return 'down'
 
     @abstractmethod

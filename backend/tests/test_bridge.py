@@ -11,7 +11,7 @@ from vcore.app import create_app
 
 SIGNAL_MANIFEST = {
     "schema_version": "1.0.0",
-    "stream": {"name": "om.cognitive", "source_id": "test", "nominal_srate": 10},
+    "stream": {"name": "sensor.cognitive", "source_id": "test", "nominal_srate": 10},
     "channels": [
         {
             "name": "cognitive_load",
@@ -54,7 +54,7 @@ def test_dashboard_receives_signal_manifest_on_connect(app) -> None:  # type: ig
     with TestClient(app) as client, client.websocket_connect("/ws/dashboard") as ws:
         messages = _collect(ws, count=1, looking_for="signal_manifest")
     assert any(m["type"] == "signal_manifest" for m in messages)
-    assert messages[0]["payload"]["stream"]["name"] == "om.cognitive"
+    assert messages[0]["payload"]["stream"]["name"] == "sensor.cognitive"
 
 
 def test_dashboard_receives_object_status_manifest_on_connect(app) -> None:  # type: ignore[no-untyped-def]

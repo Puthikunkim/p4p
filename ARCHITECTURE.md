@@ -69,7 +69,7 @@ contracts** that keep the core fixed:
 
 > **Amendment 1.** Contract 3 is **object-addressable**: each controllable Unity object
 > declares an `ObjectStatus` (discrete or continuous), V-CORE **auto-collects** these, uses
-> them — with Om's signals — to **auto-populate the rule builder**, and streams status-change
+> them — with the sensor pipeline's signals — to **auto-populate the rule builder**, and streams status-change
 > requests back. *Scene-level **abstract actions** are retained as a commented **skeleton**
 > for a future extension — see [§5](#contract-2--rule-grammar-rule-files--engineui).*
 >
@@ -84,7 +84,7 @@ contracts** that keep the core fixed:
 V-CORE is one component of a larger research effort; its neighbours are referenced only
 through their contracts:
 
-- **"Om"** — the Python signal-processing pipeline; emits self-describing channels over **LSL**.
+- **Sensor pipeline** — the Python signal-processing pipeline; emits self-describing channels over **LSL**.
 - **"Jerry"** — a Unity runtime (one of several swappable environments; *need not be VR*).
   Each scene declares an **Object-Status Manifest**. Because the partner *will not
   co-develop*, V-CORE ships a **thin Unity reference POC** (`unity-poc/`) so the whole loop —
@@ -108,10 +108,10 @@ flowchart LR
     EEG["OpenBCI EEG"]
     PPG["Shimmer PPG/EDA"]
     EYE["Pupil Labs eye tracker"]
-    OM["Signal Pipeline 'Om' (Python)"]
-    EEG -- LSL --> OM
-    PPG -- LSL --> OM
-    EYE -- LSL --> OM
+    SP["Signal Pipeline (Python)"]
+    EEG -- LSL --> SP
+    PPG -- LSL --> SP
+    EYE -- LSL --> SP
   end
 
   subgraph MA["Machine A — V-CORE"]
@@ -141,7 +141,7 @@ flowchart LR
     JERRY["Unity runtime 'Jerry'\n+ ObjectStatus + spectator cam"]
   end
 
-  OM == "Contract 1: Signal Schema  «LSL over LAN»" ==> ING
+  SP == "Contract 1: Signal Schema  «LSL over LAN»" ==> ING
   JERRY == "Contract 3b: Object-Status Manifest  «WS handshake»" ==> OUT
   OUT == "Contract 3a: Status-Change Request  «WebSocket»" ==> JERRY
   JERRY -. "participant VR view  «WebRTC video, P2P»" .-> UI
@@ -150,7 +150,7 @@ flowchart LR
 
 **Reading the diagram:**
 
-- **Contract 1** crosses the LAN from Om (C) into ingestion (A) over LSL.
+- **Contract 1** crosses the LAN from the sensor pipeline (C) into ingestion (A) over LSL.
 - **Contract 2** is local: rule files on disk, loaded by the registry; the **Rule Builder**
   writes the same files via the **Rules API**, and a **manual trigger** can fire a rule on
   demand.
@@ -181,7 +181,7 @@ flowchart LR
 ### Decision: Option A, and why
 
 1. **Put LSL where LSL lives.** `pylsl` is the de-facto standard and matches the Python
-   pipeline. It is **network-transparent and clock-synced** — right with "Om" on a separate
+   pipeline. It is **network-transparent and clock-synced** — right with the sensor pipeline on a separate
    machine, and the same LSL clock aligns the recorded video to the signals
    ([§11](#11-participant-video-mirror--recording-webrtc)).
 2. **Put the schema-driven UI where it is idiomatic.** The renderer-by-type registry, the
@@ -219,7 +219,7 @@ flowchart LR
 - **Dashboard delivery:** browser web app (Vite); backend stays Python.
 - **Persistence:** raw streams → **XDF**; session metadata + events → **SQLite**;
   **participant video → a session video file**, all timestamp-synced via the LSL clock.
-- **Topology:** **three machines** — V-CORE/A, Unity/B, Om/C — on a lab LAN; endpoints are
+- **Topology:** **three machines** — V-CORE/A, Unity/B, Pipeline/C — on a lab LAN; endpoints are
   configuration ([§10](#10-deployment--configuration)).
 - **Unity context model:** **per-object statuses** (primary) + an **abstract-action
   skeleton**. **WebSocket** control transport. **Thin, package-ready Unity POC.** Rules
@@ -619,7 +619,7 @@ p4p/
 
 > **Axis 1 (indicators).**
 
-1. Om adds a `pupil_diameter` channel (`timeseries`, `mm`, `display.hint: line_chart`),
+1. The sensor pipeline adds a `pupil_diameter` channel (`timeseries`, `mm`, `display.hint: line_chart`),
    minor-bumps `schema_version`.
 2. `ingestion/lsl_source.py` reads it; `core/schema.py` validates + version-checks (minor →
    accept) and publishes `manifest.updated`.
@@ -637,7 +637,7 @@ p4p/
 2. On play, `StatusCollector.cs` builds the **Object-Status Manifest**; `VCoreConnection.cs`
    sends it over `/ws/runtime`; V-CORE indexes it and forwards it to the dashboard.
 3. In the **Rule Builder** the user picks **IF** `cognitive_load >= 0.8` sustained 5 s (from
-   Om) and **THEN** `set tag:ambient_light brightness = 20` (from Unity), and saves;
+   the sensor pipeline) and **THEN** `set tag:ambient_light brightness = 20` (from Unity), and saves;
    `api/rules.py` validates and writes `backend/rules/overload-dim-lights.yaml`.
 4. The registry hot-reloads it; `degradation.py` reconciles — `ambient_light` resolves,
    `20 ∈ [0,100]` → **enabled**.
@@ -678,7 +678,7 @@ test in Phase 8 of [`TODO.md`](./TODO.md).
 | Rule **target/status unresolved** (no matching object/tag, or value out of range/values) | object-status reconciliation | Rule **disabled + warning**; request never emitted |
 | **Unknown channel type / display hint** | `renderers/registry.ts` lookup miss | **FallbackRenderer** (raw value + badge) |
 | **Schema version skew** | `core/schema.py` SemVer compare | patch/minor → warn + best-effort; **major → refuse + blocking warning** |
-| **Control-link drop** — Om↔A **LSL**, A↔Unity **WS**, A↔browser **WS** | per-adapter heartbeats / connection state | Each **reconnects with backoff independently**; **per-link status** in System Config / Session Monitor; a down Unity link drops requests without crashing the engine |
+| **Control-link drop** — Pipeline↔A **LSL**, A↔Unity **WS**, A↔browser **WS** | per-adapter heartbeats / connection state | Each **reconnects with backoff independently**; **per-link status** in System Config / Session Monitor; a down Unity link drops requests without crashing the engine |
 | **Video-link drop / WebRTC fails** (Amendment 2) | `RTCPeerConnection` state / ICE failure | **VideoFeed shows "reconnecting"**; renegotiate; **the session, recording, signals, and rule engine are unaffected** (video is a separate plane) |
 | **Stale signal** (stream up, no recent samples) | last-sample timeout | Channel **stale**; rules referencing it **do not fire on stale data** |
 | **Malformed rule file** / rejected by the Rules API | `engine/registry.py` / `api/rules.py` | File **skipped** / API returns a clear error; other rules load normally |
@@ -697,7 +697,7 @@ test in Phase 8 of [`TODO.md`](./TODO.md).
 |---|---|---|
 | **A** | V-CORE (backend + served dashboard) | ← LSL from C · ↔ WS with B · → WS to browsers · brokers WebRTC signaling |
 | **B** | Unity VR runtime "Jerry" | ↔ WS with A · → WebRTC video to the dashboard |
-| **C** | Om signal pipeline | → LSL to A |
+| **C** | Sensor pipeline | → LSL to A |
 
 The dashboard is served by A and opened from any LAN machine. The WebRTC video flows
 **directly Unity (B) → browser** (peer-to-peer); V-CORE only brokers the connection setup.
@@ -708,7 +708,7 @@ The dashboard is served by A and opened from any LAN machine. The WebRTC video f
 ingestion:
   transport: lsl
   streams:
-    - { name: om.cognitive, manifest: lsl_header }   # lsl_header | sidecar:<path>
+    - { name: sensor.cognitive, manifest: lsl_header }   # lsl_header | sidecar:<path>
   stale_timeout_s: 2.0
   # known_peers: ["192.168.1.42"]   # only if LSL multicast discovery is blocked across subnets
 
@@ -838,7 +838,7 @@ the video on the wire.
 
 Defaults are chosen so none block progress; flag any to change.
 
-1. **Topology — 3 machines** (V-CORE/A, Unity/B, Om/C) on an **isolated lab LAN** (flat
+1. **Topology — 3 machines** (V-CORE/A, Unity/B, Pipeline/C) on an **isolated lab LAN** (flat
    subnet for LSL multicast; `known_peers` covers cross-subnet). Plaintext LSL accepted on an
    isolated network; WebRTC video is encrypted by default.
 2. **Unity control transport — RESOLVED: WebSocket** (Unity as WS client); ZMQ swappable.
@@ -875,4 +875,4 @@ Defaults are chosen so none block progress; flag any to change.
 | **Abstract action** | A scene-level semantic command — a *skeleton* for a future extension, not implemented. |
 | **Renderer-by-type** | UI pattern: pick a component from a registry keyed on a channel's `type`/`display.hint`. |
 | **Graceful degradation** | On any mismatch, disable the affected element and surface a warning — never crash. |
-| **Om / Jerry** | Codenames for the external Python signal pipeline and the Unity runtime. |
+| **Sensor pipeline / Jerry** | The external Python signal pipeline, and the codename for the Unity runtime. |

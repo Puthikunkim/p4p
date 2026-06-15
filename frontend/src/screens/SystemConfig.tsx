@@ -1,10 +1,5 @@
 import { useVCoreStore } from '../ws/store'
-
-const CHIP_LABELS: Record<string, string> = {
-  'browser-ws': 'Browser WS',
-  'unity-ws': 'Unity VR Scene',
-  'om-lsl': 'OM LSL Stream',
-}
+import { linkLabel } from '../ws/links'
 
 function stateLabel(state: string): string {
   const map: Record<string, string> = {
@@ -22,7 +17,7 @@ export function SystemConfig() {
 
   const chips = Object.entries(linkStatuses).map(([key, ls]) => ({
     key,
-    name: CHIP_LABELS[key] ?? key,
+    name: linkLabel(key),
     state: ls.state,
     detail: ls.detail ?? null,
   }))
@@ -31,7 +26,6 @@ export function SystemConfig() {
     <div className="screen">
       <div style={{ marginBottom: 18 }}>
         <div className="screen-title">System Configuration</div>
-        <div className="screen-subtitle">Health check, sensor pipeline status and protocol configuration.</div>
       </div>
 
       <div className="status-chips-row" style={{ gridTemplateColumns: `repeat(${Math.min(chips.length, 4)}, 1fr)` }}>

@@ -339,7 +339,7 @@ async def test_object_status_manifest_can_be_resent_mid_session() -> None:
 
 _PHYS_MANIFEST: dict[str, Any] = {
     "schema_version": "1.0.0",
-    "stream": {"name": "om.cognitive", "source_id": "t", "nominal_srate": 10},
+    "stream": {"name": "sensor.cognitive", "source_id": "t", "nominal_srate": 10},
     "channels": [
         {"name": "cognitive_load", "unit": "normalized", "type": "scalar",
          "range": {"min": 0, "max": 1},

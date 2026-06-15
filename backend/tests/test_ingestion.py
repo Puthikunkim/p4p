@@ -99,7 +99,7 @@ async def test_replay_manifest_stored_in_registry() -> None:
     await src.stop()
 
     assert manifests.signal_manifest is not None
-    assert manifests.signal_manifest["stream"]["name"] == "om.cognitive"
+    assert manifests.signal_manifest["stream"]["name"] == "sensor.cognitive"
 
 
 # ── stale detection ───────────────────────────────────────────────────────────
@@ -121,7 +121,7 @@ async def test_stale_event_emitted_after_silence() -> None:
     await src.stop()
 
     assert len(stale_events) >= 1
-    assert stale_events[0].stream_name == "om.cognitive"
+    assert stale_events[0].stream_name == "sensor.cognitive"
     assert stale_events[0].age_s > 0.5
 
 
@@ -133,7 +133,7 @@ async def test_lsl_watchdog_goes_down_after_prolonged_silence() -> None:
     bus = EventBus()
     manifests = ActiveManifests()
     src = LSLSource(
-        "om.cognitive",
+        "sensor.cognitive",
         MANIFEST,
         bus=bus,
         manifests=manifests,
@@ -170,7 +170,7 @@ async def test_lsl_watchdog_goes_down_after_prolonged_silence() -> None:
 async def test_lsl_source_resolves_and_reads() -> None:
     pylsl = pytest.importorskip("pylsl")
 
-    info = pylsl.StreamInfo("om.cognitive.test", "EEG", 2, 20, pylsl.cf_float32, "test-src-unique")
+    info = pylsl.StreamInfo("sensor.cognitive.test", "EEG", 2, 20, pylsl.cf_float32, "test-src-unique")
     outlet = pylsl.StreamOutlet(info)
 
     # Minimal 2-channel manifest matching the outlet above (no categorical channel
@@ -179,7 +179,7 @@ async def test_lsl_source_resolves_and_reads() -> None:
     import tempfile
     manifest_data = {
         "schema_version": "1.0.0",
-        "stream": {"name": "om.cognitive.test", "source_id": "test-src-unique", "nominal_srate": 20},
+        "stream": {"name": "sensor.cognitive.test", "source_id": "test-src-unique", "nominal_srate": 20},
         "channels": [
             {"name": "cognitive_load", "unit": "normalized", "type": "scalar",
              "range": {"min": 0, "max": 1}, "display": {"hint": "stat_card", "label": "Cognitive Load"}},
@@ -196,7 +196,7 @@ async def test_lsl_source_resolves_and_reads() -> None:
     bus = EventBus()
     manifests = ActiveManifests()
     src = LSLSource(
-        "om.cognitive.test",
+        "sensor.cognitive.test",
         manifest_tmp,
         bus=bus,
         manifests=manifests,

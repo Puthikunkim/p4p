@@ -30,7 +30,7 @@ _DATA_DIR = Path(__file__).parent.parent / "data"
 _SINK_HOST = "localhost"
 _SINK_PORT = 9001
 _DEFAULT_MANIFEST = Path(__file__).parent.parent.parent / "tools" / "fixtures" / "full_session.manifest.json"
-_DEFAULT_STREAM = "om.cognitive"
+_DEFAULT_STREAM = "sensor.cognitive"
 
 
 def create_app(

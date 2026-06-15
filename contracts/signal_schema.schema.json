@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://vcore/contracts/signal_schema",
   "title": "Signal Schema — Contract 1",
-  "description": "Self-describing manifest that Om publishes alongside its LSL stream. Drives dashboard renderer selection and rule engine signal resolution.",
+  "description": "Self-describing manifest that the sensor pipeline publishes alongside its LSL stream. Drives dashboard renderer selection and rule engine signal resolution.",
   "type": "object",
   "required": ["schema_version", "stream", "channels"],
   "additionalProperties": false,

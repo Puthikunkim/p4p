@@ -1,7 +1,7 @@
 /* Auto-generated from contracts/signal_schema.schema.json — do not edit by hand. */
 
 /**
- * Self-describing manifest that Om publishes alongside its LSL stream. Drives dashboard renderer selection and rule engine signal resolution.
+ * Self-describing manifest that the sensor pipeline publishes alongside its LSL stream. Drives dashboard renderer selection and rule engine signal resolution.
  */
 export interface SignalSchemaContract1 {
   /**

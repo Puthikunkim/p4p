@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class IngestionConfig(BaseModel):
-    lsl_streams: list[str] = ["om.cognitive"]
+    lsl_streams: list[str] = ["sensor.cognitive"]
     stale_timeout_s: float = 5.0
     replay_fixture: str | None = None
 

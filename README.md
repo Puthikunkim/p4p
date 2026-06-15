@@ -3,7 +3,7 @@
 **VR Cognitive-state Observation, Rules & Environment adaptation** — a research platform for
 real-time VR cognitive-state monitoring and adaptation.
 
-V-CORE is the **middleware** between a physiological-sensing pipeline ("Om") and a swappable
+V-CORE is the **middleware** between a physiological-sensing pipeline and a swappable
 Unity runtime ("Jerry"). It provides a **schema-driven dashboard** that renders whatever
 signal channels the pipeline declares (and lets you **author rules from the browser**, and —
 during a study session — shows a **live mirror of the participant's VR view** beside the

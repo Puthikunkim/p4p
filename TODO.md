@@ -227,7 +227,7 @@ WebRTC, recording synced to signals, and a manual rule trigger.)*
   unhandled exception.
 - [ ] **Schema version-skew end-to-end** — minor-bumped manifest (warn + continue) and a
   major-bumped one (refuse + blocking warning). *AC:* matches `contracts/VERSIONING.md`.
-- [ ] 🆕 **Per-link independent reconnect + UI status** for all 3 links (Om-**LSL**,
+- [ ] 🆕 **Per-link independent reconnect + UI status** for all 3 links (Sensor-Pipeline-**LSL**,
   Unity-**WS**, browser-**WS**). *AC:* dropping each in turn — engine + UI survive; statuses
   reflect reality.
 - [ ] 🎥 **Video-plane isolation** — drop/fail the WebRTC connection mid-session. *AC:* the
@@ -252,7 +252,7 @@ WebRTC, recording synced to signals, and a manual rule trigger.)*
 
 ### Definition of done (v1)
 
-A channel added in Om appears on the dashboard *and* as a Rule-Builder IF with no V-CORE
+A channel added in the sensor pipeline appears on the dashboard *and* as a Rule-Builder IF with no V-CORE
 change; a developer drops `ObjectStatus` onto a Unity object and it appears as a Rule-Builder
 THEN; a rule authored in the browser is saved as a file, hot-loads, fires, and changes the
 object over WebSocket; during a session the researcher watches the participant's VR view live

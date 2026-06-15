@@ -153,7 +153,7 @@ class StaleEvent(BaseModel):
 class LinkStatusEvent(BaseModel):
     """Network link state change for any of the three links."""
     model_config = {"extra": "forbid"}
-    link: Literal["om-lsl", "unity-ws", "browser-ws"]
+    link: Literal["sensor-pipeline", "unity-ws", "browser-ws"]
     state: Literal["up", "down", "stale", "reconnecting"]
     detail: str | None = None
 

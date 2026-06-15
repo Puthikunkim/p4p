@@ -494,11 +494,11 @@ async def test_link_status_forwarded_to_dashboard(tmp_path: Path) -> None:
     fake: Any = _FakeWS()
     bridge._clients.add(fake)
 
-    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="down"))
+    await bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="down"))
 
     assert len(fake.sent) == 1
     assert fake.sent[0]["type"] == "link_status"
-    assert fake.sent[0]["payload"]["link"] == "om-lsl"
+    assert fake.sent[0]["payload"]["link"] == "sensor-pipeline"
     assert fake.sent[0]["payload"]["state"] == "down"
 
     await bridge.stop()

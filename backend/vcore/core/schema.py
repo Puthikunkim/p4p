@@ -115,7 +115,7 @@ class ActiveManifests:
         These augment the active signal manifest so the dashboard renders them,
         the rule engine can reference them, and degradation keeps the matching
         rules enabled. Raises on a malformed channel. Channel names already
-        present in the base (Om) manifest are ignored to avoid duplicates.
+        present in the base (sensor-pipeline) manifest are ignored to avoid duplicates.
         """
         from vcore.core.models import Channel  # local import avoids import cycle
         for ch in channels:
@@ -124,7 +124,7 @@ class ActiveManifests:
 
     @property
     def signal_manifest(self) -> dict[str, Any] | None:
-        """Active signal manifest = base (Om) manifest ⊕ Unity behavioural channels."""
+        """Active signal manifest = base (sensor-pipeline) manifest ⊕ Unity behavioural channels."""
         if self._signal is None:
             return None
         if not self._behaviour_channels:

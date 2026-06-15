@@ -21,11 +21,11 @@ _RESOLVE_TIMEOUT = 10.0  # seconds to wait for the LSL stream to appear
 
 
 class LSLSource(SignalSource):
-    """Read a live LSL stream from Om and publish samples onto the event bus.
+    """Read a live LSL stream from the sensor pipeline and publish samples onto the event bus.
 
     The Signal Schema manifest is loaded from *manifest_path* (a Contract 1
-    JSON sidecar that Om provides alongside its LSL stream). The channel order
-    in the manifest must match the LSL stream's channel order.
+    JSON sidecar that the sensor pipeline provides alongside its LSL stream). The channel
+    order in the manifest must match the LSL stream's channel order.
     """
 
     def __init__(
@@ -117,7 +117,7 @@ class LSLSource(SignalSource):
                 log.warning("lsl_source: stream %r not found, retrying…", self._stream_name)
                 await self._bus.publish(
                     Topics.LINK_STATUS,
-                    LinkStatusEvent(link="om-lsl", state="down", detail=f"waiting for '{self._stream_name}'"),
+                    LinkStatusEvent(link="sensor-pipeline", state="down", detail=f"waiting for '{self._stream_name}'"),
                 )
         if not self._running:
             return
@@ -134,7 +134,7 @@ class LSLSource(SignalSource):
         log.info("lsl_source: connected to %r", self._stream_name)
         await self._bus.publish(
             Topics.LINK_STATUS,
-            LinkStatusEvent(link="om-lsl", state="up"),
+            LinkStatusEvent(link="sensor-pipeline", state="up"),
         )
 
         while self._running:
@@ -169,16 +169,16 @@ class LSLSource(SignalSource):
                 manifest = self._manifests.signal_manifest
                 name = manifest["stream"]["name"] if manifest else self._stream_name
                 await self._bus.publish(Topics.STALE, StaleEvent(stream_name=name, age_s=age))
-                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="stale"))
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="stale"))
                 self._is_stale = True
                 self._stale_since = now
             elif is_stale and self._is_stale and not self._is_offline and (now - self._stale_since) >= self._offline_timeout_s:
-                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="down", detail="stream went silent"))
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="down", detail="stream went silent"))
                 self._is_stale = False
                 self._is_offline = True
                 self._stale_since = 0.0
             elif not is_stale and self._last_sample_at > 0 and (self._is_stale or self._is_offline):
-                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="om-lsl", state="up"))
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="up"))
                 self._is_stale = False
                 self._is_offline = False
                 self._stale_since = 0.0
