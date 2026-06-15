@@ -51,14 +51,11 @@ export function NewSession({ onStarted }: Props) {
     }
   }
 
-  const systemLinks = [
-    { name: 'Dashboard WS', state: wsState, detail: null },
-    ...Object.entries(linkStatuses).map(([key, ls]) => ({
-      name: key,
-      state: ls.state,
-      detail: ls.detail ?? null,
-    })),
-  ]
+  const systemLinks = Object.entries(linkStatuses).map(([key, ls]) => ({
+    name: key,
+    state: ls.state,
+    detail: ls.detail ?? null,
+  }))
 
   const allConnected = wsState === 'connected'
 
