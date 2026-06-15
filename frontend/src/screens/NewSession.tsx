@@ -55,7 +55,6 @@ export function NewSession({ onStarted }: Props) {
   const systemLinks = Object.entries(linkStatuses).map(([key, ls]) => ({
     name: linkLabel(key),
     state: ls.state,
-    detail: ls.detail ?? null,
   }))
 
   const allConnected = wsState === 'connected'
@@ -112,9 +111,6 @@ export function NewSession({ onStarted }: Props) {
                   <span className={`status-dot status-dot--${link.state}`} />
                   <span className="link-status-row__name">{link.name}</span>
                   <span className={`badge badge--${link.state}`}>{link.state}</span>
-                  {link.detail && (
-                    <span className="link-status-row__detail">{link.detail}</span>
-                  )}
                 </div>
               ))
             )}

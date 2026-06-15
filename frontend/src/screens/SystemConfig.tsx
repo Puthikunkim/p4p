@@ -19,7 +19,6 @@ export function SystemConfig() {
     key,
     name: linkLabel(key),
     state: ls.state,
-    detail: ls.detail ?? null,
   }))
 
   return (
@@ -36,9 +35,6 @@ export function SystemConfig() {
               <span className="status-chip__value">{stateLabel(chip.state)}</span>
               <span className={`status-dot status-dot--${chip.state}`} />
             </div>
-            {chip.detail && (
-              <span style={{ fontSize: 11, opacity: 0.55 }}>{chip.detail}</span>
-            )}
           </div>
         ))}
       </div>
