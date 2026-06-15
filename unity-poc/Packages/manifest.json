@@ -1,10 +1,13 @@
 {
   "dependencies": {
-    "com.unity.webrtc": "3.0.0-pre.8",
+    "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
     "com.unity.nuget.newtonsoft-json": "3.2.1",
+    "com.unity.webrtc": "3.0.0-pre.8",
     "com.unity.modules.audio": "1.0.0",
     "com.unity.modules.imageconversion": "1.0.0",
     "com.unity.modules.physics": "1.0.0",
+    "com.unity.modules.physics2d": "1.0.0",
+    "com.unity.modules.screencapture": "1.0.0",
     "com.unity.modules.ui": "1.0.0",
     "com.unity.modules.video": "1.0.0"
   }
