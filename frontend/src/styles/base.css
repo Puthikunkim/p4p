@@ -1,0 +1,158 @@
+/* ── App layout ── */
+
+.app {
+  display: flex;
+  flex-direction: row;
+  min-height: 100vh;
+}
+
+/* ── Main content area ── */
+
+.main-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--bg);
+}
+
+/* ── Page main area ── */
+
+.main {
+  flex: 1;
+  padding: 20px 24px;
+  overflow-y: auto;
+}
+
+/* ── Screen chrome ── */
+
+.screen {
+  width: 100%;
+}
+
+.screen-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.screen-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--text-h);
+}
+
+.screen-subtitle {
+  font-size: 13px;
+  color: var(--text);
+  margin-top: 2px;
+  opacity: 0.8;
+}
+
+/* ── Buttons ── */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text-h);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: opacity 0.12s, background 0.12s;
+  white-space: nowrap;
+}
+
+.btn:hover { opacity: 0.82; }
+.btn:disabled { opacity: 0.38; cursor: not-allowed; }
+
+.btn--primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: transparent;
+}
+
+.btn--danger {
+  background: #dc2626;
+  color: #fff;
+  border-color: transparent;
+}
+
+.btn--ghost {
+  background: transparent;
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn--small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* ── Badges ── */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.badge--up, .badge--running, .badge--connected { background: #dcfce7; color: #15803d; }
+.badge--down, .badge--idle, .badge--disconnected { background: var(--border); color: var(--text); }
+.badge--done { background: #dbeafe; color: #1d4ed8; }
+.badge--connecting { background: #fef3c7; color: #b45309; }
+.badge--stale { background: #fef3c7; color: #b45309; }
+.badge--reconnecting { background: #fef3c7; color: #b45309; }
+
+@media (prefers-color-scheme: dark) {
+  .badge--up, .badge--running, .badge--connected { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+  .badge--down, .badge--idle, .badge--disconnected { background: rgba(255,255,255,0.08); color: var(--text); }
+  .badge--done { background: rgba(96, 165, 250, 0.15); color: #60a5fa; }
+  .badge--connecting, .badge--stale, .badge--reconnecting { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+}
+
+/* ── Status dot ── */
+
+.status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+  flex-shrink: 0;
+}
+
+.status-dot--up, .status-dot--connected { background: #22c55e; }
+.status-dot--down, .status-dot--disconnected { background: #94a3b8; }
+.status-dot--connecting, .status-dot--stale, .status-dot--reconnecting { background: #f59e0b; }
+
+/* ── Session / session-running states ── */
+
+.session-running,
+.session-done {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.session-id-label {
+  font-size: 13px;
+  opacity: 0.6;
+}
+
+/* ── Empty state ── */
+
+.empty-state {
+  opacity: 0.5;
+  font-size: 13.5px;
+}
+
