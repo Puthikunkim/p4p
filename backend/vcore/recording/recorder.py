@@ -23,11 +23,21 @@ log = logging.getLogger(__name__)
 class Recorder:
     """Subscribes to bus events and persists them to XDF + SQLite during a session."""
 
-    def __init__(self, bus: EventBus, manifests: ActiveManifests, data_dir: Path) -> None:
+    def __init__(
+        self,
+        bus: EventBus,
+        manifests: ActiveManifests,
+        data_dir: Path,
+        *,
+        sqlite_path: Path | None = None,
+        xdf_enabled: bool = True,
+    ) -> None:
         self._bus = bus
         self._manifests = manifests
         self._data_dir = data_dir
-        self._store = SqliteStore(data_dir / "sessions.db")
+        self._xdf_enabled = xdf_enabled
+        # sqlite_path defaults under data_dir, preserving the historical location.
+        self._store = SqliteStore(Path(sqlite_path) if sqlite_path is not None else data_dir / "sessions.db")
         self._session_id: str | None = None
         self._xdf: XdfWriter | None = None
         self._last_lsl_ts: float | None = None
@@ -154,6 +164,8 @@ class Recorder:
     # ── helpers ───────────────────────────────────────────────────────────────
 
     def _open_xdf(self) -> None:
+        if not self._xdf_enabled:
+            return
         raw = self._manifests.signal_manifest
         if raw is None or not self._session_id:
             return

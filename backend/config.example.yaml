@@ -1,57 +1,70 @@
 # V-CORE configuration template.
-# Copy to config.yaml (gitignored) and adjust for your deployment.
-# See ARCHITECTURE §10 for the topology overview.
+#
+# Copy to config.yaml and adjust for your deployment. The app reads config.yaml
+# (or $VCORE_CONFIG) at startup; if absent, the defaults in vcore/core/config.py
+# apply (which match the values below).
+#
+# Relative paths resolve against the backend/ directory (where this file lives),
+# so they work regardless of the working directory you launch from.
+# Each key is tagged (wired) = consumed by app.py, or (reference only) = documents
+# intent but not yet read.
 
 # ── Ingestion (signal pipeline — Machine C) ──────────────────────────────────
 ingestion:
-  # Name(s) of the LSL streams to resolve. Matches the 'name' field in Contract 1.
+  # (wired) LSL stream name(s); the first is the primary stream to resolve.
   lsl_streams:
     - sensor.cognitive
-  # Seconds without a sample before the signal is marked stale (rules won't fire).
+  # (wired) Contract-1 signal manifest (sidecar JSON) for the stream's channels.
+  manifest_path: ../tools/fixtures/full_session.manifest.json
+  # (wired) Seconds without a sample before the signal is marked stale.
   stale_timeout_s: 5
-  # Path to an XDF or CSV fixture for offline replay (hardware-free dev/test).
-  # replay_fixture: "tools/fixtures/sample_session.xdf"
+  # (reference only) Offline replay fixture — ReplaySource is test-only.
+  # replay_fixture: tools/fixtures/sample_session.csv
 
-# ── Outbound (Jerry / Unity runtime — Machine B) ─────────────────────────────
+# ── Outbound (Unity runtime — Machine B) ─────────────────────────────────────
 outbound:
-  # Primary transport. 'ws' = Unity connects to /ws/runtime on this server.
-  # Alternative: 'zmq' — see outbound/zmq_sink.py (documented stub).
+  # (reference only) Only 'ws' is implemented; 'zmq' is a documented stub.
   transport: ws
-  # Path that Unity's WS client connects to (relative to the bind address).
+  # (wired) Standalone WsSink server bind, used by mock_unity / direct clients.
+  # The real Unity POC instead connects to /ws/runtime on the main bridge port.
+  ws_host: localhost
+  ws_port: 9001
+  # (reference only) Route path is fixed in code.
   runtime_ws_path: /ws/runtime
-  # Seconds between reconnect attempts if Unity drops the link.
+  # (reference only) Unity-side reconnect backoff.
   reconnect_backoff_s: 2
 
 # ── WebSocket bridge (V-CORE server — Machine A) ──────────────────────────────
 bridge:
-  # Interface and port V-CORE listens on.
+  # (wired via `python -m vcore.app`) Interface and port to bind.
   # Use 0.0.0.0 for LAN; 127.0.0.1 for single-machine dev.
+  # NB: `uvicorn vcore.app:app` ignores these — pass --host/--port on the CLI.
   host: 0.0.0.0
   port: 8000
-  # Path the browser dashboard subscribes to.
+  # (reference only) Route path is fixed in code.
   dashboard_ws_path: /ws/dashboard
-  # Optional bearer token. Leave empty to disable auth (isolated LAN only).
+  # (reference only) Auth is not implemented yet.
   # bearer_token: "change-me-before-use"
 
 # ── Recording ─────────────────────────────────────────────────────────────────
 recording:
-  # Directory for session data (gitignored by default).
-  data_dir: ../data
-  # Raw LSL streams → XDF per session.
+  # (wired) Root directory for per-session data (XDF + video) → backend/data.
+  data_dir: data
+  # (wired) Write raw LSL streams to XDF per session.
   xdf_enabled: true
-  # Session metadata + rule-fire events → SQLite.
+  # (wired) SQLite database for sessions + events → backend/data/sessions.db.
+  sqlite_path: data/sessions.db
+  # (reference only) SQLite is always on (the sessions API depends on it).
   sqlite_enabled: true
-  sqlite_path: ../data/vcore.db
 
 # ── Participant video (Amendment 2 — WebRTC) ──────────────────────────────────
 video:
+  # (reference only) Signaling is always available; these document intent.
   enabled: true
-  # V-CORE brokers WebRTC signaling only; media is peer-to-peer.
   signaling_ws_path: /ws/signaling
-  # Fallback: MJPEG-over-WS preview when WebRTC is unavailable.
   fallback_transport: none  # options: none | mjpeg
 
 # ── Rule files ────────────────────────────────────────────────────────────────
 rules:
-  # Directory watched for YAML/JSON rule files (hot-reloaded by watchdog).
-  rules_dir: ./rules
+  # (wired) Directory watched for YAML/JSON rule files → backend/rules.
+  rules_dir: rules

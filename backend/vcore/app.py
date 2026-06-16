@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -14,6 +15,7 @@ from vcore.api.rules import router as rules_router
 from vcore.api.sessions import router as sessions_router
 from vcore.bridge.signaling import SignalingBroker
 from vcore.bridge.ws import DashboardBridge
+from vcore.core.config import VCoreConfig, load_config
 from vcore.core.eventbus import EventBus
 from vcore.core.schema import ActiveManifests
 from vcore.engine.evaluator import RuleEvaluator
@@ -25,33 +27,69 @@ from vcore.recording.video_store import VideoStore
 
 log = logging.getLogger(__name__)
 
-_RULES_DIR = Path(__file__).parent.parent / "rules"
-_DATA_DIR = Path(__file__).parent.parent / "data"
-_SINK_HOST = "localhost"
-_SINK_PORT = 9001
-_DEFAULT_MANIFEST = Path(__file__).parent.parent.parent / "tools" / "fixtures" / "full_session.manifest.json"
-_DEFAULT_STREAM = "sensor.cognitive"
+# Backend directory (this file is backend/vcore/app.py → parents[1] == backend/).
+# Relative config paths are resolved against this so behaviour is cwd-independent.
+_BACKEND_DIR = Path(__file__).resolve().parent.parent
+
+
+def _default_config_path() -> Path:
+    """Config file location: ``$VCORE_CONFIG`` if set, else ``backend/config.yaml``."""
+    env = os.environ.get("VCORE_CONFIG")
+    return Path(env) if env else _BACKEND_DIR / "config.yaml"
+
+
+def _resolve(path: str | Path) -> Path:
+    """Resolve a (possibly relative) config path against the backend directory."""
+    p = Path(path)
+    return p if p.is_absolute() else (_BACKEND_DIR / p)
 
 
 def create_app(
     *,
-    rules_dir: Path = _RULES_DIR,
-    data_dir: Path = _DATA_DIR,
-    sink_host: str = _SINK_HOST,
-    sink_port: int = _SINK_PORT,
+    config: VCoreConfig | None = None,
+    config_path: Path | str | None = None,
+    rules_dir: Path | None = None,
+    data_dir: Path | None = None,
+    sink_host: str | None = None,
+    sink_port: int | None = None,
 ) -> FastAPI:
     """Create and return the FastAPI application.
 
-    Pass ``rules_dir`` / ``sink_host`` / ``sink_port`` to override defaults in tests.
+    Configuration comes from ``config.yaml`` (or ``$VCORE_CONFIG``); a missing
+    file falls back to the defaults in :mod:`vcore.core.config`. The keyword
+    arguments are **explicit overrides** (used by tests) that win over config.
     All wired components are stored on ``app.state`` for route-handler access.
     """
+    if config is None:
+        config = load_config(config_path if config_path is not None else _default_config_path())
+
+    # ── resolve paths (explicit override → config → default), backend-anchored ──
+    rules_dir = Path(rules_dir) if rules_dir is not None else _resolve(config.rules.rules_dir)
+    if data_dir is not None:
+        # An overriding data_dir (tests) also relocates the SQLite db beneath it.
+        data_dir = Path(data_dir)
+        sqlite_path: Path | None = None
+    else:
+        data_dir = _resolve(config.recording.data_dir)
+        sqlite_path = _resolve(config.recording.sqlite_path)
+
+    sink_host = sink_host if sink_host is not None else config.outbound.ws_host
+    sink_port = sink_port if sink_port is not None else config.outbound.ws_port
+
+    manifest_path = _resolve(config.ingestion.manifest_path)
+    stream_name = config.ingestion.lsl_streams[0] if config.ingestion.lsl_streams else None
+
     bus = EventBus()
     manifests = ActiveManifests()
     registry = RuleRegistry(rules_dir)
     evaluator = RuleEvaluator(registry, bus, manifests)
     ws_sink = WsSink(sink_host, sink_port, bus=bus, manifests=manifests)
     bridge = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
-    recorder = Recorder(bus, manifests, data_dir)
+    recorder = Recorder(
+        bus, manifests, data_dir,
+        sqlite_path=sqlite_path,
+        xdf_enabled=config.recording.xdf_enabled,
+    )
     signaling = SignalingBroker()
     video_store = VideoStore(data_dir)
 
@@ -67,16 +105,17 @@ def create_app(
         await recorder.start()
 
         lsl_source: LSLSource | None = None
-        if _DEFAULT_MANIFEST.exists():
+        if stream_name and manifest_path.exists():
             lsl_source = LSLSource(
-                stream_name=_DEFAULT_STREAM,
-                manifest_path=_DEFAULT_MANIFEST,
+                stream_name=stream_name,
+                manifest_path=manifest_path,
                 bus=bus,
                 manifests=manifests,
+                stale_timeout_s=config.ingestion.stale_timeout_s,
             )
             bridge.signal_source = lsl_source
             await lsl_source.start()
-            log.info("V-CORE LSL source started (stream=%s)", _DEFAULT_STREAM)
+            log.info("V-CORE LSL source started (stream=%s)", stream_name)
 
         log.info("V-CORE started (rules_dir=%s)", rules_dir)
         yield
@@ -99,6 +138,7 @@ def create_app(
     )
 
     # Store references for route-handler dependency injection via request.app.state
+    app.state.config = config
     app.state.bus = bus
     app.state.manifests = manifests
     app.state.registry = registry
@@ -136,3 +176,18 @@ def create_app(
 
 # Module-level singleton used by `uvicorn vcore.app:app`
 app = create_app()
+
+
+def main() -> None:
+    """Run with config-driven bind address: ``python -m vcore.app``.
+
+    (For dev with autoreload, use ``uvicorn vcore.app:app --reload`` instead.)
+    """
+    import uvicorn
+
+    cfg: VCoreConfig = app.state.config
+    uvicorn.run(app, host=cfg.bridge.host, port=cfg.bridge.port)
+
+
+if __name__ == "__main__":
+    main()
