@@ -180,7 +180,7 @@ registry  = RuleRegistry(rules_dir)
 evaluator = RuleEvaluator(registry, bus, manifests)
 ws_sink   = WsSink("localhost", 9001, bus=bus, manifests=manifests)
 bridge    = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
-recorder  = Recorder(bus, manifests, data_dir)
+recorder  = Recorder(bus, manifests, xdf_dir=xdf_dir, sqlite_path=sqlite_path)
 signaling = SignalingBroker()
 ```
 
@@ -364,12 +364,15 @@ touches the video bytes** — once setup is done, video flows peer-to-peer. See 
 [`recording/recorder.py`](../backend/vcore/recording/recorder.py) subscribes to `SAMPLE`,
 `RULE_FIRED`, `WARNING`, `VR_CONTEXT`, and `LINK_STATUS`. When a session is active it persists:
 
-- **SQLite** (`backend/data/sessions.db`): the session row + a timeline of events (rule fires,
-  warnings, vr_context changes, link state changes).
-- **XDF** (`backend/data/<session_id>/signals.xdf`): the raw numeric signal samples, in the
+Each artifact type has its own independently-configurable location
+(`recording.xdf_dir` / `video_dir` / `sqlite_path` in `config.yaml`):
+
+- **SQLite** (`backend/data/vcore.db`): the session row + a timeline of events (rule fires,
+  warnings, vr_context changes, link state changes). The filename is configurable.
+- **XDF** (`backend/data/xdf/<session_id>.xdf`): the raw numeric signal samples, in the
   LSL-native recording format, so they can be replayed/aligned later.
-- **Video**: the recorded participant view (uploaded by the browser) is stored on disk and
-  referenced from the session row.
+- **Video** (`backend/data/video/<session_id>.<ext>`): the recorded participant view
+  (uploaded by the browser) is stored on disk and referenced from the session row.
 
 ### 4.9 The REST API
 
@@ -699,7 +702,7 @@ These are places where the running code differs from the design doc / README, ca
 nobody is misled. None of them stop the system from running end-to-end.
 
 1. **Resolved — `config.yaml` is now read.** `create_app()` calls `load_config()` and sources
-   the rules dir, data dir + SQLite path, LSL stream name, signal manifest path, stale timeout,
+   the rules dir, the XDF/video dirs + SQLite path, LSL stream name, signal manifest path, stale timeout,
    the standalone `WsSink` host/port, and (via `python -m vcore.app`) the bind host/port from
    [`config.yaml`](../backend/config.yaml). Defaults match the previous hardcoded values, so
    behaviour is unchanged. **Not every key is wired** — `config.yaml` tags each one `(wired)`
@@ -730,8 +733,9 @@ nobody is misled. None of them stop the system from running end-to-end.
    uses `:8000`. Only one Unity connection is tracked at a time.
 
 6. **Resolved — recording paths are now config-driven and consistent.** SQLite is at
-   `backend/data/sessions.db` and XDF at `backend/data/<session_id>/signals.xdf`, and these now
-   come from `recording.data_dir` + `recording.sqlite_path` in `config.yaml` (defaults chosen
-   to keep the existing locations). The earlier `vcore.db` mismatch is gone — `config.yaml`
-   holds the actual `data/sessions.db`. `Recorder` accepts a `sqlite_path` so the DB can be
-   relocated independently of `data_dir`.
+   `backend/data/vcore.db`, XDF at `backend/data/xdf/<session_id>.xdf`, and video at
+   `backend/data/video/<session_id>.<ext>` — each from an independent, fully configurable key
+   (`recording.sqlite_path` / `xdf_dir` / `video_dir`). The DB filename is configurable
+   (default `vcore.db`, no longer `sessions.db`). The old `data_dir`/`vcore.db` mismatch is
+   gone, and `Recorder`/`VideoStore` take these paths directly so each artifact can live on
+   different storage.
