@@ -29,10 +29,6 @@ outbound:
   # The real Unity POC instead connects to /ws/runtime on the main bridge port.
   ws_host: localhost
   ws_port: 9001
-  # (reference only) Route path is fixed in code.
-  runtime_ws_path: /ws/runtime
-  # (reference only) Unity-side reconnect backoff.
-  reconnect_backoff_s: 2
 
 # ── WebSocket bridge (V-CORE server — Machine A) ──────────────────────────────
 bridge:
@@ -41,8 +37,6 @@ bridge:
   # NB: `uvicorn vcore.app:app` ignores these — pass --host/--port on the CLI.
   host: 0.0.0.0
   port: 8000
-  # (reference only) Route path is fixed in code.
-  dashboard_ws_path: /ws/dashboard
   # (reference only) Auth is not implemented yet.
   # bearer_token: "change-me-before-use"
 
@@ -56,15 +50,6 @@ recording:
   video_dir: data/video
   # (wired) SQLite database file (name is configurable) → backend/data/vcore.db.
   sqlite_path: data/vcore.db
-  # (reference only) SQLite is always on (the sessions API depends on it).
-  sqlite_enabled: true
-
-# ── Participant video (Amendment 2 — WebRTC) ──────────────────────────────────
-video:
-  # (reference only) Signaling is always available; these document intent.
-  enabled: true
-  signaling_ws_path: /ws/signaling
-  fallback_transport: none  # options: none | mjpeg
 
 # ── Rule files ────────────────────────────────────────────────────────────────
 rules:

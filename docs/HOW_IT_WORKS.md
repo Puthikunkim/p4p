@@ -705,10 +705,11 @@ nobody is misled. None of them stop the system from running end-to-end.
    the rules dir, the XDF/video dirs + SQLite path, LSL stream name, signal manifest path, stale timeout,
    the standalone `WsSink` host/port, and (via `python -m vcore.app`) the bind host/port from
    [`config.yaml`](../backend/config.yaml). Defaults match the previous hardcoded values, so
-   behaviour is unchanged. **Not every key is wired** — `config.yaml` tags each one `(wired)`
-   vs `(reference only)` (e.g. the WS route paths are still fixed in code, `outbound.transport`
-   only supports `ws`, and auth is not implemented). The `create_app()` keyword arguments
-   remain as test overrides.
+   behaviour is unchanged. Keys that documented unbuilt or non-backend behaviour (the WS route
+   paths, the Unity-side reconnect backoff, `sqlite_enabled`, and the whole `video` block) have
+   been removed, so the file now contains only keys the code reads — plus two still tagged
+   `(reference only)`: `outbound.transport` (only `ws` is implemented) and `bridge.bearer_token`
+   (auth not implemented). The `create_app()` keyword arguments remain as test overrides.
 
 2. **Resolved — duplicate rule file removed.** Previously two files
    (`clear-fog-stressed.yaml` and `clear_fog_stressed.yaml`) both declared

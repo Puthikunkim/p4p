@@ -34,18 +34,12 @@ class OutboundConfig(BaseModel):
     # Standalone WsSink server bind, used by mock_unity / direct websockets clients. (wired)
     ws_host: str = "localhost"
     ws_port: int = 9001
-    # Path Unity's WS client connects to on the main server; the route is fixed in code. (reference only)
-    runtime_ws_path: str = "/ws/runtime"
-    # Unity-side reconnect backoff. (reference only)
-    reconnect_backoff_s: float = 2.0
 
 
 class BridgeConfig(BaseModel):
     # Bind interface/port — used when launched via ``python -m vcore.app``. (wired via runner)
     host: str = "0.0.0.0"
     port: int = 8000
-    # Dashboard WS path; the route is fixed in code. (reference only)
-    dashboard_ws_path: str = "/ws/dashboard"
     # Optional bearer token; auth is not implemented yet. (reference only)
     bearer_token: str | None = None
 
@@ -59,15 +53,6 @@ class RecordingConfig(BaseModel):
     video_dir: str = "data/video"
     # SQLite database file for sessions + events; the filename is configurable. (wired)
     sqlite_path: str = "data/vcore.db"
-    # SQLite is always on today (the sessions API depends on it). (reference only)
-    sqlite_enabled: bool = True
-
-
-class VideoConfig(BaseModel):
-    # Signaling is always available; these document intent. (reference only)
-    enabled: bool = True
-    signaling_ws_path: str = "/ws/signaling"
-    fallback_transport: str = "none"
 
 
 class RulesConfig(BaseModel):
@@ -80,7 +65,6 @@ class VCoreConfig(BaseModel):
     outbound: OutboundConfig = Field(default_factory=OutboundConfig)
     bridge: BridgeConfig = Field(default_factory=BridgeConfig)
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
-    video: VideoConfig = Field(default_factory=VideoConfig)
     rules: RulesConfig = Field(default_factory=RulesConfig)
 
 
