@@ -170,6 +170,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c1d2e3f4a5b6c7d8e9f0a1b2c3d4e5f6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  backendConfig: {fileID: 11400000, guid: c0ffee00beef1234567890abcdef0002, type: 2}
   host: localhost
   port: 8000
   initialReconnectDelay: 1
@@ -584,6 +585,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
+  backendConfig: {fileID: 11400000, guid: c0ffee00beef1234567890abcdef0002, type: 2}
   host: localhost
   port: 8000
   iceServerUrls:
@@ -604,6 +606,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   outputDir: Recordings
   fps: 30
+  backendConfig: {fileID: 11400000, guid: c0ffee00beef1234567890abcdef0002, type: 2}
   vcoreBaseUrl: http://localhost:8000
 --- !u!1 &400
 GameObject:
