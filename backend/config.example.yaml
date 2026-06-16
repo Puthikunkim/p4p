@@ -46,14 +46,16 @@ bridge:
   # (reference only) Auth is not implemented yet.
   # bearer_token: "change-me-before-use"
 
-# ── Recording ─────────────────────────────────────────────────────────────────
+# ── Recording (fully granular — each path independently configurable) ─────────
 recording:
-  # (wired) Root directory for per-session data (XDF + video) → backend/data.
-  data_dir: data
   # (wired) Write raw LSL streams to XDF per session.
   xdf_enabled: true
-  # (wired) SQLite database for sessions + events → backend/data/sessions.db.
-  sqlite_path: data/sessions.db
+  # (wired) Dir for per-session XDF files → backend/data/xdf/<session_id>.xdf.
+  xdf_dir: data/xdf
+  # (wired) Dir for per-session video files → backend/data/video/<session_id>.<ext>.
+  video_dir: data/video
+  # (wired) SQLite database file (name is configurable) → backend/data/vcore.db.
+  sqlite_path: data/vcore.db
   # (reference only) SQLite is always on (the sessions API depends on it).
   sqlite_enabled: true
 

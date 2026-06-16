@@ -163,7 +163,11 @@ async def rec_fixture(
     bus = EventBus()
     manifests = ActiveManifests()
     manifests.update_signal_manifest(manifest.model_dump(exclude_none=True))
-    rec = Recorder(bus, manifests, tmp_path / "data")
+    rec = Recorder(
+        bus, manifests,
+        xdf_dir=tmp_path / "data" / "xdf",
+        sqlite_path=tmp_path / "data" / "vcore.db",
+    )
     await rec.start()
     yield bus, rec
     if rec.active_session_id:

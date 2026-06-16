@@ -127,7 +127,11 @@ async def test_signal_to_unity_and_sqlite(
     port = sink.bound_port
 
     # --- recorder ---
-    recorder = Recorder(bus, manifests, data_dir)
+    recorder = Recorder(
+        bus, manifests,
+        xdf_dir=data_dir / "xdf",
+        sqlite_path=data_dir / "vcore.db",
+    )
     await recorder.start()
 
     # --- replay source (fast: bump rate to avoid long waits) ---
@@ -184,7 +188,7 @@ async def test_signal_to_unity_and_sqlite(
     assert req["source_rule"] == "smoke-dim"
 
     # SQLite session was persisted
-    store = SqliteStore(data_dir / "sessions.db")
+    store = SqliteStore(data_dir / "vcore.db")
     sessions = store.list_sessions()
     assert any(s["id"] == sid for s in sessions), "session not found in SQLite"
     store.close()

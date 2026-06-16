@@ -65,12 +65,17 @@ def create_app(
 
     # ── resolve paths (explicit override → config → default), backend-anchored ──
     rules_dir = Path(rules_dir) if rules_dir is not None else _resolve(config.rules.rules_dir)
+    # Recording artifact locations (Option C — fully granular). An umbrella
+    # `data_dir` override (used by tests) roots all three beneath it; otherwise
+    # xdf_dir / video_dir / sqlite_path are each taken independently from config.
     if data_dir is not None:
-        # An overriding data_dir (tests) also relocates the SQLite db beneath it.
         data_dir = Path(data_dir)
-        sqlite_path: Path | None = None
+        xdf_dir = data_dir / "xdf"
+        video_dir = data_dir / "video"
+        sqlite_path = data_dir / "vcore.db"
     else:
-        data_dir = _resolve(config.recording.data_dir)
+        xdf_dir = _resolve(config.recording.xdf_dir)
+        video_dir = _resolve(config.recording.video_dir)
         sqlite_path = _resolve(config.recording.sqlite_path)
 
     sink_host = sink_host if sink_host is not None else config.outbound.ws_host
@@ -86,12 +91,13 @@ def create_app(
     ws_sink = WsSink(sink_host, sink_port, bus=bus, manifests=manifests)
     bridge = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
     recorder = Recorder(
-        bus, manifests, data_dir,
+        bus, manifests,
+        xdf_dir=xdf_dir,
         sqlite_path=sqlite_path,
         xdf_enabled=config.recording.xdf_enabled,
     )
     signaling = SignalingBroker()
-    video_store = VideoStore(data_dir)
+    video_store = VideoStore(video_dir)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:

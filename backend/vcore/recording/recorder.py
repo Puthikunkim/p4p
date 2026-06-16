@@ -27,17 +27,16 @@ class Recorder:
         self,
         bus: EventBus,
         manifests: ActiveManifests,
-        data_dir: Path,
         *,
-        sqlite_path: Path | None = None,
+        xdf_dir: Path,
+        sqlite_path: Path,
         xdf_enabled: bool = True,
     ) -> None:
         self._bus = bus
         self._manifests = manifests
-        self._data_dir = data_dir
+        self._xdf_dir = Path(xdf_dir)
         self._xdf_enabled = xdf_enabled
-        # sqlite_path defaults under data_dir, preserving the historical location.
-        self._store = SqliteStore(Path(sqlite_path) if sqlite_path is not None else data_dir / "sessions.db")
+        self._store = SqliteStore(Path(sqlite_path))
         self._session_id: str | None = None
         self._xdf: XdfWriter | None = None
         self._last_lsl_ts: float | None = None
@@ -171,7 +170,7 @@ class Recorder:
             return
         manifest = SignalManifest.model_validate(raw)
         writer = XdfWriter(
-            self._data_dir / self._session_id / "signals.xdf",
+            self._xdf_dir / f"{self._session_id}.xdf",
             manifest,
         )
         if not writer.has_numeric_channels:

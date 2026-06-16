@@ -51,12 +51,14 @@ class BridgeConfig(BaseModel):
 
 
 class RecordingConfig(BaseModel):
-    # Root directory for per-session data (XDF + video). (wired)
-    data_dir: str = "data"
     # Write raw signal streams to XDF per session. (wired)
     xdf_enabled: bool = True
-    # SQLite database file for sessions + events. (wired)
-    sqlite_path: str = "data/sessions.db"
+    # Directory for per-session XDF files: <xdf_dir>/<session_id>.xdf. (wired)
+    xdf_dir: str = "data/xdf"
+    # Directory for per-session video files: <video_dir>/<session_id>.<ext>. (wired)
+    video_dir: str = "data/video"
+    # SQLite database file for sessions + events; the filename is configurable. (wired)
+    sqlite_path: str = "data/vcore.db"
     # SQLite is always on today (the sessions API depends on it). (reference only)
     sqlite_enabled: bool = True
 
