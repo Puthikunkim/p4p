@@ -6,7 +6,7 @@ from pathlib import Path
 from fastapi.testclient import TestClient
 
 from vcore.app import create_app
-from vcore.core.config import LiveKitConfig
+from vcore.core.config import LiveKitConfig, VCoreConfig
 from vcore.recording.livekit_recorder import mint_token
 
 
@@ -26,8 +26,14 @@ def test_mint_token_returns_jwt_and_client_url() -> None:
 
 
 def test_token_endpoint_returns_409_when_disabled(tmp_path: Path) -> None:
-    # Default config has livekit.enabled = False, so the endpoint must refuse.
-    app = create_app(rules_dir=tmp_path / "rules", data_dir=tmp_path / "data", sink_port=0)
+    # Pass an explicit config (livekit disabled by default) so the test doesn't depend
+    # on the local, gitignored config.yaml.
+    app = create_app(
+        config=VCoreConfig(),
+        rules_dir=tmp_path / "rules",
+        data_dir=tmp_path / "data",
+        sink_port=0,
+    )
     client = TestClient(app)
     resp = client.get("/api/livekit/token", params={"identity": "x"})
     assert resp.status_code == 409

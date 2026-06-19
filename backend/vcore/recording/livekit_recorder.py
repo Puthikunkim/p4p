@@ -64,7 +64,10 @@ class LiveKitRecorder:
         return self._cfg.enabled
 
     async def start(self, session_id: str) -> None:
-        """Start recording the room → <video_dir>/<session_id>.mp4, anchored to LSL."""
+        """Record the publisher's video track → <video_dir>/<session_id>.webm, anchored
+        to LSL. Uses Track Egress (records one track directly — no headless-Chrome
+        compositor, so it is reliable in Docker), recording the spectator camera the
+        Unity publisher already streams for the live mirror."""
         if not self._cfg.enabled:
             return
         from livekit import api
@@ -75,31 +78,36 @@ class LiveKitRecorder:
 
         # Egress writes inside its container at egress_out_dir, which is mounted to the
         # backend's video_dir on the host — so we store the backend-side path for serving.
-        egress_path = f"{self._cfg.egress_out_dir.rstrip('/')}/{session_id}.mp4"
-        backend_path = str(self._video_dir / f"{session_id}.mp4")
+        # Track egress of a VP8 video track produces a WebM.
+        egress_path = f"{self._cfg.egress_out_dir.rstrip('/')}/{session_id}.webm"
+        backend_path = str(self._video_dir / f"{session_id}.webm")
 
         lk = api.LiveKitAPI(self._cfg.api_url, self._cfg.api_key, self._cfg.api_secret)
         try:
-            info = await lk.egress.start_room_composite_egress(
-                api.RoomCompositeEgressRequest(
+            track_id = await self._find_video_track(lk)
+            if track_id is None:
+                self._store.set_video(session_id, None, started_at, lsl_ts)
+                log.warning(
+                    "livekit: no video track in room %r — recording skipped "
+                    "(is the Unity publisher running?)", self._cfg.room,
+                )
+                return
+
+            info = await lk.egress.start_track_egress(
+                api.TrackEgressRequest(
                     room_name=self._cfg.room,
-                    layout="grid",
-                    file_outputs=[
-                        api.EncodedFileOutput(
-                            file_type=api.EncodedFileType.MP4,
-                            filepath=egress_path,
-                        )
-                    ],
+                    track_id=track_id,
+                    file=api.DirectFileOutput(filepath=egress_path),
                 )
             )
             self._egress_id = info.egress_id
         except Exception as exc:
             # Recording is best-effort: a missing/unhealthy Egress must NOT abort the
-            # session — signals and the live mirror continue. Still store the LSL anchor
-            # so anything captured later can be aligned.
+            # session — signals and the live mirror continue. Still store the LSL anchor.
             self._store.set_video(session_id, None, started_at, lsl_ts)
             log.warning(
-                "livekit: egress did not start (%s); session continues without recording", exc
+                "livekit: track egress did not start (%s); session continues "
+                "without recording", exc,
             )
             return
         finally:
@@ -108,9 +116,22 @@ class LiveKitRecorder:
         # Persist path + LSL anchor immediately (so review can align even before close).
         self._store.set_video(session_id, backend_path, started_at, lsl_ts)
         log.info(
-            "livekit: egress %s started for %s (lsl_ts=%.3f → %s)",
-            self._egress_id, session_id, lsl_ts, backend_path,
+            "livekit: track egress %s started for %s (track=%s, lsl_ts=%.3f → %s)",
+            self._egress_id, session_id, track_id, lsl_ts, backend_path,
         )
+
+    async def _find_video_track(self, lk: object) -> str | None:
+        """Return the SID of the first published video track in the room, or None."""
+        from livekit import api
+
+        resp = await lk.room.list_participants(  # type: ignore[attr-defined]
+            api.ListParticipantsRequest(room=self._cfg.room)
+        )
+        for participant in resp.participants:
+            for track in participant.tracks:
+                if track.type == api.TrackType.VIDEO:
+                    return str(track.sid)
+        return None
 
     async def stop(self) -> None:
         """Stop the active egress, if any."""
