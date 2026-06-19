@@ -93,6 +93,15 @@ class LiveKitRecorder:
                 )
             )
             self._egress_id = info.egress_id
+        except Exception as exc:
+            # Recording is best-effort: a missing/unhealthy Egress must NOT abort the
+            # session — signals and the live mirror continue. Still store the LSL anchor
+            # so anything captured later can be aligned.
+            self._store.set_video(session_id, None, started_at, lsl_ts)
+            log.warning(
+                "livekit: egress did not start (%s); session continues without recording", exc
+            )
+            return
         finally:
             await lk.aclose()
 
