@@ -341,14 +341,13 @@ def test_api_get_session_detail(client: TestClient) -> None:
     assert s["events"] == []
 
 
-def test_api_video_upload_then_playback(client: TestClient) -> None:
+def test_api_video_playback(client: TestClient, tmp_path: Path) -> None:
     sid = client.post("/api/sessions", json={"participant": "P01"}).json()["session_id"]
-    up = client.post(
-        f"/api/sessions/{sid}/video",
-        content=b"FAKEWEBMDATA",
-        headers={"content-type": "video/webm"},
-    )
-    assert up.status_code == 201
+    # Simulate what LiveKit Egress + the recorder do: a file on disk + its path stored.
+    video = tmp_path / "data" / "video" / f"{sid}.webm"
+    video.parent.mkdir(parents=True, exist_ok=True)
+    video.write_bytes(b"FAKEWEBMDATA")
+    client.app.state.recorder.store.set_video(sid, str(video))
 
     resp = client.get(f"/api/sessions/{sid}/video")
     assert resp.status_code == 200

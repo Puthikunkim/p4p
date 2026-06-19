@@ -14,7 +14,6 @@ from fastapi.middleware.cors import CORSMiddleware
 from vcore.api.livekit import router as livekit_router
 from vcore.api.rules import router as rules_router
 from vcore.api.sessions import router as sessions_router
-from vcore.bridge.signaling import SignalingBroker
 from vcore.bridge.ws import DashboardBridge
 from vcore.core.config import VCoreConfig, load_config
 from vcore.core.eventbus import EventBus
@@ -25,7 +24,6 @@ from vcore.ingestion.lsl_source import LSLSource
 from vcore.outbound.ws_sink import WsSink
 from vcore.recording.livekit_recorder import LiveKitRecorder
 from vcore.recording.recorder import Recorder
-from vcore.recording.video_store import VideoStore
 
 log = logging.getLogger(__name__)
 
@@ -98,8 +96,6 @@ def create_app(
         sqlite_path=sqlite_path,
         xdf_enabled=config.recording.xdf_enabled,
     )
-    signaling = SignalingBroker()
-    video_store = VideoStore(video_dir)
     livekit_recorder = LiveKitRecorder(config.livekit, recorder.store, video_dir)
 
     @asynccontextmanager
@@ -155,8 +151,6 @@ def create_app(
     app.state.ws_sink = ws_sink
     app.state.bridge = bridge
     app.state.recorder = recorder
-    app.state.signaling = signaling
-    app.state.video_store = video_store
     app.state.livekit_recorder = livekit_recorder
     app.state.rules_dir = rules_dir
 
@@ -173,10 +167,6 @@ def create_app(
     @app.websocket("/ws/runtime")
     async def ws_runtime(ws: WebSocket) -> None:
         await bridge.handle_runtime(ws)
-
-    @app.websocket("/ws/signaling")
-    async def ws_signaling(ws: WebSocket) -> None:
-        await signaling.handle_peer(ws)
 
     @app.get("/healthz")
     async def healthz() -> dict[str, str]:

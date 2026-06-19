@@ -5,7 +5,7 @@ namespace VCore
     /// <summary>
     /// Shared V-CORE backend address (host + port), referenced by every component
     /// that talks to Machine A: <see cref="VCoreConnection"/> (<c>/ws/runtime</c>) and
-    /// <see cref="WebRtcSender"/> (<c>/ws/signaling</c>).
+    /// <see cref="LiveKitPublisher"/> (fetches a LiveKit token from <c>/api/livekit/token</c>).
     ///
     /// Create one via <b>Assets ▸ Create ▸ V-CORE ▸ Backend Config</b> and assign it
     /// on each of those components so the backend address lives in exactly one place
