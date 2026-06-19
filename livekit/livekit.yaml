@@ -1,0 +1,16 @@
+# LiveKit server (SFU) config — dev/self-hosted on Machine A.
+# Media plane only; V-CORE remains the control plane + orchestrator.
+port: 7880
+rtc:
+  tcp_port: 7881
+  port_range_start: 50000
+  port_range_end: 50100
+  # On a single host / LAN, host candidates suffice; set true + node_ip for routed setups.
+  use_external_ip: false
+redis:
+  address: redis:6379
+# Dev API key/secret. CHANGE for any real deployment (and keep out of git).
+keys:
+  devkey: devsecretdevsecretdevsecretdevsecret12
+logging:
+  level: info

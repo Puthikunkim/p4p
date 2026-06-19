@@ -11,7 +11,15 @@ services:
       - ./data:/data
     environment:
       - VCORE_CONFIG=/app/config.yaml
+      # LiveKit endpoints/secrets (override config.yaml). In-network API URL for the
+      # backend; the client-facing URL handed out in tokens points at the host.
+      - LIVEKIT_API_URL=http://livekit:7880
+      - LIVEKIT_URL=ws://localhost:7880
+      - LIVEKIT_API_KEY=devkey
+      - LIVEKIT_API_SECRET=devsecretdevsecretdevsecretdevsecret12
     command: uvicorn vcore.app:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - livekit
 
   frontend:
     build:
@@ -24,3 +32,36 @@ services:
     command: npm run dev -- --host
     depends_on:
       - backend
+
+  # ── Media plane (LiveKit SFU + Egress) ──────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  livekit:
+    image: livekit/livekit-server:latest
+    command: --config /etc/livekit.yaml
+    ports:
+      - "7880:7880"     # signaling + server API
+      - "7881:7881"     # RTC over TCP
+      - "50000-50100:50000-50100/udp"  # RTC media (UDP range)
+    volumes:
+      - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
+    depends_on:
+      - redis
+
+  egress:
+    image: livekit/egress:latest
+    environment:
+      - EGRESS_CONFIG_FILE=/etc/egress.yaml
+    volumes:
+      - ./livekit/egress.yaml:/etc/egress.yaml:ro
+      # Egress writes MP4s here; same host dir the backend serves from (backend/data/video).
+      - ./backend/data/video:/out
+    # Room-composite egress runs headless Chrome, which needs this.
+    cap_add:
+      - SYS_ADMIN
+    depends_on:
+      - redis
+      - livekit

@@ -1,0 +1,11 @@
+# LiveKit Egress config — server-side recording service.
+# Records a room to an MP4 written under /out (mounted to backend/data/video on the host),
+# so V-CORE can serve it via /api/sessions/{id}/video.
+redis:
+  address: redis:6379
+api_key: devkey
+api_secret: devsecretdevsecretdevsecretdevsecret12
+ws_url: ws://livekit:7880
+insecure: true
+# Local file output goes to the mounted /out directory (no cloud upload configured).
+log_level: info
