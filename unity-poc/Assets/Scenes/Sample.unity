@@ -483,7 +483,6 @@ GameObject:
   - component: {fileID: 302}
   - component: {fileID: 303}
   - component: {fileID: 304}
-  - component: {fileID: 305}
   m_Layer: 0
   m_Name: SpectatorCamera
   m_TagString: Untagged
@@ -592,22 +591,6 @@ MonoBehaviour:
   - stun:stun.l.google.com:19302
   maxFramerate: 30
   maxBitrateKbps: 8000
---- !u!114 &305
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 300}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7, type: 3}
-  m_Name: 
-  m_EditorClassIdentifier: 
-  outputDir: Recordings
-  fps: 30
-  backendConfig: {fileID: 11400000, guid: c0ffee00beef1234567890abcdef0002, type: 2}
-  vcoreBaseUrl: http://localhost:8000
 --- !u!1 &400
 GameObject:
   m_ObjectHideFlags: 0
