@@ -1,0 +1,8 @@
+# V-CORE dashboard — Vite dev server.
+FROM node:20-bookworm-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY . .
+EXPOSE 5173
+CMD ["npm", "run", "dev", "--", "--host"]
