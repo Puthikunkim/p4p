@@ -14,6 +14,8 @@ services:
       - ./tools:/tools:ro
     environment:
       - VCORE_CONFIG=/app/config.yaml
+      # LSL resolves streams over loopback unicast (multicast doesn't work in a container).
+      - LSLAPICFG=/app/lsl_api.cfg
       # LiveKit endpoints/secrets (override config.yaml). In-network API URL for the
       # backend; the client-facing URL handed out in tokens points at the host.
       - LIVEKIT_API_URL=http://livekit:7880
