@@ -23,6 +23,7 @@ async def start_session(body: StartSessionBody, request: Request) -> dict[str, s
     if recorder.active_session_id:
         raise HTTPException(409, "A session is already active")
     sid: str = recorder.start_session(body.participant, body.notes)
+    await request.app.state.livekit_recorder.start(sid)  # no-op unless livekit.enabled
     return {"session_id": sid}
 
 
@@ -31,6 +32,7 @@ async def stop_session(session_id: str, request: Request) -> dict[str, Any]:
     recorder: Any = request.app.state.recorder
     if recorder.active_session_id != session_id:
         raise HTTPException(404, "No active session with that ID")
+    await request.app.state.livekit_recorder.stop()  # no-op unless livekit.enabled
     xdf_path: str | None = await recorder.stop_session()
     return {"session_id": session_id, "xdf_path": xdf_path}
 

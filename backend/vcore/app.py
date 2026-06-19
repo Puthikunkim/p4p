@@ -11,6 +11,7 @@ from pathlib import Path
 from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
+from vcore.api.livekit import router as livekit_router
 from vcore.api.rules import router as rules_router
 from vcore.api.sessions import router as sessions_router
 from vcore.bridge.signaling import SignalingBroker
@@ -22,6 +23,7 @@ from vcore.engine.evaluator import RuleEvaluator
 from vcore.engine.registry import RuleRegistry
 from vcore.ingestion.lsl_source import LSLSource
 from vcore.outbound.ws_sink import WsSink
+from vcore.recording.livekit_recorder import LiveKitRecorder
 from vcore.recording.recorder import Recorder
 from vcore.recording.video_store import VideoStore
 
@@ -98,6 +100,7 @@ def create_app(
     )
     signaling = SignalingBroker()
     video_store = VideoStore(video_dir)
+    livekit_recorder = LiveKitRecorder(config.livekit, recorder.store, video_dir)
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
@@ -154,12 +157,14 @@ def create_app(
     app.state.recorder = recorder
     app.state.signaling = signaling
     app.state.video_store = video_store
+    app.state.livekit_recorder = livekit_recorder
     app.state.rules_dir = rules_dir
 
     # ── routes ────────────────────────────────────────────────────────────────
 
     app.include_router(rules_router)
     app.include_router(sessions_router)
+    app.include_router(livekit_router)
 
     @app.websocket("/ws/dashboard")
     async def ws_dashboard(ws: WebSocket) -> None:

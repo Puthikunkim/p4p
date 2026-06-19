@@ -55,3 +55,19 @@ recording:
 rules:
   # (wired) Directory watched for YAML/JSON rule files → backend/rules.
   rules_dir: rules
+
+# ── LiveKit (media plane — SFU + Egress recording) ────────────────────────────
+livekit:
+  # (wired) Master switch. Keep false until the LiveKit frontend + Unity clients exist.
+  enabled: false
+  # (wired) Client-facing URL handed out in tokens (browser/Unity dial this).
+  url: ws://localhost:7880
+  # (wired) Backend → LiveKit server API (docker-compose env overrides to http://livekit:7880).
+  api_url: http://localhost:7880
+  # (wired) Dev key/secret — override via env LIVEKIT_API_KEY / LIVEKIT_API_SECRET.
+  api_key: devkey
+  api_secret: devsecretdevsecretdevsecretdevsecret12
+  # (wired) Fixed room everyone shares (always-on live mirror).
+  room: vcore
+  # (wired) Egress container's output dir; maps to recording.video_dir on the host.
+  egress_out_dir: /out

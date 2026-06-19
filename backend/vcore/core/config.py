@@ -10,6 +10,7 @@ app — kept honest so the config never over-promises.
 """
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -60,12 +61,30 @@ class RulesConfig(BaseModel):
     rules_dir: str = "rules"
 
 
+class LiveKitConfig(BaseModel):
+    # Server-side recording + SFU via LiveKit. Stays off until the LiveKit clients
+    # (frontend subscriber + Unity publisher) are in place. (wired)
+    enabled: bool = False
+    # Client-facing URL handed out in access tokens (browser/Unity connect here). (wired)
+    url: str = "ws://localhost:7880"
+    # Backend → LiveKit server API URL (in Docker: http://livekit:7880). (wired)
+    api_url: str = "http://localhost:7880"
+    # API key/secret — dev defaults; override via env (LIVEKIT_API_KEY/SECRET). (wired)
+    api_key: str = "devkey"
+    api_secret: str = "devsecretdevsecretdevsecretdevsecret12"
+    # Fixed room all participants share (always-on live mirror). (wired)
+    room: str = "vcore"
+    # Egress container's output dir; maps to recording.video_dir on the host. (wired)
+    egress_out_dir: str = "/out"
+
+
 class VCoreConfig(BaseModel):
     ingestion: IngestionConfig = Field(default_factory=IngestionConfig)
     outbound: OutboundConfig = Field(default_factory=OutboundConfig)
     bridge: BridgeConfig = Field(default_factory=BridgeConfig)
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
     rules: RulesConfig = Field(default_factory=RulesConfig)
+    livekit: LiveKitConfig = Field(default_factory=LiveKitConfig)
 
 
 def load_config(path: Path | str) -> VCoreConfig:
@@ -76,4 +95,22 @@ def load_config(path: Path | str) -> VCoreConfig:
     if config_path.exists():
         with config_path.open() as f:
             raw = yaml.safe_load(f) or {}
-    return VCoreConfig(**raw)
+    cfg = VCoreConfig(**raw)
+    _apply_livekit_env(cfg)
+    return cfg
+
+
+def _apply_livekit_env(cfg: VCoreConfig) -> None:
+    """Override LiveKit endpoints/secrets from env (12-factor: keeps secrets out of git
+    and lets docker-compose point the backend at the in-network LiveKit server)."""
+    env = os.environ
+    if v := env.get("LIVEKIT_URL"):
+        cfg.livekit.url = v
+    if v := env.get("LIVEKIT_API_URL"):
+        cfg.livekit.api_url = v
+    if v := env.get("LIVEKIT_API_KEY"):
+        cfg.livekit.api_key = v
+    if v := env.get("LIVEKIT_API_SECRET"):
+        cfg.livekit.api_secret = v
+    if v := env.get("LIVEKIT_ENABLED"):
+        cfg.livekit.enabled = v.lower() in ("1", "true", "yes", "on")
