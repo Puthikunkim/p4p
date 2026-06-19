@@ -179,6 +179,11 @@ WebRTC, recording synced to signals, and a manual rule trigger.)*
   the running scene.
 - [ ] 🎥 **`SpectatorCamera.cs`** — a mono camera mirroring the participant's view. *AC:* it
   renders the scene at the configured resolution.
+
+> **As-built:** the two video scripts below were superseded by **`LiveKitPublisher.cs`** (publishes
+> the spectator camera to a LiveKit SFU; recording is server-side via LiveKit Egress).
+> `WebRtcSender.cs` and `VideoRecorder.cs` have been removed — see `docs/LIVEKIT_SETUP.md`.
+
 - [ ] 🎥 **`WebRtcSender.cs`** (`com.unity.webrtc`) — connect to V-CORE signaling, negotiate,
   and send the spectator-cam video to the dashboard. *AC:* the participant view appears in the
   dashboard VideoFeed within ~150 ms on the LAN.
@@ -199,6 +204,12 @@ WebRTC, recording synced to signals, and a manual rule trigger.)*
   sessions are listed; opening one shows its events.
 
 ## Phase 7.5 — Participant video mirror (WebRTC) + recording 🎥
+
+> **As-built:** implemented, then **reimplemented on a LiveKit SFU** (Unity publishes → browser
+> subscribes → server-side Track Egress recording, LSL-anchored). The `bridge/signaling.py`
+> broker, `frontend/src/video` `RTCPeerConnection`/`MediaRecorder`, and the browser-upload
+> endpoints below are **superseded and removed.** See `docs/HOW_IT_WORKS.md` §9 and
+> `docs/LIVEKIT_SETUP.md`.
 
 - [ ] **`bridge/signaling.py`** — WebRTC signaling broker: relay SDP offer/answer + ICE
   candidates between the Unity peer and the dashboard peer over `/ws/signaling`. **V-CORE

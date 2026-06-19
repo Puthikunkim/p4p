@@ -19,9 +19,9 @@ plus the Amendment 2 WebRTC video plane.
 | `VrContextReporter.cs` | Sends study-step / scene context (`vr_context`, Contract 4) → dashboard VR Context panel |
 | `BehaviourReporter.cs` | Declares behavioural channels and streams their values (`behaviour_manifest` / `behaviour_sample`, Contract 5) → dashboard, rule engine, recorder |
 | `BehaviourMetric.cs` | Per-object behavioural channel declaration, scene-scanned by `BehaviourReporter` (the behaviour analogue of `ObjectStatus`) |
-| `SpectatorCamera.cs` | Mono camera rendering to a `RenderTexture` for WebRTC streaming |
-| `WebRtcSender.cs` | Connects to `/ws/signaling`, negotiates WebRTC, streams spectator-cam video to the dashboard |
-| `VideoRecorder.cs` | Captures the spectator cam to PNG frames stamped with the LSL session start time |
+| `SpectatorCamera.cs` | Mono camera rendering to a `RenderTexture` for video streaming |
+| `LiveKitPublisher.cs` | Fetches a token from `/api/livekit/token` and publishes the spectator-cam video to the LiveKit SFU (the dashboard subscribes; recording is server-side via LiveKit Egress) |
+| `BackendConfig.cs` | Shared `ScriptableObject` holding the backend host/port, referenced by `VCoreConnection` + `LiveKitPublisher` |
 
 The pre-built **Sample scene** (`Assets/Scenes/Sample.unity`) contains:
 
@@ -29,7 +29,7 @@ The pre-built **Sample scene** (`Assets/Scenes/Sample.unity`) contains:
 |---|---|
 | **VCoreManager** | `VCoreConnection` · `StatusCollector` · `RequestDispatcher` |
 | **CampfireLight** | `Light` · two `ObjectStatus` components (`brightness` continuous + `crackle` discrete) |
-| **SpectatorCamera** | `Camera` · `SpectatorCamera` · `WebRtcSender` · `VideoRecorder` |
+| **SpectatorCamera** | `Camera` · `SpectatorCamera` · `LiveKitPublisher` |
 | **Main Camera** | `Camera` · `AudioListener` |
 
 ---
@@ -67,7 +67,7 @@ You should see four GameObjects in the Hierarchy:
 ```
 ▼ VCoreManager       (empty, has VCoreConnection / StatusCollector / RequestDispatcher)
 ▼ CampfireLight      (Directional Light + two ObjectStatus components)
-▼ SpectatorCamera    (Camera + SpectatorCamera + WebRtcSender + VideoRecorder)
+▼ SpectatorCamera    (Camera + SpectatorCamera + LiveKitPublisher)
 ▼ Main Camera        (Camera + AudioListener)
 ```
 
@@ -80,13 +80,12 @@ Select **VCoreManager** in the Hierarchy. In the **Inspector**:
 | `VCoreConnection` | `Host` | `localhost` | IP of Machine A if running on a different machine |
 | `VCoreConnection` | `Port` | `8000` | port V-CORE is bound to |
 | `StatusCollector` | `Scene Name` | `sample_scene` | any string identifying this scene |
-| `WebRtcSender` | `Host` / `Port` | same as above | same as `VCoreConnection` |
 
 Select **SpectatorCamera**:
 
 | Component | Field | Default | Notes |
 |---|---|---|---|
-| `VideoRecorder` | `Vcore Base Url` | `http://localhost:8000` | update if on a different machine |
+| `LiveKitPublisher` | `Backend Config` | the shared asset | assign the same `BackendConfig` as the `VCoreManager` components; it fetches a LiveKit token from the backend |
 
 ### 5  Wire the light-control event (optional but recommended)
 
@@ -130,9 +129,8 @@ Press **▶ Play** in Unity. In the Console you should see:
 [VCore] Connecting → ws://localhost:8000/ws/runtime
 [VCore] Connected to V-CORE
 [Dispatcher] Index built: 1 object(s), 2 tag(s)
-[WebRTC] Connecting signaling → ws://localhost:8000/ws/signaling
-[WebRTC] Registered as publisher (peer_id=…)
-[WebRTC] SDP offer sent
+[LiveKit] connected → ws://localhost:7880
+[LiveKit] publishing spectator camera
 ```
 
 V-CORE will log that it received the Object-Status Manifest and index it. The manifest
@@ -239,43 +237,36 @@ Unity → V-CORE frame — `object_status_manifest`, `vr_context`, `behaviour_ma
 
 ---
 
-## WebRTC video (Amendment 2)
+## Video (LiveKit)
 
-The video plane works without any extra setup if the dashboard browser is open while Unity
-is playing:
+The participant video runs over a **LiveKit** SFU:
 
-1. The dashboard opens `ws://[host]:8000/ws/signaling` as a subscriber.
-2. Unity opens the same path as a publisher and sends an SDP offer.
-3. V-CORE brokers the offer/answer + ICE candidates.
-4. The dashboard's `<video>` element shows the spectator-cam view within ~150 ms.
+1. `LiveKitPublisher` fetches a token from `…:8000/api/livekit/token` and connects to the
+   LiveKit server, publishing the spectator-camera track.
+2. The dashboard browser fetches a subscriber token and subscribes — its `<video>` shows the
+   spectator view.
+3. Recording is **server-side** (LiveKit Egress): the backend starts/stops it automatically on
+   session start/stop, anchored to the LSL clock.
 
-**V-CORE never relays media** — the video is peer-to-peer Unity → browser (UDP/WebRTC).
-
-If WebRTC fails (NAT issues on a non-flat network), add a TURN server in
-`WebRtcSender.iceServerUrls` in the Inspector.
+LiveKit + Egress run via Docker, and one value (`node_ip` = your LAN IP) must be set per
+machine. See [`../docs/LIVEKIT_SETUP.md`](../docs/LIVEKIT_SETUP.md) for the full setup.
 
 ---
 
 ## Session recording
 
-Call the public API on `VideoRecorder` from any manager script:
-
-```csharp
-var rec = FindObjectOfType<VideoRecorder>();
-rec.StartRecording("session-2026-06-11", lslStartTime: "2026-06-11T09:00:00.000Z");
-// ... session runs ...
-rec.StopRecording(upload: true);
-```
-
-Frames are saved to `Application.persistentDataPath/Recordings/<sessionId>/`. On Windows
-this is typically `%APPDATA%/../LocalLow/<CompanyName>/<ProductName>/Recordings/`.
+Recording is **fully server-side** — there's nothing to call from Unity. When a session is
+started from the dashboard, the backend's `LiveKitRecorder` finds the published video track and
+starts a LiveKit **Track Egress**, writing `backend/data/video/<session_id>.webm` (anchored to
+the LSL clock). Stopping the session stops the recording, and you can play it back in the
+dashboard's **Data History** screen.
 
 ---
 
 ## Promoting to a UPM package
 
-Each script has no inter-project dependencies beyond `Newtonsoft.Json` and
-`com.unity.webrtc`. To package:
+Each script has no inter-project dependencies beyond `Newtonsoft.Json` and the LiveKit Unity
+SDK (`io.livekit.livekit-sdk`). To package:
 
 1. Move the scripts to a folder named `com.vcore.unity-poc/` with a `package.json`.
 2. Add the package to any Unity project via the Package Manager's **Add package from disk**

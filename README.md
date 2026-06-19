@@ -96,11 +96,13 @@ WsSink bind address, and (optional) auth token for multi-machine deployments.
 ## Tech stack (summary)
 
 Python 3.11 · FastAPI · pylsl · pydantic — backend (LSL ingestion, rule engine, WebSocket
-bridge to the dashboard and the Unity runtime, plus WebRTC signaling). React · TypeScript ·
-Vite — schema-driven browser dashboard with a rule builder and a live participant video feed.
-A thin Unity reference POC (`unity-poc/`). Participant video over **WebRTC** (peer-to-peer;
-V-CORE brokers signaling only). Contracts as JSON Schema, validated on both sides.
-See [`ARCHITECTURE.md §3`](./ARCHITECTURE.md#3-tech-stack--rationale).
+bridge to the dashboard and the Unity runtime, plus LiveKit token/recording orchestration).
+React · TypeScript · Vite — schema-driven browser dashboard with a rule builder and a live
+participant video feed. A thin Unity reference POC (`unity-poc/`). Participant video runs over a
+**LiveKit** SFU (Unity publishes, the browser subscribes) with server-side **Egress** recording;
+V-CORE only mints tokens and drives the recording. Contracts as JSON Schema, validated on both
+sides. See [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) and
+[`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
 
 Backend (from backend/ directory):
 

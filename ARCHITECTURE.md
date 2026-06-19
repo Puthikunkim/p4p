@@ -9,6 +9,14 @@
 | **Date** | 2026-06-01 |
 | **Contracts version** | 1.0.0 (Signal Schema · Rule Grammar · Object-Status / Status-Request) |
 
+> **⚠ As-built note:** the **participant-video plane was reimplemented on a LiveKit SFU**
+> (Unity publishes → browser subscribes → server-side **Track Egress** recording, LSL-anchored).
+> The WebRTC-signaling-broker design described below (`bridge/signaling.py`, `WebRtcSender.cs`,
+> `VideoRecorder.cs`, browser `MediaRecorder`) is **superseded and removed from the code.**
+> For the current video architecture and setup, see
+> [`docs/HOW_IT_WORKS.md` §9](./docs/HOW_IT_WORKS.md) and [`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
+> The rest of this document (signals, rules, contracts, recording) remains the design reference.
+
 > This document is the **single source of truth** for the V-CORE architecture. If the plan
 > changes, change this file and [`TODO.md`](./TODO.md) first.
 
