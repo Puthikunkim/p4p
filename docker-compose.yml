@@ -9,6 +9,9 @@ services:
       - ./backend:/app
       - ./contracts:/contracts:ro
       - ./data:/data
+      # Signal manifest + mock_pipeline live here; the backend resolves its manifest
+      # at ../tools/fixtures/… (→ /tools) and you can run the mock pipeline in-container.
+      - ./tools:/tools:ro
     environment:
       - VCORE_CONFIG=/app/config.yaml
       # LiveKit endpoints/secrets (override config.yaml). In-network API URL for the
