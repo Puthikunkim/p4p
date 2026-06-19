@@ -5,8 +5,12 @@ rtc:
   tcp_port: 7881
   port_range_start: 50000
   port_range_end: 50100
-  # On a single host / LAN, host candidates suffice; set true + node_ip for routed setups.
   use_external_ip: false
+  # Docker + clients on the host: LiveKit advertises this IP for WebRTC media. Set it to
+  # your machine's LAN IP (e.g. 192.168.1.x) so host-side Unity/browser AND the in-container
+  # Egress can all reach the media ports. 'localhost' breaks Egress; the container IP breaks
+  # host clients. Uncomment and set to your LAN IP:
+  # node_ip: 192.168.1.100
 redis:
   address: redis:6379
 # Dev API key/secret. CHANGE for any real deployment (and keep out of git).

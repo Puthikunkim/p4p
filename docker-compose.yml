@@ -29,6 +29,10 @@ services:
       - "5173:5173"
     volumes:
       - ./frontend/src:/app/src
+    environment:
+      # In Docker the dev-server proxies /api and /ws to the backend *service*,
+      # not localhost (which would be the frontend container itself).
+      - VITE_PROXY_TARGET=http://backend:8000
     command: npm run dev -- --host
     depends_on:
       - backend
