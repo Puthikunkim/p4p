@@ -117,10 +117,36 @@ and on stop, `backend/data/video/<session_id>.mp4` exists.
 
 ---
 
-## 7. Status / TODO
+## 7. Unity POC publisher (LiveKit)
+
+The POC publishes its spectator camera to LiveKit via
+[`LiveKitPublisher.cs`](../unity-poc/Assets/Scripts/LiveKitPublisher.cs). In the editor:
+
+1. **Install the LiveKit Unity SDK.** It's referenced in
+   [`Packages/manifest.json`](../unity-poc/Packages/manifest.json) as
+   `"io.livekit.unity": "https://github.com/livekit/client-sdk-unity.git"`. If Unity reports a
+   package-name mismatch or can't resolve it, add it from the UI instead — **Window → Package
+   Manager → + → Add package from git URL →** `https://github.com/livekit/client-sdk-unity.git`
+   (Unity then writes the correct package key automatically).
+2. **Reconcile WebRTC.** The SDK brings its own WebRTC dependency; if it conflicts with the
+   existing `com.unity.webrtc` (3.0.0-pre.8), let the LiveKit SDK's required version win.
+3. **Wire the component.** On the GameObject that has `SpectatorCamera` (the one that had
+   `WebRtcSender`): add **LiveKitPublisher**, assign the **Backend Config** asset, and
+   **remove/disable `WebRtcSender`**.
+4. **Enable + run.** Set `livekit.enabled: true`, `docker compose up`, press Play. The token is
+   fetched from `/api/livekit/token`; video should appear in the dashboard's Video Mirror.
+5. **Cross-machine:** also set the publisher's `BackendConfig.host` to the Docker host's LAN IP
+   (see §4B) so Unity can reach both the token endpoint and LiveKit.
+
+> ⚠ `LiveKitPublisher.cs` was written without an editor to compile against — **verify its API
+> calls against the installed SDK version** (see the warning header in the file). It's a
+> working starting point, not final code.
+
+## 8. Status / TODO
 
 - [x] Backend: token endpoint + Egress orchestration (LSL-anchored), gated by `livekit.enabled`.
 - [x] docker-compose: LiveKit + Egress + Redis.
 - [x] Frontend: `livekit-client` subscriber (live mirror).
-- [ ] Unity POC: LiveKit publisher (replaces the old custom `WebRtcSender`). *In progress.*
-- [ ] Remove the old signaling broker / `/ws/signaling` once the Unity publisher is in.
+- [x] Unity POC: `LiveKitPublisher.cs` + SDK manifest entry (⚠ needs in-editor verification).
+- [ ] **After you verify the LiveKit loop end-to-end:** remove the old `WebRtcSender`, the
+      backend `SignalingBroker` / `/ws/signaling`, and the unused browser-upload video endpoints.
