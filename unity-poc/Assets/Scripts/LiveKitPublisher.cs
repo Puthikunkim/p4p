@@ -66,7 +66,8 @@ namespace VCore
 
             // 2. Connect to the LiveKit room.
             _room = new Room();
-            var connect = _room.Connect(lkUrl, lkToken, new RoomOptions());
+            // Fully qualified: both LiveKit and LiveKit.Proto define a RoomOptions.
+            var connect = _room.Connect(lkUrl, lkToken, new LiveKit.RoomOptions());
             yield return connect;
             if (connect.IsError)
             {
