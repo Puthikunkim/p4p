@@ -53,6 +53,15 @@
       },
       "url": "https://packages.unity.com"
     },
+    "io.livekit.livekit-sdk": {
+      "version": "https://github.com/livekit/client-sdk-unity.git",
+      "depth": 0,
+      "source": "git",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.1"
+      },
+      "hash": "e84e131903f6d9bae52213b4a86c95bac27fee16"
+    },
     "com.unity.modules.audio": {
       "version": "1.0.0",
       "depth": 0,

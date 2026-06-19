@@ -581,16 +581,13 @@ MonoBehaviour:
   m_GameObject: {fileID: 300}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: f1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6, type: 3}
+  m_Script: {fileID: 11500000, guid: face1ace00001111222233334444aaaa, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   backendConfig: {fileID: 11400000, guid: c0ffee00beef1234567890abcdef0002, type: 2}
   host: localhost
   port: 8000
-  iceServerUrls:
-  - stun:stun.l.google.com:19302
-  maxFramerate: 30
-  maxBitrateKbps: 8000
+  identity: unity
 --- !u!1 &400
 GameObject:
   m_ObjectHideFlags: 0
