@@ -515,10 +515,10 @@ flowchart TB
   shared `ScriptableObject` holding the backend host/port so all three networked components
   point at the same place.
 
-> **Caveat:** `VideoRecorder.cs` (a PNG-frame recorder that POSTs to
-> `/api/sessions/{id}/recording`) targets an endpoint that **does not exist** in this backend.
-> The *working* recording path is browser-side (see [§9](#9-the-participant-video-plane-webrtc)
-> and [§11](#11-as-built-notes--discrepancies)).
+> **Recording:** the participant view is currently recorded **browser-side** (see
+> [§9](#9-the-participant-video-plane-webrtc)). A former Unity-side `VideoRecorder.cs` (PNG
+> frames → a non-existent endpoint) was removed as dead code; server-side recording via a
+> recv-only WebRTC peer is the planned replacement (see [§11](#11-as-built-notes--discrepancies)).
 
 ---
 
@@ -719,11 +719,14 @@ nobody is misled. None of them stop the system from running end-to-end.
    [`clear_fog_stressed.yaml`](../backend/rules/clear_fog_stressed.yaml) is now the single
    canonical version.
 
-3. **Unity-side video recording targets a missing endpoint.** `unity-poc`'s
-   [`VideoRecorder.cs`](../unity-poc/Assets/Scripts/VideoRecorder.cs) POSTs to
-   `/api/sessions/{id}/recording`, which the backend does not define. The recording that
-   actually works is **browser-side** (`MediaRecorder` → `/api/sessions/{id}/video`). Treat
-   `VideoRecorder.cs` as an unwired alternative.
+3. **Resolved — dead Unity-side recorder removed.** `unity-poc`'s `VideoRecorder.cs` POSTed to
+   `/api/sessions/{id}/recording`, which the backend never defined; it has been deleted (script,
+   meta, and its component in `Sample.unity`). The recording that actually works today is
+   **browser-side** (`MediaRecorder` → `/api/sessions/{id}/video`). A server-side recv-only
+   WebRTC recorder (aiortc) is the intended robust replacement — **not yet implemented**,
+   because the POC publisher is currently 1:1 (single peer connection / one broadcast offer in
+   `WebRtcSender.cs`), so a recorder can't simply join as a second subscriber alongside the
+   browser without either a multi-subscriber publisher upgrade or a backend SFU.
 
 4. **"Three contracts" vs five message types.** The docs emphasize three contracts, but the
    running system also uses `vr_context` (④) and `unity_behaviour` (⑤), each with its own
