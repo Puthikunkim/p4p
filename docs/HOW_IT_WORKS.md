@@ -21,7 +21,7 @@
 6. [The Unity POC deep dive](#6-the-unity-poc-deep-dive)
 7. [The sensor pipeline & mock tooling](#7-the-sensor-pipeline--mock-tooling)
 8. [End-to-end walkthroughs](#8-end-to-end-walkthroughs)
-9. [The participant video plane (WebRTC)](#9-the-participant-video-plane-webrtc)
+9. [The participant video plane (LiveKit)](#9-the-participant-video-plane-livekit)
 10. [How to run the whole thing locally](#10-how-to-run-the-whole-thing-locally)
 11. [As-built notes & discrepancies](#11-as-built-notes--discrepancies)
 
@@ -58,15 +58,15 @@ flowchart LR
     SP["Signal pipeline / mock_pipeline.py<br/>(emits an LSL stream)"]
   end
 
-  subgraph A["Machine A — V-CORE backend (FastAPI, port 8000)"]
+  subgraph A["Machine A"]
     LSL["LSLSource<br/>(ingestion)"]
     BUS[("EventBus<br/>in-process pub/sub")]
     ENG["RuleEvaluator + RuleRegistry<br/>+ degradation"]
     SINK["WsSink<br/>(also listens on :9001)"]
     BRIDGE["DashboardBridge"]
-    SIG["SignalingBroker"]
-    REC["Recorder<br/>(SQLite + XDF)"]
-    API["REST API<br/>/api/rules, /api/sessions"]
+    REC["Recorder (SQLite + XDF)<br/>+ LiveKitRecorder"]
+    API["REST API<br/>/api/rules, /api/sessions,<br/>/api/livekit/token"]
+    LK["LiveKit server (SFU :7880)<br/>+ Egress — separate service"]
 
     LSL --> BUS
     BUS --> ENG
@@ -75,24 +75,25 @@ flowchart LR
     BUS --> BRIDGE
     BUS --> REC
     API --> BUS
+    REC -. "start/stop Track Egress (server API)" .-> LK
   end
 
   subgraph B["Machine B — Unity runtime (unity-poc or real 'Jerry')"]
-    UNITY["VCoreConnection + WebRtcSender"]
+    UNITY["VCoreConnection + LiveKitPublisher"]
   end
 
   subgraph BR["Browser — React dashboard (dev: port 5173)"]
-    UI["Dashboard"]
+    UI["Dashboard + livekit-client"]
   end
 
   SP ==>|"Contract 1: Signal Schema, over LSL"| LSL
   UNITY ==>|"Contract 3b: Object-Status Manifest, WS /ws/runtime"| SINK
   SINK ==>|"Contract 3a: Status-Change Request, WS"| UNITY
   BRIDGE -->|"events, WS /ws/dashboard"| UI
-  UI -->|"REST: author/trigger rules, start session"| API
-  UNITY -. "WebRTC video (peer-to-peer)" .-> UI
-  UNITY <-. "SDP/ICE, WS /ws/signaling" .-> SIG
-  UI <-. "SDP/ICE, WS /ws/signaling" .-> SIG
+  UI -->|"REST: rules, sessions, LiveKit token"| API
+  UNITY ==>|"publishes video (WebRTC)"| LK
+  LK ==>|"forwards video (WebRTC)"| UI
+  LK -. "Track Egress → .webm on disk" .-> REC
 ```
 
 **The links you'll see named in the UI** (defined in
@@ -104,15 +105,17 @@ flowchart LR
 | `unity-ws` | Unity WS | A Unity runtime is connected on the control WebSocket. |
 | `browser-ws` | Browser WS | At least one dashboard browser is connected. |
 
-**Ports at a glance** (these are *hardcoded* in the backend today — see
-[§11](#11-as-built-notes--discrepancies)):
+**Ports at a glance** (defaults; configurable via `config.yaml` / `LIVEKIT_SETUP.md`):
 
-- **8000** — FastAPI: serves `/ws/dashboard`, `/ws/runtime`, `/ws/signaling`, and all REST.
+- **8000** — FastAPI: serves `/ws/dashboard`, `/ws/runtime`, and all REST (incl.
+  `/api/livekit/token`).
 - **9001** — A *second*, standalone WebSocket server run by `WsSink`. Used by the headless
   `mock_unity.py`. The real Unity POC uses `8000/ws/runtime` instead. Both funnel into the
   same handler.
-- **5173** — Vite dev server for the frontend, which **proxies** `/api` and `/ws` to `:8000`
-  (see [`frontend/vite.config.ts`](../frontend/vite.config.ts)).
+- **7880 / 7881 / 50000–50100·udp** — LiveKit server: signaling + server API (7880), RTC over
+  TCP (7881), and RTC media (UDP range). The video plane lives here, not in FastAPI.
+- **5173** — Vite dev server for the frontend, which **proxies** `/api` and `/ws` to the
+  backend (see [`frontend/vite.config.ts`](../frontend/vite.config.ts)).
 
 ---
 
@@ -181,7 +184,7 @@ evaluator = RuleEvaluator(registry, bus, manifests)
 ws_sink   = WsSink("localhost", 9001, bus=bus, manifests=manifests)
 bridge    = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
 recorder  = Recorder(bus, manifests, xdf_dir=xdf_dir, sqlite_path=sqlite_path)
-signaling = SignalingBroker()
+livekit_recorder = LiveKitRecorder(config.livekit, recorder.store, video_dir)
 ```
 
 On startup it loads the rules, starts the evaluator, begins watching the rules directory,
@@ -351,13 +354,22 @@ current signal manifest, object-status manifest, rule list, and link states) so 
 opened dashboard is immediately populated, then streams live events. It also owns the
 `browser-ws` link status and delegates `/ws/runtime` to `WsSink`.
 
-### 4.7 The signaling broker (video setup only)
+### 4.7 The video plane (LiveKit) and how V-CORE drives it
 
-[`bridge/signaling.py`](../backend/vcore/bridge/signaling.py) (`SignalingBroker`) serves
-`/ws/signaling`. WebRTC peers need to exchange a little setup info (SDP + ICE candidates)
-before they can stream video directly to each other. The broker relays those messages between
-**one publisher** (Unity) and **N subscribers** (browser dashboards). Crucially, **it never
-touches the video bytes** — once setup is done, video flows peer-to-peer. See [§9](#9-the-participant-video-plane-webrtc).
+The participant video does **not** flow through FastAPI. A separate **LiveKit** server (an SFU)
+handles all media: Unity publishes its spectator camera to it, browsers subscribe for the live
+mirror, and **LiveKit Egress** records. V-CORE is only the *orchestrator*:
+
+- [`api/livekit.py`](../backend/vcore/api/livekit.py) — `GET /api/livekit/token` mints a LiveKit
+  access token (publisher token for Unity, subscriber token for the browser).
+- [`recording/livekit_recorder.py`](../backend/vcore/recording/livekit_recorder.py)
+  (`LiveKitRecorder`) — on session start it finds the publisher's video track and starts a
+  **Track Egress** recording to `<video_dir>/<session_id>.webm`, capturing the LSL clock at that
+  moment; on session stop it stops the egress. It's gated by `livekit.enabled` and best-effort
+  (a recording failure never aborts the session). See [§9](#9-the-participant-video-plane-livekit).
+
+V-CORE never touches the media bytes itself; LiveKit does. *(The earlier custom `/ws/signaling`
+broker + browser `MediaRecorder` path was removed once LiveKit was in place.)*
 
 ### 4.8 Recording
 
@@ -371,8 +383,8 @@ Each artifact type has its own independently-configurable location
   warnings, vr_context changes, link state changes). The filename is configurable.
 - **XDF** (`backend/data/xdf/<session_id>.xdf`): the raw numeric signal samples, in the
   LSL-native recording format, so they can be replayed/aligned later.
-- **Video** (`backend/data/video/<session_id>.<ext>`): the recorded participant view
-  (uploaded by the browser) is stored on disk and referenced from the session row.
+- **Video** (`backend/data/video/<session_id>.webm`): the recorded participant view, written
+  server-side by **LiveKit Egress** (see §4.7) and referenced from the session row.
 
 ### 4.9 The REST API
 
@@ -380,9 +392,11 @@ Each artifact type has its own independently-configurable location
   authors rules as YAML files here; files stay the source of truth) plus
   `POST /api/rules/{id}/trigger` to **manually fire** a rule (`source: "manual"`), validated
   against the scene first.
-- [`api/sessions.py`](../backend/vcore/api/sessions.py) — start/stop/list/get sessions, and the
-  video endpoints `POST /api/sessions/{id}/video-start`, `POST .../video` (upload), and
-  `GET .../video` (playback).
+- [`api/sessions.py`](../backend/vcore/api/sessions.py) — start/stop/list/get sessions, plus
+  `GET /api/sessions/{id}/video` to stream the recorded file for playback. (Recording is
+  started/stopped server-side by `LiveKitRecorder` on session start/stop — there's no browser
+  upload endpoint anymore.)
+- [`api/livekit.py`](../backend/vcore/api/livekit.py) — `GET /api/livekit/token` (see §4.7).
 
 ---
 
@@ -448,11 +462,12 @@ with no code change.**
 
 ### 5.4 The video provider
 
-[`video/VideoSessionProvider.tsx`](../frontend/src/video/VideoSessionProvider.tsx) owns a
-single `RTCPeerConnection` (as a **subscriber**) and a `MediaRecorder` for the whole app, so
-the feed and recording survive screen switches. It connects to the signaling broker as a
-subscriber, answers Unity's offer, and — when a session is active — records the incoming
-stream to `webm` and uploads it to `/api/sessions/{id}/video`. (Details in [§9](#9-the-participant-video-plane-webrtc).)
+[`video/VideoSessionProvider.tsx`](../frontend/src/video/VideoSessionProvider.tsx) fetches a
+subscriber token from `/api/livekit/token`, connects to the LiveKit room with the
+[`livekit-client`](https://github.com/livekit/client-sdk-js) SDK, and exposes the remote video
+track to `<VideoFeed>` for the live mirror. It only *views* — **recording is server-side**
+(LiveKit Egress), so the browser no longer runs a `MediaRecorder` or uploads anything.
+(Details in [§9](#9-the-participant-video-plane-livekit).)
 
 ---
 
@@ -477,17 +492,18 @@ flowchart TB
     DISP["RequestDispatcher<br/>StatusRequest → apply to ObjectStatus"]
     BREP["BehaviourReporter<br/>channels + samples"]
     VREP["VrContextReporter<br/>study step context"]
-    WRTC["WebRtcSender<br/>publisher → /ws/signaling"]
+    LKP["LiveKitPublisher<br/>publishes to LiveKit SFU"]
   end
 
   CFG["BackendConfig asset<br/>(shared host/port)"] --- CONN
-  CFG --- WRTC
+  CFG --- LKP
   OS --> COLL --> CONN
   CONN -->|manifest up| BACKEND[("V-CORE backend")]
   BACKEND -->|StatusRequest down| CONN --> DISP --> OS
   BM --> BREP --> CONN
   VREP --> CONN
-  CAM --> WRTC -. "video P2P" .-> BACKEND
+  LKP -->|"GET /api/livekit/token"| BACKEND
+  CAM --> LKP -. "publishes video" .-> LIVEKIT[("LiveKit SFU")]
 ```
 
 - **`ObjectStatus`** ([ObjectStatus.cs](../unity-poc/Assets/Scripts/ObjectStatus.cs)) — put one
@@ -508,17 +524,16 @@ flowchart TB
   stream their values (real or synthetic) to the backend.
 - **`VrContextReporter`** — pushes study/scene context (Contract ④) for the dashboard's VR
   Context panel.
-- **`SpectatorCamera` + `WebRtcSender`** — render the participant's view to a texture and
-  publish it over WebRTC (Contract for the video plane); `WebRtcSender` connects to
-  `/ws/signaling` as the publisher.
+- **`SpectatorCamera` + `LiveKitPublisher`** — render the participant's view to a texture and
+  publish it to the **LiveKit** room; `LiveKitPublisher` ([LiveKitPublisher.cs](../unity-poc/Assets/Scripts/LiveKitPublisher.cs))
+  fetches a token from `/api/livekit/token` and publishes via the LiveKit Unity SDK.
 - **`BackendConfig`** ([BackendConfig.cs](../unity-poc/Assets/Scripts/BackendConfig.cs)) — a
-  shared `ScriptableObject` holding the backend host/port so all three networked components
+  shared `ScriptableObject` holding the backend host/port so the networked components
   point at the same place.
 
-> **Recording:** the participant view is currently recorded **browser-side** (see
-> [§9](#9-the-participant-video-plane-webrtc)). A former Unity-side `VideoRecorder.cs` (PNG
-> frames → a non-existent endpoint) was removed as dead code; server-side recording via a
-> recv-only WebRTC peer is the planned replacement (see [§11](#11-as-built-notes--discrepancies)).
+> **Recording** is server-side via LiveKit Egress (see [§9](#9-the-participant-video-plane-livekit)).
+> Two earlier dead-code recorders were removed: the Unity-side `VideoRecorder.cs` (PNG frames →
+> a non-existent endpoint) and the browser-side `MediaRecorder` upload path.
 
 ---
 
@@ -620,38 +635,39 @@ sequenceDiagram
 
 ---
 
-## 9. The participant video plane (WebRTC)
+## 9. The participant video plane (LiveKit)
 
 The researcher watches a **live mirror of the participant's VR view** next to the signals, and
-that view is recorded for later. This is a separate "plane" — it does not affect the signal/
-rule path, and the backend never relays the video bytes.
+that view is recorded for later. This is a separate "plane" handled by a **LiveKit** SFU — it
+doesn't affect the signal/rule path. V-CORE only mints tokens and starts/stops the recording;
+the media flows through LiveKit, not FastAPI.
 
 ```mermaid
 sequenceDiagram
   participant U as Unity (publisher)
-  participant SIG as SignalingBroker (/ws/signaling)
+  participant API as V-CORE (/api/livekit/token, sessions)
+  participant LK as LiveKit (SFU + Egress)
   participant BR as Browser (subscriber)
-  participant API as Sessions API
 
-  U->>SIG: register {role: publisher}
-  BR->>SIG: register {role: subscriber}
-  SIG-->>BR: publisher-available
-  U->>SIG: SDP offer
-  SIG-->>BR: SDP offer (relayed)
-  BR->>SIG: SDP answer
-  SIG-->>U: SDP answer (relayed)
-  U-->>BR: ICE candidates (relayed both ways)
-  U-->>BR: VIDEO (peer-to-peer, encrypted DTLS-SRTP)
-  Note over BR: while a session is active
-  BR->>API: POST /api/sessions/{id}/video-start
-  BR->>BR: MediaRecorder records the incoming stream (webm)
-  BR->>API: POST /api/sessions/{id}/video (upload blob on stop)
+  U->>API: GET token (role=publisher)
+  U->>LK: connect + publish spectator camera (WebRTC)
+  BR->>API: GET token (role=subscriber)
+  BR->>LK: connect + subscribe
+  LK-->>BR: live video (the mirror)
+  Note over API,LK: on Start Session
+  API->>LK: find publisher's video track → start Track Egress
+  API->>API: store video_lsl_ts (LSL clock at egress start)
+  LK->>LK: Track Egress writes <session_id>.webm to disk
+  Note over API,LK: on Stop Session
+  API->>LK: stop Egress
+  BR->>API: GET /api/sessions/{id}/video (playback in Data History)
 ```
 
-- **Unity is the publisher**, the **browser is the subscriber** (it never sends media).
-- **Recording happens in the browser**: `VideoSessionProvider` runs a `MediaRecorder` on the
-  received stream and uploads `webm` to the backend, which stores it against the session.
-- The backend's only video role is brokering SDP/ICE.
+- **Unity publishes**, the **browser subscribes** (live mirror) — both via the LiveKit SDKs.
+- **Recording is server-side**: `LiveKitRecorder` drives **Track Egress** (records the single
+  published track directly — no headless-Chrome compositor), anchored to the LSL clock so the
+  `.webm` lines up with the XDF at `t=0`.
+- V-CORE's only video role is **tokens + egress control**; it never relays media bytes.
 
 ---
 
@@ -683,8 +699,9 @@ you can click a rule to fire it manually.
 
 To run with the **real Unity POC** instead of `mock_unity.py`, open `unity-poc/` in Unity,
 make sure the components' `BackendConfig` points at the backend host (`localhost:8000`), and
-press Play — `VCoreConnection` connects to `8000/ws/runtime` and `WebRtcSender` to
-`8000/ws/signaling`.
+press Play — `VCoreConnection` connects to `8000/ws/runtime`, and `LiveKitPublisher` fetches a
+token from `8000/api/livekit/token` and publishes video to the LiveKit SFU. For the full video
+stack (LiveKit + Egress recording) use Docker — see [`LIVEKIT_SETUP.md`](LIVEKIT_SETUP.md).
 
 **Tests:**
 
@@ -719,14 +736,13 @@ nobody is misled. None of them stop the system from running end-to-end.
    [`clear_fog_stressed.yaml`](../backend/rules/clear_fog_stressed.yaml) is now the single
    canonical version.
 
-3. **Resolved — dead Unity-side recorder removed.** `unity-poc`'s `VideoRecorder.cs` POSTed to
-   `/api/sessions/{id}/recording`, which the backend never defined; it has been deleted (script,
-   meta, and its component in `Sample.unity`). The recording that actually works today is
-   **browser-side** (`MediaRecorder` → `/api/sessions/{id}/video`). A server-side recv-only
-   WebRTC recorder (aiortc) is the intended robust replacement — **not yet implemented**,
-   because the POC publisher is currently 1:1 (single peer connection / one broadcast offer in
-   `WebRtcSender.cs`), so a recorder can't simply join as a second subscriber alongside the
-   browser without either a multi-subscriber publisher upgrade or a backend SFU.
+3. **Resolved — video moved to LiveKit; legacy paths removed.** The participant video plane is
+   now a **LiveKit** SFU with server-side **Track Egress** recording (§4.7, §9). The earlier
+   custom path was deleted entirely: the Unity `WebRtcSender` + `VideoRecorder`, the backend
+   `SignalingBroker` / `/ws/signaling`, and the browser `MediaRecorder` upload endpoints. The
+   one knob you must set per machine is LiveKit's `node_ip` (your LAN IP) — see
+   [`LIVEKIT_SETUP.md`](LIVEKIT_SETUP.md). LSL sync is **start-point** alignment
+   (`video_lsl_ts` captured at egress start); frame-accurate sync remains future work.
 
 4. **"Three contracts" vs five message types.** The docs emphasize three contracts, but the
    running system also uses `vr_context` (④) and `unity_behaviour` (⑤), each with its own
