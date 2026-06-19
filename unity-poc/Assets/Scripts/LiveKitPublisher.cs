@@ -1,5 +1,6 @@
 using System.Collections;
 using LiveKit;
+using LiveKit.Proto;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
 using UnityEngine.Networking;
@@ -16,13 +17,10 @@ namespace VCore
     /// the LiveKit room at the URL the token carries → publish the spectator render
     /// texture as a video track.
     ///
-    /// ── ⚠ UNVERIFIED ───────────────────────────────────────────────────────────────
-    /// This was written against the LiveKit Unity SDK (io.livekit.unity /
-    /// github.com/livekit/client-sdk-unity) WITHOUT an editor to compile it. Install
-    /// that package first (see docs/LIVEKIT_SETUP.md), then verify/adjust the API calls
-    /// below against the installed SDK version — names like TextureVideoSource,
-    /// CreateVideoTrack, TrackPublishOptions and the source-pump coroutine may differ
-    /// slightly by version. Treat this as a working starting point, not final code.
+    /// ── Note ───────────────────────────────────────────────────────────────────────
+    /// API matched to the LiveKit Unity SDK package <c>io.livekit.livekit-sdk</c>
+    /// (github.com/livekit/client-sdk-unity); it compiles against that SDK. Not yet
+    /// runtime-verified end-to-end — see docs/LIVEKIT_SETUP.md for setup and wiring.
     /// </summary>
     [RequireComponent(typeof(SpectatorCamera))]
     public class LiveKitPublisher : MonoBehaviour
@@ -83,8 +81,8 @@ namespace VCore
 
             var options = new TrackPublishOptions
             {
-                VideoCodec = VideoCodec.H264,
                 Source = TrackSource.SourceCamera,
+                VideoCodec = VideoCodec.Vp8,
             };
             var publish = _room.LocalParticipant.PublishTrack(_track, options);
             yield return publish;
@@ -94,14 +92,15 @@ namespace VCore
                 yield break;
             }
 
-            // The texture source must be pumped so frames are encoded each update.
+            // The texture source must be started, then pumped each update so frames encode.
+            _source.Start();
             StartCoroutine(_source.Update());
             Debug.Log("[LiveKit] publishing spectator camera");
         }
 
         void OnDestroy()
         {
-            _track?.Stop();
+            _source?.Stop();
             _room?.Disconnect();
         }
     }
