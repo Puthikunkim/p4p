@@ -1,147 +1,90 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
-import { SignalingClient } from './signaling'
-import { useVCoreStore } from '../ws/store'
+import { useEffect, useState, type ReactNode } from 'react'
+import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client'
 import { VideoSessionContext, type FeedStatus } from './videoSession'
 
 /**
- * Owns the single WebRTC subscription and the MediaRecorder for the whole app,
- * so a session keeps recording no matter which screen is showing. Mounted once
- * at the App root; the Session Monitor's <VideoFeed> just displays the shared
- * stream. (Unity's WebRtcSender is a single-peer publisher, so there can only be
- * one subscription — hence one persistent owner rather than per-screen ones.)
+ * Subscribes to the shared LiveKit room and exposes the participant's spectator
+ * video to the app. Recording is handled **server-side** by LiveKit Egress
+ * (started by the backend on session start), so the browser only *views* the
+ * mirror here — it no longer records or uploads.
+ *
+ * Mounted once at the App root; the Session Monitor's <VideoFeed> displays the
+ * shared stream. Video appears whenever the Unity publisher is in the room.
+ * If LiveKit is disabled (token endpoint returns 409) the app still runs with no
+ * mirror.
  */
 export function VideoSessionProvider({ children }: { children: ReactNode }) {
-  const sessionId = useVCoreStore((s) => s.activeSessionId)
-
   const [stream, setStream] = useState<MediaStream | null>(null)
   const [status, setStatus] = useState<FeedStatus>('idle')
 
-  const pcRef = useRef<RTCPeerConnection | null>(null)
-  const sigRef = useRef<SignalingClient | null>(null)
-  const streamRef = useRef<MediaStream | null>(null)
-  const recorderRef = useRef<MediaRecorder | null>(null)
-  const chunksRef = useRef<Blob[]>([])
-  const sessionIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    let room: Room | null = null
+    let cancelled = false
 
-  // Keep the latest session id readable inside the once-built ontrack handler.
-  useEffect(() => { sessionIdRef.current = sessionId }, [sessionId])
-
-  const uploadVideo = useCallback((sid: string, blob: Blob) => {
-    fetch(`/api/sessions/${sid}/video`, {
-      method: 'POST',
-      headers: { 'content-type': 'video/webm' },
-      body: blob,
-    }).catch(() => null)
-  }, [])
-
-  const stopRecording = useCallback(() => {
-    if (recorderRef.current?.state === 'recording') recorderRef.current.stop()
-    recorderRef.current = null
-  }, [])
-
-  const startRecording = useCallback((sid: string, src: MediaStream) => {
-    if (recorderRef.current) return
-    chunksRef.current = []
-    const recorder = new MediaRecorder(src, { mimeType: 'video/webm' })
-    recorderRef.current = recorder
-
-    fetch(`/api/sessions/${sid}/video-start`, { method: 'POST' }).catch(() => null)
-
-    recorder.ondataavailable = (ev) => {
-      if (ev.data.size > 0) chunksRef.current.push(ev.data)
-    }
-    recorder.onstop = () => {
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' })
-      chunksRef.current = []
-      uploadVideo(sid, blob)
-    }
-    recorder.start(1000)
-    setStatus('recording')
-  }, [uploadVideo])
-
-  const teardownPeer = useCallback(() => {
-    stopRecording()
-    pcRef.current?.close()
-    pcRef.current = null
-    streamRef.current = null
-    setStream(null)
-  }, [stopRecording])
-
-  const buildPeerConnection = useCallback((publisherPeerId: string): RTCPeerConnection => {
-    teardownPeer()
-    const pc = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] })
-    pcRef.current = pc
-
-    pc.onicecandidate = (ev) => {
-      if (ev.candidate) sigRef.current?.sendIce(ev.candidate.toJSON(), publisherPeerId)
-    }
-
-    pc.ontrack = (ev) => {
-      const src = ev.streams[0] ?? new MediaStream([ev.track])
-      streamRef.current = src
-      setStream(src)
-      const sid = sessionIdRef.current
-      if (sid) startRecording(sid, src)
-      else setStatus('live')
-    }
-
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        teardownPeer()
-        setStatus('idle')
+    const attachVideo = (track: RemoteTrack) => {
+      if (track.kind === Track.Kind.Video) {
+        setStream(new MediaStream([track.mediaStreamTrack]))
+        setStatus('live')
       }
     }
 
-    return pc
-  }, [teardownPeer, startRecording])
-
-  // Connect signaling once, for the app's lifetime.
-  useEffect(() => {
-    const signalingUrl =
-      window.location.protocol === 'https:'
-        ? `wss://${window.location.host}/ws/signaling`
-        : `ws://${window.location.host}/ws/signaling`
-
-    const sig = new SignalingClient(signalingUrl)
-    sigRef.current = sig
-
-    sig.onPublisherGone = () => {
-      teardownPeer()
-      setStatus('idle')
-    }
-
-    sig.onOffer = async (sdp, publisherPeerId) => {
+    async function connect() {
       setStatus('connecting')
-      const pc = buildPeerConnection(publisherPeerId)
-      await pc.setRemoteDescription({ type: 'offer', sdp })
-      const answer = await pc.createAnswer()
-      await pc.setLocalDescription(answer)
-      sig.sendAnswer(answer.sdp!, publisherPeerId)
+      let token: string
+      let url: string
+      try {
+        const identity = `dashboard-${Math.random().toString(36).slice(2, 8)}`
+        const resp = await fetch(`/api/livekit/token?identity=${identity}&role=subscriber`)
+        if (!resp.ok) {
+          setStatus('idle') // LiveKit disabled (409) or backend unavailable
+          return
+        }
+        ;({ token, url } = (await resp.json()) as { token: string; url: string })
+      } catch {
+        setStatus('idle')
+        return
+      }
+
+      const r = new Room()
+      room = r
+      r.on(RoomEvent.TrackSubscribed, (track) => attachVideo(track))
+        .on(RoomEvent.TrackUnsubscribed, () => {
+          setStream(null)
+          setStatus('idle')
+        })
+        .on(RoomEvent.Disconnected, () => {
+          setStream(null)
+          setStatus('idle')
+        })
+
+      try {
+        await r.connect(url, token)
+        if (cancelled) {
+          await r.disconnect()
+          return
+        }
+        // Attach any video track already published when we joined.
+        let attached = false
+        for (const participant of r.remoteParticipants.values()) {
+          for (const pub of participant.trackPublications.values()) {
+            if (pub.track && pub.track.kind === Track.Kind.Video) {
+              attachVideo(pub.track)
+              attached = true
+            }
+          }
+        }
+        if (!attached) setStatus('idle') // connected; waiting for the publisher
+      } catch {
+        setStatus('error')
+      }
     }
 
-    sig.onIce = (candidate) => {
-      pcRef.current?.addIceCandidate(candidate).catch(() => null)
-    }
-
-    sig.connect().catch(() => setStatus('error'))
-
+    void connect()
     return () => {
-      teardownPeer()
-      sig.disconnect()
-      sigRef.current = null
+      cancelled = true
+      room?.disconnect()
     }
-  }, [teardownPeer, buildPeerConnection])
-
-  // Start/stop recording as the active session changes (the stream may already be live).
-  useEffect(() => {
-    if (!sessionId) {
-      stopRecording()
-      if (streamRef.current) setStatus('live')
-      return
-    }
-    const src = streamRef.current
-    if (src && src.active) startRecording(sessionId, src)
-  }, [sessionId, stopRecording, startRecording])
+  }, []) // connect once for the app's lifetime
 
   return (
     <VideoSessionContext.Provider value={{ stream, status }}>
