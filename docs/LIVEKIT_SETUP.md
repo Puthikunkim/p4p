@@ -124,10 +124,11 @@ The POC publishes its spectator camera to LiveKit via
 
 1. **Install the LiveKit Unity SDK.** It's referenced in
    [`Packages/manifest.json`](../unity-poc/Packages/manifest.json) as
-   `"io.livekit.unity": "https://github.com/livekit/client-sdk-unity.git"`. If Unity reports a
-   package-name mismatch or can't resolve it, add it from the UI instead — **Window → Package
-   Manager → + → Add package from git URL →** `https://github.com/livekit/client-sdk-unity.git`
-   (Unity then writes the correct package key automatically).
+   `"io.livekit.livekit-sdk": "https://github.com/livekit/client-sdk-unity.git"`. If Unity still
+   reports a package-name mismatch (the SDK's package name can change between versions), use the
+   exact name from the error, or add it from the UI — **Window → Package Manager → + → Add
+   package from git URL →** `https://github.com/livekit/client-sdk-unity.git` (Unity then writes
+   the correct package key automatically).
 2. **Reconcile WebRTC.** The SDK brings its own WebRTC dependency; if it conflicts with the
    existing `com.unity.webrtc` (3.0.0-pre.8), let the LiveKit SDK's required version win.
 3. **Wire the component.** On the GameObject that has `SpectatorCamera` (the one that had

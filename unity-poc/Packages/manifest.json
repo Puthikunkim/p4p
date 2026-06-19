@@ -1,7 +1,7 @@
 {
   "dependencies": {
     "com.coplaydev.unity-mcp": "https://github.com/CoplayDev/unity-mcp.git?path=/MCPForUnity#main",
-    "io.livekit.unity": "https://github.com/livekit/client-sdk-unity.git",
+    "io.livekit.livekit-sdk": "https://github.com/livekit/client-sdk-unity.git",
     "com.unity.nuget.newtonsoft-json": "3.2.1",
     "com.unity.webrtc": "3.0.0-pre.8",
     "com.unity.modules.audio": "1.0.0",
