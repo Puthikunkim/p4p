@@ -1,12 +1,15 @@
 """REST API for recording session lifecycle and history."""
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
+
+from vcore.recording.xdf_reader import load_xdf_signals
 
 router = APIRouter()
 
@@ -63,3 +66,18 @@ async def get_video(session_id: str, request: Request) -> FileResponse:
         raise HTTPException(404, "No video recorded for this session")
     media_type = "video/mp4" if str(video_path).endswith(".mp4") else "video/webm"
     return FileResponse(video_path, media_type=media_type)
+
+
+@router.get("/api/sessions/{session_id}/signals")
+async def get_signals(session_id: str, request: Request) -> dict[str, Any]:
+    """Return the numeric signal series recorded in the session's XDF, for video-synced
+    review (LSL-clock timestamps the frontend aligns to the video via ``video_lsl_ts``)."""
+    recorder: Any = request.app.state.recorder
+    session: dict[str, Any] | None = recorder.store.get_session(session_id)
+    if session is None:
+        raise HTTPException(404, "Session not found")
+    xdf_path = session.get("xdf_path")
+    if not xdf_path or not Path(xdf_path).exists():
+        raise HTTPException(404, "No signals recorded for this session")
+    # XDF parsing is blocking; keep it off the event loop.
+    return await asyncio.to_thread(load_xdf_signals, xdf_path)

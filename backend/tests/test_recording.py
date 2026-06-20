@@ -103,6 +103,23 @@ def test_xdf_no_numeric_channels(tmp_path: Path) -> None:
     assert not w.has_numeric_channels
 
 
+def test_load_xdf_signals_roundtrip(manifest: SignalManifest, tmp_path: Path) -> None:
+    from vcore.recording.xdf_reader import load_xdf_signals
+
+    path = tmp_path / "signals.xdf"
+    w = XdfWriter(path, manifest)
+    w.open()
+    w.write_sample(SampleEvent(stream_name="s", timestamp=10.0, values={"alpha": 0.5, "load": 0.8}))
+    w.write_sample(SampleEvent(stream_name="s", timestamp=10.1, values={"alpha": 0.6, "load": 0.9}))
+    w.close()
+
+    out = load_xdf_signals(path)
+    assert out["channels"] == ["alpha", "load"]
+    assert len(out["timestamps"]) == 2
+    assert out["series"]["load"] == [0.8, 0.9]
+    assert abs(out["timestamps"][0] - 10.0) < 0.01
+
+
 # ── SqliteStore ───────────────────────────────────────────────────────────────
 
 def test_sqlite_create_and_list(tmp_path: Path) -> None:
@@ -362,3 +379,12 @@ def test_api_get_video_missing(client: TestClient) -> None:
 
 def test_api_get_video_unknown_session(client: TestClient) -> None:
     assert client.get("/api/sessions/nope/video").status_code == 404
+
+
+def test_api_signals_missing_when_no_xdf(client: TestClient) -> None:
+    sid = client.post("/api/sessions", json={"participant": "P01"}).json()["session_id"]
+    assert client.get(f"/api/sessions/{sid}/signals").status_code == 404
+
+
+def test_api_signals_unknown_session(client: TestClient) -> None:
+    assert client.get("/api/sessions/nope/signals").status_code == 404
