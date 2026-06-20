@@ -19,5 +19,8 @@
       ]
     }
   ],
-  "abstract_actions": []
+  "abstract_actions": [
+    { "name": "advance_scene", "scope": "scene" },
+    { "name": "extinguish", "scope": "object", "id": "campfire_01", "tags": ["ambient_light", "fire"] }
+  ]
 }

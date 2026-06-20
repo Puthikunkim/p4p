@@ -6,6 +6,7 @@ from pathlib import Path
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import (
+    ActionRequest,
     LinkStatusEvent,
     SampleEvent,
     SignalManifest,
@@ -112,12 +113,18 @@ class Recorder:
         if self._xdf:
             self._xdf.write_sample(event)
 
-    async def _on_rule_fired(self, event: StatusRequest) -> None:
+    async def _on_rule_fired(self, event: object) -> None:
         if not self._session_id:
+            return
+        if isinstance(event, StatusRequest):
+            event_type = "rule_fired"
+        elif isinstance(event, ActionRequest):
+            event_type = "action_fired"
+        else:
             return
         self._store.record_event(
             self._session_id,
-            "rule_fired",
+            event_type,
             event.source_rule or event.source,
             event.model_dump(),
         )

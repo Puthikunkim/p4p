@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from vcore.core.models import IdTarget, Rule, TagTarget
+from vcore.core.models import IdTarget, InvokeAction, Rule, TagTarget
 
 
 def reconcile(
@@ -45,11 +45,15 @@ def reconcile(
 # ── helpers ───────────────────────────────────────────────────────────────────
 
 def _check_then(rule: Rule, manifest: dict[str, Any] | None) -> str | None:
-    """Return a disable reason if the rule's then.set cannot be resolved, else None."""
+    """Return a disable reason if the rule's then-output cannot be resolved, else None."""
     if manifest is None:
         return "no object-status manifest received yet"
 
+    if rule.then.action is not None:
+        return _check_action(rule.then.action, manifest)
+
     set_action = rule.then.set
+    assert set_action is not None  # ThenClause guarantees exactly one output
     target = set_action.target
     status_name = set_action.status
     value = set_action.value
@@ -73,6 +77,27 @@ def _check_then(rule: Rule, manifest: dict[str, Any] | None) -> str | None:
             return reason  # wrong value for this status
 
     return f"status '{status_name}' not found on matched object(s)"
+
+
+def _check_action(action: InvokeAction, manifest: dict[str, Any]) -> str | None:
+    """Return a disable reason if the action isn't declared by Unity, else None."""
+    declared: list[dict[str, Any]] = manifest.get("abstract_actions", [])
+    target = action.target
+    for a in declared:
+        if a.get("name") != action.action:
+            continue
+        if target is None:
+            if a.get("scope") == "scene":
+                return None
+        elif isinstance(target, TagTarget):
+            if a.get("scope") == "object" and target.tag in a.get("tags", []):
+                return None
+        elif a.get("scope") == "object" and a.get("id") == target.id:
+            return None
+    if target is None:
+        return f"scene action '{action.action}' not declared by Unity"
+    label = f"tag={target.tag}" if isinstance(target, TagTarget) else f"id={target.id}"
+    return f"action '{action.action}' not declared for {label}"
 
 
 def _match_objects(target: TagTarget | IdTarget, objects: list[dict[str, Any]]) -> list[dict[str, Any]]:

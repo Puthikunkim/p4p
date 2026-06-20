@@ -11,7 +11,7 @@ import pytest
 import yaml
 
 from vcore.core.eventbus import EventBus, Topics
-from vcore.core.models import Rule, SampleEvent, StatusRequest
+from vcore.core.models import ActionRequest, Rule, SampleEvent, StatusRequest
 from vcore.core.schema import ActiveManifests, validate
 from vcore.engine import degradation
 from vcore.engine.evaluator import RuleEvaluator
@@ -474,3 +474,99 @@ async def test_emitted_status_request_has_engine_source(tmp_path: Path) -> None:
 
     assert fired[0].source == "engine"
     assert fired[0].source_rule == "r"
+
+
+# ══ Actions (abstract-action / command path) ═════════════════════════════════
+
+def _action_rule_dict(
+    rule_id: str = "act",
+    *,
+    action: str = "advance_scene",
+    target: dict[str, str] | None = None,
+    threshold: float = 0.1,
+) -> dict[str, Any]:
+    then: dict[str, Any] = {"action": {"action": action}}
+    if target is not None:
+        then["action"]["target"] = target
+    return {
+        "id": rule_id,
+        "schema_version": "1.0.0",
+        "description": "test action",
+        "enabled": True,
+        "when": {"all": [{"signal": "cognitive_load", "op": ">=", "threshold": threshold}]},
+        "then": then,
+    }
+
+
+def _manifest_with_actions(actions: list[dict[str, Any]]) -> dict[str, Any]:
+    m = _object_manifest()
+    m["abstract_actions"] = actions
+    return m
+
+
+def test_then_requires_exactly_one_output() -> None:
+    bad_both = _rule_dict("r")
+    bad_both["then"]["action"] = {"action": "x"}
+    with pytest.raises(Exception):  # noqa: B017 — pydantic ValidationError
+        Rule.model_validate(bad_both)
+    bad_neither = _rule_dict("r")
+    bad_neither["then"].pop("set")
+    with pytest.raises(Exception):  # noqa: B017
+        Rule.model_validate(bad_neither)
+
+
+def test_degradation_scene_action_enabled_when_declared() -> None:
+    rules = {"a": Rule.model_validate(_action_rule_dict("a", action="advance_scene"))}
+    m = _manifest_with_actions([{"name": "advance_scene", "scope": "scene"}])
+    disabled = degradation.reconcile(rules, _signal_manifest(), m)
+    assert "a" not in disabled
+
+
+def test_degradation_scene_action_disabled_when_undeclared() -> None:
+    rules = {"a": Rule.model_validate(_action_rule_dict("a", action="ghost"))}
+    disabled = degradation.reconcile(rules, _signal_manifest(), _manifest_with_actions([]))
+    assert "a" in disabled
+    assert "ghost" in disabled["a"]
+
+
+def test_degradation_object_action_by_tag() -> None:
+    rules = {"a": Rule.model_validate(
+        _action_rule_dict("a", action="extinguish", target={"tag": "ambient_light"})
+    )}
+    m = _manifest_with_actions(
+        [{"name": "extinguish", "scope": "object", "id": "light-1", "tags": ["ambient_light"]}]
+    )
+    disabled = degradation.reconcile(rules, _signal_manifest(), m)
+    assert "a" not in disabled
+
+
+@pytest.mark.asyncio
+async def test_evaluator_fires_action_request(tmp_path: Path) -> None:
+    _write_rule(tmp_path, "a", _action_rule_dict("a", action="advance_scene"))
+    reg = RuleRegistry(tmp_path)
+    reg.load_all()
+    bus = EventBus()
+    manifests = ActiveManifests()
+    manifests.update_signal_manifest(_signal_manifest())
+    manifests.update_object_status_manifest(
+        _manifest_with_actions([{"name": "advance_scene", "scope": "scene"}])
+    )
+    ev = RuleEvaluator(reg, bus, manifests)
+    await ev.start()
+    fired: list[ActionRequest] = []
+
+    async def on_fire(p: object) -> None:
+        assert isinstance(p, ActionRequest)
+        fired.append(p)
+
+    bus.subscribe(Topics.RULE_FIRED, on_fire)
+    await _fire_sample(bus, cognitive_load=0.9)
+    await ev.stop()
+
+    assert len(fired) == 1
+    req = fired[0]
+    assert req.action == "advance_scene"
+    assert req.target is None
+    assert req.source == "engine"
+    # exclude_none mirrors the wire form (scene action omits 'target')
+    validate(req.model_dump(mode="json", exclude_none=True), "action_request")

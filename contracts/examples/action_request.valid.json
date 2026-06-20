@@ -1,0 +1,8 @@
+{
+  "schema_version": "1.0.0",
+  "intent_id": "b3c8f0e2-7a1d-4c9e-9f2a-1e6d4b5a0c11",
+  "timestamp": "2025-01-01T00:00:00.000Z",
+  "action": "advance_scene",
+  "source_rule": "stress-advance",
+  "source": "engine"
+}

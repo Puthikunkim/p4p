@@ -17,7 +17,7 @@
     "abstract_actions": {
       "type": "array",
       "items": { "$ref": "#/$defs/abstract_action" },
-      "$comment": "TODO(abstract-actions): populate once abstract-action capability is implemented. Currently always empty []."
+      "$comment": "Parameterless commands Unity exposes. The rule builder offers these on the THEN side as an alternative to setting a status."
     }
   },
   "$defs": {
@@ -64,13 +64,15 @@
       "else": { "required": ["range"] }
     },
     "abstract_action": {
-      "$comment": "TODO(abstract-actions): scene-level semantic capability. Not yet wired. Future shape: { action: string, params_schema: object }.",
+      "$comment": "A parameterless command Unity exposes. scope=object carries id+tags and is addressed like a status; scope=scene is addressed by name only.",
       "type": "object",
-      "required": ["action"],
-      "additionalProperties": true,
+      "required": ["name", "scope"],
+      "additionalProperties": false,
       "properties": {
-        "action":       { "type": "string" },
-        "params_schema": { "type": "object" }
+        "name":  { "type": "string", "minLength": 1 },
+        "scope": { "enum": ["object", "scene"] },
+        "id":    { "type": "string", "minLength": 1 },
+        "tags":  { "type": "array", "items": { "type": "string" } }
       }
     }
   }

@@ -55,6 +55,7 @@ def check_version(payload_version: str, contract: str) -> VersionSkew:
         "signal_schema": "1.0.0",
         "rule_grammar": "1.0.0",
         "status_request": "1.0.0",
+        "action_request": "1.0.0",
         "object_status_manifest": "1.0.0",
     }
     current = known.get(contract, "1.0.0")

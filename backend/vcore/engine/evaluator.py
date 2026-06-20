@@ -8,6 +8,7 @@ from typing import Any
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import (
+    ActionRequest,
     ConditionGroup,
     ConditionItem,
     Rule,
@@ -168,17 +169,33 @@ class RuleEvaluator:
         await self._emit(rule)
 
     async def _emit(self, rule: Rule) -> None:
-        req = StatusRequest(
-            schema_version="1.0.0",
-            intent_id=str(uuid.uuid4()),
-            timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
-            target=rule.then.set.target,
-            status=rule.then.set.status,
-            value=rule.then.set.value,
-            source_rule=rule.id,
-            source="engine",
-        )
-        log.info("engine: rule %r fired → %s=%s on %s", rule.id, req.status, req.value, _target_label(req.target))
+        ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+        req: StatusRequest | ActionRequest
+        if rule.then.action is not None:
+            act = rule.then.action
+            req = ActionRequest(
+                schema_version="1.0.0",
+                intent_id=str(uuid.uuid4()),
+                timestamp=ts,
+                action=act.action,
+                target=act.target,
+                source_rule=rule.id,
+                source="engine",
+            )
+            log.info("engine: rule %r fired → action %s on %s", rule.id, act.action, _target_label(act.target))
+        else:
+            assert rule.then.set is not None  # ThenClause guarantees exactly one
+            req = StatusRequest(
+                schema_version="1.0.0",
+                intent_id=str(uuid.uuid4()),
+                timestamp=ts,
+                target=rule.then.set.target,
+                status=rule.then.set.status,
+                value=rule.then.set.value,
+                source_rule=rule.id,
+                source="engine",
+            )
+            log.info("engine: rule %r fired → %s=%s on %s", rule.id, req.status, req.value, _target_label(req.target))
         await self._bus.publish(Topics.RULE_FIRED, req)
 
     # ── public read ───────────────────────────────────────────────────────────
@@ -190,6 +207,8 @@ class RuleEvaluator:
 
 
 def _target_label(target: Any) -> str:
+    if target is None:
+        return "scene"
     if isinstance(target, TagTarget):
         return f"tag:{target.tag}"
     return f"id:{target.id}"

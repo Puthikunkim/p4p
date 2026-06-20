@@ -50,13 +50,17 @@
     },
     "then_clause": {
       "type": "object",
-      "required": ["set"],
       "additionalProperties": false,
+      "oneOf": [
+        { "required": ["set"] },
+        { "required": ["action"] }
+      ],
       "properties": {
         "set": { "$ref": "#/$defs/set_action" },
+        "action": { "$ref": "#/$defs/invoke_action" },
         "cooldown_s": { "type": "number", "minimum": 0 }
       },
-      "$comment": "TODO(abstract-actions): add an 'action' branch here once the abstract-action capability is implemented. It would look like: { 'action': string, 'params': object }. The target/status/value model is the primary path; abstract actions are a future extension."
+      "$comment": "A rule fires exactly one output: 'set' (change an object status) or 'action' (invoke a parameterless Unity command)."
     },
     "set_action": {
       "type": "object",
@@ -88,17 +92,15 @@
         }
       ]
     },
-    "$defs": {
-      "$comment": "TODO(abstract-actions): placeholder for the future abstract_action definition. Add here when abstract-action capability is implemented.",
-      "abstract_action": {
-        "$comment": "Not currently wired into 'then'. Future: { action: string, params: object } targeting scene-level capabilities rather than per-object statuses.",
-        "type": "object",
-        "required": ["action"],
-        "properties": {
-          "action": { "type": "string" },
-          "params": { "type": "object" }
-        }
-      }
+    "invoke_action": {
+      "type": "object",
+      "required": ["action"],
+      "additionalProperties": false,
+      "properties": {
+        "action": { "type": "string", "minLength": 1 },
+        "target": { "$ref": "#/$defs/target" }
+      },
+      "$comment": "Parameterless command. Omit 'target' for a scene-level action; include a tag/id target for an object-level one."
     }
   }
 }

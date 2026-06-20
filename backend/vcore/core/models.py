@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 # ── Contract 1 — Signal Schema ────────────────────────────────────────────────
 
@@ -77,10 +77,24 @@ class SetAction(BaseModel):
     value: float | str
 
 
+class InvokeAction(BaseModel):
+    """Invoke a parameterless Unity action. No target = scene-level."""
+    model_config = {"extra": "forbid"}
+    action: str
+    target: Target | None = None
+
+
 class ThenClause(BaseModel):
     model_config = {"extra": "forbid"}
-    set: SetAction
+    set: SetAction | None = None
+    action: InvokeAction | None = None
     cooldown_s: float | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_output(self) -> ThenClause:
+        if (self.set is None) == (self.action is None):
+            raise ValueError("rule 'then' must have exactly one of 'set' or 'action'")
+        return self
 
 
 class Rule(BaseModel):
@@ -103,6 +117,20 @@ class StatusRequest(BaseModel):
     target: Target = Field(discriminator=None)
     status: str
     value: float | str
+    source_rule: str | None = None
+    source: Literal["engine", "manual"]
+
+
+# ── Contract 3c — Action Request ──────────────────────────────────────────────
+
+class ActionRequest(BaseModel):
+    """Invoke a parameterless abstract action on Unity. No target = scene-level."""
+    model_config = {"extra": "forbid"}
+    schema_version: str
+    intent_id: str
+    timestamp: str
+    action: str
+    target: Target | None = None
     source_rule: str | None = None
     source: Literal["engine", "manual"]
 

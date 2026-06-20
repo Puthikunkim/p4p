@@ -13,6 +13,7 @@ import pytest
 
 from vcore.core import schema as vschema
 from vcore.core.models import (
+    ActionRequest,
     ObjectStatusManifest,
     Rule,
     SignalManifest,
@@ -25,6 +26,7 @@ CONTRACT_MAP = {
     "signal_schema": SignalManifest,
     "rule_grammar": Rule,
     "status_request": StatusRequest,
+    "action_request": ActionRequest,
     "object_status_manifest": ObjectStatusManifest,
 }
 

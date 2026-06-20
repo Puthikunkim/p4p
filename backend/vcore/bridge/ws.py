@@ -172,9 +172,11 @@ class DashboardBridge:
         await self._broadcast("rule_list", self._rule_list_payload())
 
     async def _on_rule_fired(self, payload: object) -> None:
-        from vcore.core.models import StatusRequest
+        from vcore.core.models import ActionRequest, StatusRequest
         if isinstance(payload, StatusRequest):
             await self._broadcast("rule_fired", payload.model_dump(mode="json"))
+        elif isinstance(payload, ActionRequest):
+            await self._broadcast("action_fired", payload.model_dump(mode="json"))
 
     async def _on_vr_context(self, payload: object) -> None:
         from vcore.core.models import VrContextEvent

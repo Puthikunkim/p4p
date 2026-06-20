@@ -11,6 +11,7 @@ import websockets
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import (
+    ActionRequest,
     IdTarget,
     LinkStatusEvent,
     SampleEvent,
@@ -242,29 +243,37 @@ class WsSink(ActionSink):
     # ── bus handler ───────────────────────────────────────────────────────────
 
     async def _on_rule_fired(self, event: object) -> None:
-        if not isinstance(event, StatusRequest):
-            return
-        ws = self._conn
-        if ws is None:
-            log.debug("ws_sink: no Unity connection — dropping StatusRequest for rule %r", event.source_rule)
+        """Forward a fired rule's output (status change or action invocation) to Unity."""
+        manifest = self._manifests.object_status_manifest
+        if isinstance(event, StatusRequest):
+            kind, reason = "StatusRequest", _validate_request(manifest, event)
+        elif isinstance(event, ActionRequest):
+            kind, reason = "ActionRequest", _validate_action(manifest, event)
+        else:
             return
 
-        reason = _validate_request(self._manifests.object_status_manifest, event)
+        ws = self._conn
+        if ws is None:
+            log.debug("ws_sink: no Unity connection — dropping %s for rule %r", kind, event.source_rule)
+            return
+
         if reason:
             await self._bus.publish(
                 Topics.WARNING,
                 WarningEvent(
                     source="ws_sink",
-                    message=f"StatusRequest dropped (rule {event.source_rule!r}): {reason}",
+                    message=f"{kind} dropped (rule {event.source_rule!r}): {reason}",
                 ),
             )
             log.warning("ws_sink: dropped — %s", reason)
             return
 
         try:
-            await ws.send(event.model_dump_json())
+            # exclude_none so a scene-level action (no target) is sent without a null
+            # 'target' key — keeping the frame valid against the contract schema.
+            await ws.send(event.model_dump_json(exclude_none=True))
         except Exception:
-            log.warning("ws_sink: connection closed while sending StatusRequest")
+            log.warning("ws_sink: connection closed while sending %s", kind)
 
 
 def _lsl_now() -> float:
@@ -316,3 +325,29 @@ def _validate_request(
                     return f"value {req.value} out of range [{lo}, {hi}]"
             return None
     return f"status '{req.status}' not found on matched object(s)"
+
+
+def _validate_action(
+    manifest: dict[str, Any] | None,
+    req: ActionRequest,
+) -> str | None:
+    """Return a rejection reason if the action isn't declared by Unity, else None."""
+    if manifest is None:
+        return "no object-status manifest"
+    declared: list[dict[str, Any]] = manifest.get("abstract_actions", [])
+    target = req.target
+    for a in declared:
+        if a.get("name") != req.action:
+            continue
+        if target is None:
+            if a.get("scope") == "scene":
+                return None
+        elif isinstance(target, TagTarget):
+            if a.get("scope") == "object" and target.tag in a.get("tags", []):
+                return None
+        elif a.get("scope") == "object" and a.get("id") == target.id:
+            return None
+    if target is None:
+        return f"scene action '{req.action}' not declared"
+    label = f"tag={target.tag}" if isinstance(target, TagTarget) else f"id={target.id}"
+    return f"action '{req.action}' not declared for {label}"

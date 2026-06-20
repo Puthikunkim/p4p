@@ -12,8 +12,8 @@ from pydantic import BaseModel
 
 from vcore.core import schema as vschema
 from vcore.core.eventbus import Topics
-from vcore.core.models import StatusRequest
-from vcore.outbound.ws_sink import _validate_request
+from vcore.core.models import ActionRequest, StatusRequest
+from vcore.outbound.ws_sink import _validate_action, _validate_request
 
 router = APIRouter(prefix="/api/rules", tags=["rules"])
 
@@ -102,17 +102,21 @@ async def delete_rule(request: Request, rule_id: str) -> None:
 
 @router.post("/{rule_id}/trigger")
 async def trigger_rule(request: Request, rule_id: str) -> JSONResponse:
-    """Manually fire a rule's StatusRequest with source=manual."""
+    """Manually fire a rule's output (status change or action) with source=manual."""
     reg = _registry(request)
     rules = reg.rules
     if rule_id not in rules:
         raise HTTPException(404, f"rule '{rule_id}' not found")
     rule = rules[rule_id]
-    manifests = _manifests(request)
-    reason = _validate_request(manifests.object_status_manifest, _make_req(rule, source="manual"))
+    manifest = _manifests(request).object_status_manifest
+    req = _make_req(rule, source="manual")
+    reason = (
+        _validate_action(manifest, req)
+        if isinstance(req, ActionRequest)
+        else _validate_request(manifest, req)
+    )
     if reason:
         raise HTTPException(422, f"cannot fire: {reason}")
-    req = _make_req(rule, source="manual")
     await _bus(request).publish(Topics.RULE_FIRED, req)
     return JSONResponse({"fired": req.model_dump(mode="json")})
 
@@ -140,11 +144,23 @@ async def _write_rule(request: Request, body: dict[str, Any], *, mode: str) -> J
     return JSONResponse({"written": str(dest), "id": rule_id}, status_code=201 if mode == "create" else 200)
 
 
-def _make_req(rule: Any, *, source: str) -> StatusRequest:
+def _make_req(rule: Any, *, source: str) -> StatusRequest | ActionRequest:
+    ts = datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+    iid = str(uuid.uuid4())
+    if rule.then.action is not None:
+        return ActionRequest(
+            schema_version="1.0.0",
+            intent_id=iid,
+            timestamp=ts,
+            action=rule.then.action.action,
+            target=rule.then.action.target,
+            source_rule=rule.id,
+            source=source,  # type: ignore[arg-type]  # "engine"|"manual" enforced by caller
+        )
     return StatusRequest(
         schema_version="1.0.0",
-        intent_id=str(uuid.uuid4()),
-        timestamp=datetime.now(UTC).strftime("%Y-%m-%dT%H:%M:%S.000Z"),
+        intent_id=iid,
+        timestamp=ts,
         target=rule.then.set.target,
         status=rule.then.set.status,
         value=rule.then.set.value,

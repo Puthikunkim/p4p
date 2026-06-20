@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://vcore/contracts/action_request",
+  "title": "Action Request — Contract 3c",
+  "description": "Emitted by the rule engine (source=engine) or by a researcher manually triggering a rule (source=manual). Sent to Unity over /ws/runtime to invoke a parameterless abstract action. Omit target for a scene-level action; include a tag/id target for an object-level one.",
+  "type": "object",
+  "required": ["schema_version", "intent_id", "timestamp", "action", "source"],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
+    "intent_id":      { "type": "string", "minLength": 1, "description": "UUID for deduplication and event logging." },
+    "timestamp":      { "type": "string", "format": "date-time" },
+    "action":         { "type": "string", "minLength": 1 },
+    "target":         { "$ref": "#/$defs/target" },
+    "source_rule": {
+      "type": "string",
+      "description": "ID of the rule that generated this request. Omitted for manual triggers with no associated rule."
+    },
+    "source": {
+      "enum": ["engine", "manual"],
+      "description": "engine = fired by the rule evaluator; manual = fired by the researcher via the dashboard trigger button."
+    }
+  },
+  "$defs": {
+    "target": {
+      "type": "object",
+      "oneOf": [
+        {
+          "required": ["tag"],
+          "additionalProperties": false,
+          "properties": { "tag": { "type": "string", "minLength": 1 } }
+        },
+        {
+          "required": ["id"],
+          "additionalProperties": false,
+          "properties": { "id": { "type": "string", "minLength": 1 } }
+        }
+      ]
+    }
+  }
+}
