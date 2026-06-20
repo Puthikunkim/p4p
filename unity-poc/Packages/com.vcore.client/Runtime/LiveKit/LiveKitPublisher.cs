@@ -23,12 +23,10 @@ namespace VCore
     /// runtime-verified end-to-end — see docs/LIVEKIT_SETUP.md for setup and wiring.
     /// </summary>
     [RequireComponent(typeof(SpectatorCamera))]
-    public class LiveKitPublisher : MonoBehaviour
+    public class LiveKitPublisher : VCoreVideoPublisher
     {
         [Header("Backend (token source)")]
-        [Tooltip("Shared backend address. When assigned it overrides the host/port below.")]
-        public BackendConfig backendConfig;
-
+        // backendConfig is inherited from VCoreVideoPublisher.
         [Tooltip("Fallback host, used only when no Backend Config asset is assigned.")]
         public string host = "localhost";
         [Tooltip("Fallback port, used only when no Backend Config asset is assigned.")]

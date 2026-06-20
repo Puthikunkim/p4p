@@ -1,0 +1,27 @@
+{
+    "name": "VCore.Client.LiveKit",
+    "rootNamespace": "VCore",
+    "references": [
+        "VCore.Client",
+        "LiveKit"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "Newtonsoft.Json.dll"
+    ],
+    "autoReferenced": true,
+    "defineConstraints": [
+        "VCORE_LIVEKIT"
+    ],
+    "versionDefines": [
+        {
+            "name": "io.livekit.livekit-sdk",
+            "expression": "",
+            "define": "VCORE_LIVEKIT"
+        }
+    ],
+    "noEngineReferences": false
+}

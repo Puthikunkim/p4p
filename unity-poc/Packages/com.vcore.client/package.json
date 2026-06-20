@@ -1,0 +1,20 @@
+{
+  "name": "com.vcore.client",
+  "version": "0.1.0",
+  "displayName": "V-CORE Unity Client",
+  "description": "Reusable client for the V-CORE adaptive-VR backend. Provides the Object-Status Manifest + Status-Change loop (Contract 3), upstream behaviour and VR-context reporters (Contracts 4 & 5), a spectator camera, and one-component setup via VCoreLauncher / the VCore prefab. Optional LiveKit video publishing compiles only when the LiveKit Unity SDK is installed.",
+  "unity": "2022.3",
+  "dependencies": {
+    "com.unity.nuget.newtonsoft-json": "3.2.1"
+  },
+  "keywords": [
+    "vcore",
+    "vr",
+    "adaptive",
+    "websocket",
+    "biometrics"
+  ],
+  "author": {
+    "name": "Jerry Puthikunkim"
+  }
+}
