@@ -20,12 +20,21 @@ namespace VCore.Editor
     /// manifest still drives dispatch + degradation, so a rule targeting an unloaded object
     /// is simply dormant until its scene loads.
     ///
-    /// Re-run after adding/removing adaptable objects or scenes: <b>V-CORE ▸ Bake Project Catalog</b>.
+    /// Runs automatically at the start of every player build (see <c>VCoreCatalogBuildHook</c>);
+    /// run it by hand to refresh during editing: <b>V-CORE ▸ Bake Project Catalog</b>.
     /// </summary>
     public static class VCoreCatalogBaker
     {
         [MenuItem("V-CORE/Bake Project Catalog")]
         public static void Bake()
+        {
+            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
+            BakeToFile();
+        }
+
+        /// <summary>Scan the project and write the catalog without prompting — safe to call
+        /// from the build preprocessor (see <c>VCoreCatalogBuildHook</c>).</summary>
+        public static void BakeToFile()
         {
             // id → (tags, statusName → status declaration). Grouping mirrors StatusCollector.
             var objects = new Dictionary<string, (HashSet<string> tags, Dictionary<string, object> statuses)>();
@@ -78,7 +87,6 @@ namespace VCore.Editor
             }
 
             // ── Scenes in Build Settings ─────────────────────────────────────────────
-            if (!EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo()) return;
             var setup = EditorSceneManager.GetSceneManagerSetup();
             try
             {
