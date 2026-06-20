@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, type MouseEvent } from 'react'
 import { IconWarn, IconCheck, IconArrowLeft } from '../components/icons'
 
 interface Session {
@@ -9,6 +9,8 @@ interface Session {
   ended_at: string | null
   xdf_path: string | null
   video_path: string | null
+  video_started_at?: string | null
+  video_lsl_ts?: number | null
   status: string
   event_count: number
 }
@@ -25,25 +27,44 @@ interface SessionDetail extends Session {
   events: SessionEvent[]
 }
 
+// Numeric signal series recorded in the session's XDF (timestamps on the LSL clock).
+interface Signals {
+  channels: string[]
+  timestamps: number[]
+  series: Record<string, number[]>
+}
+
+// Highlight events within this many seconds of the video playhead.
+const EVENT_WINDOW_S = 2
+
 // ── helpers ───────────────────────────────────────────────────────────────────
 
 function formatDuration(start: string, end: string | null): string {
   if (!end) return '—'
   const ms = new Date(end).getTime() - new Date(start).getTime()
-  const totalS = Math.max(0, Math.round(ms / 1000))
-  const h = Math.floor(totalS / 3600)
-  const m = Math.floor((totalS % 3600) / 60)
-  const s = totalS % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return formatHMS(Math.round(ms / 1000))
+}
+
+function formatHMS(totalS: number): string {
+  const s = Math.max(0, totalS)
+  const h = Math.floor(s / 3600)
+  const m = Math.floor((s % 3600) / 60)
+  const sec = s % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}`
 }
 
 function formatRelTime(sessionStart: string, occurred: string): string {
-  const ms = new Date(occurred).getTime() - new Date(sessionStart).getTime()
-  const totalS = Math.max(0, Math.round(ms / 1000))
-  const h = Math.floor(totalS / 3600)
-  const m = Math.floor((totalS % 3600) / 60)
-  const s = totalS % 60
-  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`
+  return formatHMS(Math.round((new Date(occurred).getTime() - new Date(sessionStart).getTime()) / 1000))
+}
+
+function formatClock(sec: number): string {
+  const s = Math.max(0, Math.floor(sec))
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`
+}
+
+function formatVal(v: number | undefined): string {
+  if (v === undefined || !Number.isFinite(v)) return '—'
+  return Math.abs(v) >= 100 ? v.toFixed(0) : Math.abs(v) >= 1 ? v.toFixed(1) : v.toFixed(3)
 }
 
 function seededRandom(seed: number) {
@@ -60,113 +81,80 @@ function hashStr(str: string): number {
   return Math.abs(h)
 }
 
-// Generates synthetic fatigue + error-rate trend lines for a session
-function buildChartData(session: SessionDetail): {
-  fatigue: number[]
-  errorRate: number[]
-  triggerPct: number | null
-  durationMinutes: number
-} {
-  const rand = seededRandom(hashStr(session.id))
-  const N = 48
-  const fatigue: number[] = []
-  const errorRate: number[] = []
+// ── recorded-signals chart (small multiples + a shared, video-synced cursor) ────
 
-  let f = 5 + rand() * 10
-  let e = 1 + rand() * 3
-
-  for (let i = 0; i < N; i++) {
-    f = Math.min(95, f + (rand() * 4 - 0.8))
-    e = Math.max(0, Math.min(40, e + (rand() * 3 - 1)))
-    fatigue.push(f)
-    errorRate.push(e)
+function RealSignalChart({ signals, videoLslTs, playhead, showCursor, onSeek }: {
+  signals: Signals
+  videoLslTs: number | null
+  playhead: number
+  showCursor: boolean
+  onSeek: (videoSeconds: number) => void
+}) {
+  const times = signals.timestamps
+  if (times.length === 0 || signals.channels.length === 0) {
+    return <p className="empty-state" style={{ padding: 16 }}>No numeric signals recorded for this session.</p>
   }
 
-  const durationMs = session.ended_at
-    ? new Date(session.ended_at).getTime() - new Date(session.started_at).getTime()
-    : 60 * 60 * 1000
-  const durationMinutes = durationMs / 60000
+  // Each sample's x is "video seconds" = its LSL time minus the LSL clock at video start.
+  const t0 = videoLslTs ?? times[0]
+  const xs = times.map((t) => t - t0)
+  const xMin = xs[0]
+  const xMax = xs[xs.length - 1]
+  const span = Math.max(0.001, xMax - xMin)
 
-  // triggerAt: first rule_fired event as fraction of session duration
-  const firstTrigger = session.events.find((e) => e.event_type === 'rule_fired')
-  let triggerPct: number | null = null
-  if (firstTrigger) {
-    const elapsedMs = new Date(firstTrigger.occurred_at).getTime() - new Date(session.started_at).getTime()
-    triggerPct = Math.max(0, Math.min(1, elapsedMs / durationMs))
+  // Nearest recorded sample to the playhead (for the value readout).
+  let curIdx = 0
+  let best = Infinity
+  for (let i = 0; i < xs.length; i++) {
+    const d = Math.abs(xs[i] - playhead)
+    if (d < best) { best = d; curIdx = i }
   }
+  const inRange = showCursor && playhead >= xMin - 0.05 && playhead <= xMax + 0.05
+  const cursorFrac = Math.max(0, Math.min(1, (playhead - xMin) / span))
 
-  return { fatigue, errorRate, triggerPct, durationMinutes }
-}
+  const W = 1000, H = 46  // viewBox units; SVG stretches to container width
 
-function FatigueTrendChart({ session }: { session: SessionDetail }) {
-  const W = 520, H = 170, PAD = { top: 14, right: 12, bottom: 28, left: 34 }
-  const chartW = W - PAD.left - PAD.right
-  const chartH = H - PAD.top - PAD.bottom
-
-  const { fatigue, errorRate, triggerPct, durationMinutes } = buildChartData(session)
-  const N = fatigue.length
-
-  function toX(i: number) { return PAD.left + (i / (N - 1)) * chartW }
-  function toY(v: number) { return PAD.top + chartH - (v / 100) * chartH }
-
-  function polyline(vals: number[]) {
-    return vals.map((v, i) => `${toX(i)},${toY(v)}`).join(' ')
+  function handleClick(e: MouseEvent<SVGSVGElement>) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const frac = (e.clientX - rect.left) / rect.width
+    onSeek(xMin + Math.max(0, Math.min(1, frac)) * span)
   }
-
-  const xTicks = 6
-  const yTicks = [0, 25, 50, 75, 100]
-  const triggerX = triggerPct !== null ? PAD.left + triggerPct * chartW : null
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: 'auto', display: 'block' }}>
-      {/* y grid */}
-      {yTicks.map((v) => (
-        <g key={v}>
-          <line x1={PAD.left} x2={W - PAD.right} y1={toY(v)} y2={toY(v)}
-            stroke="var(--border)" strokeWidth={0.5} />
-          <text x={PAD.left - 4} y={toY(v) + 4} textAnchor="end" fontSize={9} fill="var(--text)" opacity={0.5}>
-            {v}
-          </text>
-        </g>
-      ))}
-
-      {/* x ticks */}
-      {Array.from({ length: xTicks + 1 }, (_, i) => {
-        const frac = i / xTicks
-        const mins = frac * durationMinutes
-        const label = `${Math.round(mins)}:00`
+    <div className="signal-charts">
+      {signals.channels.map((name) => {
+        const vals = signals.series[name] ?? []
+        let vMin = Infinity, vMax = -Infinity
+        for (const v of vals) { if (v < vMin) vMin = v; if (v > vMax) vMax = v }
+        const vSpan = Math.max(1e-9, vMax - vMin)
+        const pts = vals.map((v, i) => {
+          const x = ((xs[i] - xMin) / span) * W
+          const y = 3 + (H - 6) - ((v - vMin) / vSpan) * (H - 6)
+          return `${x.toFixed(1)},${y.toFixed(1)}`
+        }).join(' ')
         return (
-          <text key={i} x={PAD.left + frac * chartW} y={H - 6}
-            textAnchor="middle" fontSize={9} fill="var(--text)" opacity={0.5}>{label}</text>
+          <div className="signal-chart-row" key={name}>
+            <div className="signal-chart-row__head">
+              <span className="signal-chart-row__name">{name}</span>
+              <span className="signal-chart-row__value">{inRange ? formatVal(vals[curIdx]) : '—'}</span>
+            </div>
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              preserveAspectRatio="none"
+              className="signal-chart-svg"
+              onClick={handleClick}
+            >
+              <polyline points={pts} fill="none" stroke="#4338ca" strokeWidth={1.5}
+                vectorEffect="non-scaling-stroke" />
+              {inRange && (
+                <line x1={cursorFrac * W} x2={cursorFrac * W} y1={0} y2={H}
+                  stroke="#d4322a" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+              )}
+            </svg>
+          </div>
         )
       })}
-
-      {/* trigger event line */}
-      {triggerX !== null && (
-        <g>
-          <line x1={triggerX} x2={triggerX} y1={PAD.top} y2={H - PAD.bottom}
-            stroke="#b26a07" strokeWidth={1} strokeDasharray="3 2" />
-          <text x={triggerX + 3} y={PAD.top + 9} fontSize={8} fill="#b26a07" fontWeight={600}>
-            TRIGGER EVENT
-          </text>
-        </g>
-      )}
-
-      {/* error rate line */}
-      <polyline points={polyline(errorRate)} fill="none" stroke="#d4322a" strokeWidth={1.5} opacity={0.65} />
-
-      {/* fatigue line */}
-      <polyline points={polyline(fatigue)} fill="none" stroke="#4338ca" strokeWidth={2} />
-
-      {/* dot at trigger */}
-      {triggerX !== null && (() => {
-        const idx = Math.round((triggerPct ?? 0) * (N - 1))
-        return (
-          <circle cx={triggerX} cy={toY(fatigue[idx])} r={4}
-            fill="#4338ca" stroke="white" strokeWidth={1.5} />
-        )
-      })()}
-    </svg>
+    </div>
   )
 }
 
@@ -192,19 +180,14 @@ function summarizePayload(payload: string): string {
     if (obj.message) return String(obj.message)
     if (obj.fields && typeof obj.fields === 'object') {
       const f = obj.fields as Record<string, unknown>
-      return Object.keys(f)
-        .slice(0, 3)
-        .map((k) => `${k}: ${f[k]}`)
-        .join(' · ')
+      return Object.keys(f).slice(0, 3).map((k) => `${k}: ${f[k]}`).join(' · ')
     }
     if (obj.value !== undefined && obj.status) return `Set ${obj.status} → ${obj.value}`
     if (obj.link && obj.state) {
       return obj.detail ? `${String(obj.state)} — ${String(obj.detail)}` : String(obj.state)
     }
     const then = obj.then as { set?: Record<string, unknown> } | undefined
-    if (then?.set) {
-      return `Set ${then.set.status} → ${then.set.value}`
-    }
+    if (then?.set) return `Set ${then.set.status} → ${then.set.value}`
     const keys = Object.keys(obj).slice(0, 2)
     return keys.map((k) => `${k}: ${JSON.stringify(obj[k])}`).join(', ')
   } catch {
@@ -241,7 +224,10 @@ function StatBox({ label, value, sub, warn }: { label: string; value: string; su
 export function DataHistory() {
   const [sessions, setSessions] = useState<Session[]>([])
   const [selected, setSelected] = useState<SessionDetail | null>(null)
+  const [signals, setSignals] = useState<Signals | null>(null)
+  const [playhead, setPlayhead] = useState(0)
   const [loading, setLoading] = useState(true)
+  const videoRef = useRef<HTMLVideoElement>(null)
 
   useEffect(() => {
     fetch('/api/sessions')
@@ -251,9 +237,22 @@ export function DataHistory() {
   }, [])
 
   async function openSession(id: string) {
+    setSignals(null)
+    setPlayhead(0)
     const r = await fetch(`/api/sessions/${id}`)
-    const data = await r.json() as SessionDetail
-    setSelected(data)
+    setSelected(await r.json() as SessionDetail)
+    try {
+      const sr = await fetch(`/api/sessions/${id}/signals`)
+      setSignals(sr.ok ? (await sr.json() as Signals) : { channels: [], timestamps: [], series: {} })
+    } catch {
+      setSignals({ channels: [], timestamps: [], series: {} })
+    }
+  }
+
+  function backToList() {
+    setSelected(null)
+    setSignals(null)
+    setPlayhead(0)
   }
 
   if (loading) return <div className="screen"><p className="empty-state">Loading…</p></div>
@@ -273,12 +272,7 @@ export function DataHistory() {
           <table className="history-table">
             <thead>
               <tr>
-                <th>Participant</th>
-                <th>Started</th>
-                <th>Duration</th>
-                <th>Events</th>
-                <th>Status</th>
-                <th></th>
+                <th>Participant</th><th>Started</th><th>Duration</th><th>Events</th><th>Status</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -303,6 +297,19 @@ export function DataHistory() {
 
   const s = selected
   const isDone = s.status === 'done'
+  const hasVideo = !!s.video_path
+  // Events are wall-clock; align them to the video via video_started_at (fallback: session start).
+  const videoStartMs = Date.parse(s.video_started_at ?? s.started_at)
+  const eventVideoTime = (ev: SessionEvent) => (Date.parse(ev.occurred_at) - videoStartMs) / 1000
+
+  function seekTo(videoSeconds: number) {
+    const v = videoRef.current
+    if (!v) return
+    const t = Math.max(0, videoSeconds)
+    v.currentTime = t
+    setPlayhead(t)
+  }
+
   const warningCount = s.events.filter((e) => e.event_type === 'warning').length
   const ruleFiredCount = s.events.filter((e) => e.event_type === 'rule_fired').length
   const rand = seededRandom(hashStr(s.id + 'stats'))
@@ -314,51 +321,56 @@ export function DataHistory() {
     <div className="screen">
       {/* detail header */}
       <div className="screen-header">
-        <button className="btn btn--small" onClick={() => setSelected(null)}><IconArrowLeft /> Back</button>
+        <button className="btn btn--small" onClick={backToList}><IconArrowLeft /> Back</button>
         <div className="detail-session-label">
           <span className="detail-session-id">{s.participant}</span>
           <span className="detail-session-date">{new Date(s.started_at).toLocaleDateString()}</span>
         </div>
         <div style={{ flex: 1 }} />
-        {s.xdf_path && (
-          <a className="btn btn--primary" href={`/api/sessions/${s.id}/download`} download>
-            Download Report
-          </a>
-        )}
-        {!s.xdf_path && (
-          <button className="btn btn--primary" disabled title="No export file available">
-            Download Report
-          </button>
+        {s.xdf_path ? (
+          <a className="btn btn--primary" href={`/api/sessions/${s.id}/download`} download>Download Report</a>
+        ) : (
+          <button className="btn btn--primary" disabled title="No export file available">Download Report</button>
         )}
       </div>
 
       <div className="detail-layout">
-        {/* main content */}
         <div className="detail-main">
           {/* recorded session video */}
-          {s.video_path && (
+          {hasVideo && (
             <div className="detail-chart-card">
               <div className="detail-chart-header">
                 <span className="detail-chart-title">Session Video</span>
+                <span className="detail-chart-legend">t = {formatClock(playhead)}</span>
               </div>
               <video
+                ref={videoRef}
                 controls
                 className="detail-video"
                 src={`/api/sessions/${s.id}/video`}
+                onTimeUpdate={() => setPlayhead(videoRef.current?.currentTime ?? 0)}
+                onSeeked={() => setPlayhead(videoRef.current?.currentTime ?? 0)}
               />
             </div>
           )}
 
-          {/* chart */}
+          {/* recorded signals, synced to the video */}
           <div className="detail-chart-card">
             <div className="detail-chart-header">
-              <span className="detail-chart-title">Cognitive Fatigue Trend</span>
-              <span className="detail-chart-legend">
-                <span className="detail-legend-dot detail-legend-dot--blue" />Fatigue Index
-                <span className="detail-legend-dot detail-legend-dot--red" />Error Rate
-              </span>
+              <span className="detail-chart-title">Recorded Signals</span>
+              {hasVideo && <span className="detail-chart-legend">cursor follows the video · click a chart to seek</span>}
             </div>
-            <FatigueTrendChart session={s} />
+            {signals === null ? (
+              <p className="empty-state" style={{ padding: 16 }}>Loading signals…</p>
+            ) : (
+              <RealSignalChart
+                signals={signals}
+                videoLslTs={s.video_lsl_ts ?? null}
+                playhead={playhead}
+                showCursor={hasVideo}
+                onSeek={seekTo}
+              />
+            )}
           </div>
 
           {/* event log */}
@@ -371,33 +383,40 @@ export function DataHistory() {
               <p className="empty-state" style={{ padding: '16px' }}>No events recorded for this session.</p>
             ) : (
               <div className="detail-event-log__body">
-              <table className="history-table">
-                <thead>
-                  <tr>
-                    <th>TIMESTAMP</th>
-                    <th>EVENT</th>
-                    <th>TRIGGER</th>
-                    <th>RESPONSE</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {s.events.map((ev) => {
-                    const style = getEventStyle(ev.event_type)
-                    return (
-                      <tr key={ev.id}>
-                        <td className="detail-ts">{formatRelTime(s.started_at, ev.occurred_at)}</td>
-                        <td>
-                          <span className="event-type-badge" style={{ color: style.color, background: style.bg }}>
-                            {style.label}
-                          </span>
-                        </td>
-                        <td className="detail-trigger">{triggerLabel(ev)}</td>
-                        <td className="detail-response">{summarizePayload(ev.payload)}</td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                <table className="history-table">
+                  <thead>
+                    <tr><th>TIMESTAMP</th><th>EVENT</th><th>TRIGGER</th><th>RESPONSE</th></tr>
+                  </thead>
+                  <tbody>
+                    {s.events.map((ev) => {
+                      const style = getEventStyle(ev.event_type)
+                      let cls = ''
+                      if (hasVideo) {
+                        const evt = eventVideoTime(ev)
+                        if (Math.abs(evt - playhead) <= EVENT_WINDOW_S) cls = 'evlog-row--active'
+                        else if (evt > playhead + EVENT_WINDOW_S) cls = 'evlog-row--future'
+                      }
+                      return (
+                        <tr
+                          key={ev.id}
+                          className={cls}
+                          onClick={hasVideo ? () => seekTo(eventVideoTime(ev)) : undefined}
+                          style={hasVideo ? { cursor: 'pointer' } : undefined}
+                          title={hasVideo ? 'Jump the video to this event' : undefined}
+                        >
+                          <td className="detail-ts">{formatRelTime(s.started_at, ev.occurred_at)}</td>
+                          <td>
+                            <span className="event-type-badge" style={{ color: style.color, background: style.bg }}>
+                              {style.label}
+                            </span>
+                          </td>
+                          <td className="detail-trigger">{triggerLabel(ev)}</td>
+                          <td className="detail-response">{summarizePayload(ev.payload)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -417,11 +436,7 @@ export function DataHistory() {
             <StatBox label="DURATION" value={formatDuration(s.started_at, s.ended_at)} />
             <StatBox label="ENVIRONMENT" value={`VR_SIM_${envSuffix}`} />
             <StatBox label="AVE. HRV" value={`${avgHrv} ms`} />
-            <StatBox
-              label="TOTAL ERRORS"
-              value={String(warningCount + ruleFiredCount)}
-              warn={warningCount > 0}
-            />
+            <StatBox label="TOTAL ERRORS" value={String(warningCount + ruleFiredCount)} warn={warningCount > 0} />
             <StatBox label="MEAN FIXATION" value={`${meanFixation} /sec`} />
           </div>
         </div>

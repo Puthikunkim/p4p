@@ -317,3 +317,47 @@
   white-space: nowrap;
   display: inline-block;
 }
+
+/* ── Recorded signals (video-synced small multiples) ── */
+
+.signal-charts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px 12px;
+}
+
+.signal-chart-row { display: flex; flex-direction: column; gap: 2px; }
+
+.signal-chart-row__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 11px;
+}
+
+.signal-chart-row__name { font-weight: 600; color: var(--text-soft); }
+
+.signal-chart-row__value {
+  font-family: var(--mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+/* override the generic `.detail-chart-card svg` padding so the cursor lines up with clicks */
+.detail-chart-card .signal-chart-svg {
+  display: block;
+  width: 100%;
+  height: 42px;
+  padding: 0;
+  background: var(--surface-2);
+  border-radius: 4px;
+  cursor: crosshair;
+}
+
+/* ── Event log: video-synced highlighting ── */
+
+.detail-event-log .evlog-row--active td { background: rgba(212, 50, 42, 0.12); }
+.detail-event-log .evlog-row--active td:first-child { box-shadow: inset 3px 0 0 #d4322a; }
+.detail-event-log .evlog-row--future td { opacity: 0.4; }
