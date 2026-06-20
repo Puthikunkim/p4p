@@ -131,6 +131,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 101}
+  - component: {fileID: 107}
   - component: {fileID: 102}
   - component: {fileID: 103}
   - component: {fileID: 104}
@@ -158,6 +159,26 @@ Transform:
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &107
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1a5e1a5e0000111122223333aaaabbbb, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  backendConfig: {fileID: 11400000, guid: c0ffee00beef1234567890abcdef0002, type: 2}
+  sceneName: sample_scene
+  runtimeId: jerry-unity
+  persistAcrossScenes: 1
+  behaviourMetrics: 1
+  vrContext: 1
+  videoPublishing: 1
+  publisher: {fileID: 304}
 --- !u!114 &102
 MonoBehaviour:
   m_ObjectHideFlags: 0

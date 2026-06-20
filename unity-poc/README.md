@@ -10,6 +10,12 @@ plus the Amendment 2 WebRTC video plane.
 
 ## What's in here
 
+The reusable client lives as an **embedded UPM package** at
+[`Packages/com.vcore.client`](Packages/com.vcore.client/README.md) (assembly `VCore.Client`,
+plus `VCore.Client.LiveKit` for the optional video publisher). Only the demo content
+(`StatusVisualizer`, the Sample scene + props) stays under `Assets/`. The scripts below ship
+in that package:
+
 | Script | Role |
 |---|---|
 | `ObjectStatus.cs` | Component that declares one settable status (discrete or continuous) on a GameObject |
@@ -22,15 +28,44 @@ plus the Amendment 2 WebRTC video plane.
 | `SpectatorCamera.cs` | Mono camera rendering to a `RenderTexture` for video streaming |
 | `LiveKitPublisher.cs` | Fetches a token from `/api/livekit/token` and publishes the spectator-cam video to the LiveKit SFU (the dashboard subscribes; recording is server-side via LiveKit Egress) |
 | `BackendConfig.cs` | Shared `ScriptableObject` holding the backend host/port, referenced by `VCoreConnection` + `LiveKitPublisher` |
+| `VCoreLauncher.cs` | One-component bootstrap: brings up the connection + reporters from a single Inspector with enable-toggles, and toggles the video publisher. The "drop into any scene" entry point. |
 
 The pre-built **Sample scene** (`Assets/Scenes/Sample.unity`) contains:
 
 | GameObject | Components |
 |---|---|
-| **VCoreManager** | `VCoreConnection` · `StatusCollector` · `RequestDispatcher` |
+| **VCoreManager** | `VCoreLauncher` · `VCoreConnection` · `StatusCollector` · `RequestDispatcher` · reporters |
 | **CampfireLight** | `Light` · two `ObjectStatus` components (`brightness` continuous + `crackle` discrete) |
 | **SpectatorCamera** | `Camera` · `SpectatorCamera` · `LiveKitPublisher` |
 | **Main Camera** | `Camera` · `AudioListener` |
+
+---
+
+## Drop V-CORE into your own scene (the launcher)
+
+`VCoreLauncher` is the single entry point for reusing the V-CORE client in any scene —
+you don't wire the individual components by hand. Two ways to add it:
+
+- **Prefab (recommended):** drag `Assets/Prefabs/VCore.prefab` into your scene. It bundles
+  the launcher, connection, collector, dispatcher, and both reporters, pre-configured.
+- **Bare component:** add `VCoreLauncher` to an empty GameObject. On play it adds the core
+  `VCoreConnection` (which auto-pulls `StatusCollector` + `RequestDispatcher` via
+  `[RequireComponent]`) and the enabled reporters for you.
+
+Then set these on the **VCoreLauncher** Inspector — it's the one place you configure the stack:
+
+| Field | Purpose |
+|---|---|
+| `Backend Config` | The shared `BackendConfig` asset. Pushed to the connection **and** the video publisher, so the address lives in one place. Leave empty to keep whatever each component already has. |
+| `Scene Name` / `Runtime Id` | Identity reported in the Object-Status Manifest. |
+| `Persist Across Scenes` | Keep the session (connection + reporters) alive across scene loads. |
+| `Behaviour Metrics` | Enable/disable `BehaviourReporter`. |
+| `Vr Context` | Enable/disable `VrContextReporter`. |
+| `Video Publishing` | Enable/disable the assigned `LiveKitPublisher`. |
+| `Publisher` | Reference to the `LiveKitPublisher` on your spectator-camera rig. Video needs its own `Camera`, so it lives on a separate GameObject — assign it here and `Video Publishing` toggles it. |
+
+The launcher only overwrites a component's shared config when its own field is set, so it
+never clobbers settings you authored directly on the bundled components.
 
 ---
 
@@ -65,7 +100,7 @@ Double-click `Sample` to open it.
 You should see four GameObjects in the Hierarchy:
 
 ```
-▼ VCoreManager       (empty, has VCoreConnection / StatusCollector / RequestDispatcher)
+▼ VCoreManager       (VCoreLauncher + VCoreConnection / StatusCollector / RequestDispatcher / reporters)
 ▼ CampfireLight      (Directional Light + two ObjectStatus components)
 ▼ SpectatorCamera    (Camera + SpectatorCamera + LiveKitPublisher)
 ▼ Main Camera        (Camera + AudioListener)
@@ -73,19 +108,17 @@ You should see four GameObjects in the Hierarchy:
 
 ### 4  Configure the backend address
 
-Select **VCoreManager** in the Hierarchy. In the **Inspector**:
+Select **VCoreManager** in the Hierarchy. The **VCoreLauncher** is the single place to
+configure the stack (it pushes the address to both the connection and the publisher):
 
 | Component | Field | Default | Change to |
 |---|---|---|---|
-| `VCoreConnection` | `Host` | `localhost` | IP of Machine A if running on a different machine |
-| `VCoreConnection` | `Port` | `8000` | port V-CORE is bound to |
-| `StatusCollector` | `Scene Name` | `sample_scene` | any string identifying this scene |
+| `VCoreLauncher` | `Backend Config` | the shared asset | the `BackendConfig` whose `Host`/`Port` point at Machine A |
+| `VCoreLauncher` | `Scene Name` | `sample_scene` | any string identifying this scene |
+| `VCoreLauncher` | `Publisher` | the scene's `LiveKitPublisher` | already wired to the SpectatorCamera rig in the sample |
 
-Select **SpectatorCamera**:
-
-| Component | Field | Default | Notes |
-|---|---|---|---|
-| `LiveKitPublisher` | `Backend Config` | the shared asset | assign the same `BackendConfig` as the `VCoreManager` components; it fetches a LiveKit token from the backend |
+To change the address itself, edit the `BackendConfig` asset (`Assets/Settings/BackendConfig.asset`):
+its `Host`/`Port` flow to every V-CORE component.
 
 ### 5  Wire the light-control event (optional but recommended)
 
@@ -173,10 +206,10 @@ declaration in the manifest (same `id`, multiple `statuses`).
 ## Reporting context & behaviour (Contracts 4 & 5)
 
 These two components push *upstream* telemetry to V-CORE over the same `/ws/runtime`
-socket. Add both to the **VCoreManager** GameObject (the one with `VCoreConnection`):
-
-1. Select **VCoreManager** → **Add Component** → `VrContextReporter`.
-2. **Add Component** → `BehaviourReporter`.
+socket. They're already on the **VCoreManager** (and in the `VCore` prefab), gated by the
+`VCoreLauncher`'s `Behaviour Metrics` / `Vr Context` toggles — untick a toggle to drop that
+reporter. (To add them to a bare GameObject yourself: **Add Component** → `VrContextReporter`
+/ `BehaviourReporter`, or just let the launcher add them.)
 
 Out of the box they behave exactly like `tools/mock_unity.py` — no extra wiring needed:
 
