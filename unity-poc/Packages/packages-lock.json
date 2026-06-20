@@ -53,6 +53,14 @@
       },
       "url": "https://packages.unity.com"
     },
+    "com.vcore.client": {
+      "version": "file:com.vcore.client",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.unity.nuget.newtonsoft-json": "3.2.1"
+      }
+    },
     "io.livekit.livekit-sdk": {
       "version": "https://github.com/livekit/client-sdk-unity.git",
       "depth": 0,
