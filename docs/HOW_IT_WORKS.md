@@ -741,8 +741,12 @@ nobody is misled. None of them stop the system from running end-to-end.
    custom path was deleted entirely: the Unity `WebRtcSender` + `VideoRecorder`, the backend
    `SignalingBroker` / `/ws/signaling`, and the browser `MediaRecorder` upload endpoints. The
    one knob you must set per machine is LiveKit's `node_ip` (your LAN IP) — see
-   [`LIVEKIT_SETUP.md`](LIVEKIT_SETUP.md). LSL sync is **start-point** alignment
-   (`video_lsl_ts` captured at egress start); frame-accurate sync remains future work.
+   [`LIVEKIT_SETUP.md`](LIVEKIT_SETUP.md). LSL↔video sync uses **two-point** alignment — the
+   LSL clock is captured at egress **start** (`video_lsl_ts`) and **stop** (`video_lsl_ts_end`),
+   and the frontend linearly maps the video timeline to the LSL timeline (drift-corrected).
+   It is **not** frame-accurate: a fixed egress-start offset (up to ~1 s) plus residual jitter
+   remain, so it's good for review (≈±tenths of a second), not sub-frame analysis. True
+   per-frame sync (timestamps embedded per frame) remains future work.
 
 4. **"Three contracts" vs five message types.** The docs emphasize three contracts, but the
    running system also uses `vr_context` (④) and `unity_behaviour` (⑤), each with its own
