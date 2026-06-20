@@ -79,8 +79,32 @@ namespace VCore
                 Scene = sceneName,
                 Runtime = runtimeId,
                 Objects = objects,
-                AbstractActions = new List<object>(),
+                AbstractActions = CollectActions(),
             };
+        }
+
+        private static List<AbstractActionDecl> CollectActions()
+        {
+            var actions = new List<AbstractActionDecl>();
+            foreach (var a in FindObjectsByType<VCoreAction>(FindObjectsSortMode.None))
+            {
+                if (string.IsNullOrEmpty(a.actionName)) continue;
+                if (a.scope == VCoreAction.ActionScope.Scene)
+                {
+                    actions.Add(new AbstractActionDecl { Name = a.actionName, Scope = "scene" });
+                }
+                else
+                {
+                    actions.Add(new AbstractActionDecl
+                    {
+                        Name = a.actionName,
+                        Scope = "object",
+                        Id = a.EffectiveId,
+                        Tags = a.tags ?? Array.Empty<string>(),
+                    });
+                }
+            }
+            return actions;
         }
 
         private static StatusDeclaration ToStatusDecl(ObjectStatus s)
@@ -113,7 +137,17 @@ namespace VCore
             public string Scene { get; set; }
             public string Runtime { get; set; }
             public List<ObjectDeclaration> Objects { get; set; }
-            public List<object> AbstractActions { get; set; }
+            public List<AbstractActionDecl> AbstractActions { get; set; }
+        }
+
+        internal class AbstractActionDecl
+        {
+            public string Name { get; set; }
+            public string Scope { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string Id { get; set; }
+            [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+            public string[] Tags { get; set; }
         }
 
         internal class ObjectDeclaration

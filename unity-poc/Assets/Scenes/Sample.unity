@@ -137,6 +137,7 @@ GameObject:
   - component: {fileID: 104}
   - component: {fileID: 106}
   - component: {fileID: 105}
+  - component: {fileID: 108}
   m_Layer: 0
   m_Name: VCoreManager
   m_TagString: Untagged
@@ -179,6 +180,25 @@ MonoBehaviour:
   vrContext: 1
   videoPublishing: 1
   publisher: {fileID: 304}
+--- !u!114 &108
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 100}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ac0deac0deac0deac0deac0deac0de01, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  actionName: advance_scene
+  scope: 1
+  objectId:
+  tags: []
+  OnInvoke:
+    m_PersistentCalls:
+      m_Calls: []
 --- !u!114 &102
 MonoBehaviour:
   m_ObjectHideFlags: 0

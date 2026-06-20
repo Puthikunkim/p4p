@@ -19,6 +19,7 @@ in that package:
 | Script | Role |
 |---|---|
 | `ObjectStatus.cs` | Component that declares one settable status (discrete or continuous) on a GameObject |
+| `VCoreAction.cs` | Component that declares a parameterless **action** (command). Backend invokes it (scene- or object-scoped); wire `OnInvoke` to anything — the free-form counterpart to `ObjectStatus` |
 | `StatusCollector.cs` | Scans the scene for all `ObjectStatus` components → builds the manifest JSON |
 | `VCoreConnection.cs` | WebSocket client (`/ws/runtime`): sends manifest on connect, routes incoming requests, exposes `Send()` for reporters |
 | `RequestDispatcher.cs` | Resolves incoming `{target, status, value}` requests to the matching `ObjectStatus` and invokes it |
