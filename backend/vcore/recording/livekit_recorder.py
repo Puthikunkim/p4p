@@ -13,6 +13,7 @@ import logging
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import Any
 
 from vcore.core.config import LiveKitConfig
 from vcore.recording.sqlite_store import SqliteStore
@@ -79,7 +80,9 @@ class LiveKitRecorder:
         egress_path = f"{self._cfg.egress_out_dir.rstrip('/')}/{session_id}.webm"
         backend_path = str(self._video_dir / f"{session_id}.webm")
 
-        lk = api.LiveKitAPI(self._cfg.api_url, self._cfg.api_key, self._cfg.api_secret)
+        # livekit ships no type stubs, so its API is effectively untyped; mark it Any so the
+        # whole call chain (egress.*, aclose) doesn't trip mypy's no-untyped-call.
+        lk: Any = api.LiveKitAPI(self._cfg.api_url, self._cfg.api_key, self._cfg.api_secret)
         try:
             track_id = await self._find_video_track(lk)
             if track_id is None:
@@ -146,7 +149,7 @@ class LiveKitRecorder:
         from livekit import api
 
         lsl_end = _lsl_now()  # ≈ recording end; the file's last frame maps to ~here
-        lk = api.LiveKitAPI(self._cfg.api_url, self._cfg.api_key, self._cfg.api_secret)
+        lk: Any = api.LiveKitAPI(self._cfg.api_url, self._cfg.api_key, self._cfg.api_secret)
         try:
             await lk.egress.stop_egress(api.StopEgressRequest(egress_id=self._egress_id))
         except Exception as exc:  # stopping is best-effort; the file is already on disk
