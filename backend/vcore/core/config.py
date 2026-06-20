@@ -25,13 +25,9 @@ class IngestionConfig(BaseModel):
     manifest_path: str = "../tools/fixtures/full_session.manifest.json"
     # Seconds without a sample before the signal is marked stale. (wired)
     stale_timeout_s: float = 5.0
-    # Offline replay fixture — ReplaySource is test-only, not wired into app.py. (reference only)
-    replay_fixture: str | None = None
 
 
 class OutboundConfig(BaseModel):
-    # Control transport. Only 'ws' is implemented; 'zmq' is a documented stub. (reference only)
-    transport: str = "ws"
     # Standalone WsSink server bind, used by mock_unity / direct websockets clients. (wired)
     ws_host: str = "localhost"
     ws_port: int = 9001

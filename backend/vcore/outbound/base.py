@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 class ActionSink(ABC):
     """Outbound adapter that delivers StatusRequests to the VR runtime.
 
-    Implement this to add a new transport (WebSocket, ZMQ, LSL, …).
+    Implement this to add a new transport (WebSocket, LSL, …).
     The composition root wires one concrete sink to the event bus and
     the ActiveManifests store.
 

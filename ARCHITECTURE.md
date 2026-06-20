@@ -5,17 +5,35 @@
 | | |
 |---|---|
 | **Status** | Design approved · implementation gated on per-phase `APPROVE` (see [`TODO.md`](./TODO.md)) |
-| **Doc version** | 1.2.0 (A1: rule authoring + object-status context · A2: participant video mirror + recording + manual rule trigger) |
-| **Date** | 2026-06-01 |
-| **Contracts version** | 1.0.0 (Signal Schema · Rule Grammar · Object-Status / Status-Request) |
+| **Doc version** | 1.3.0 (A1: rule authoring + object-status context · A2: LiveKit video mirror + recording + manual trigger · A3: abstract actions · behaviour/VR-context contracts · project catalog) |
+| **Date** | 2026-06-21 |
+| **Contracts version** | 1.0.0 — Signal Schema (1) · Rule Grammar (2) · Object-Status Manifest / Status-Request / Action-Request (3a/3b/3c) · VR Context (4) · Unity Behaviour (5) |
 
-> **⚠ As-built note:** the **participant-video plane was reimplemented on a LiveKit SFU**
-> (Unity publishes → browser subscribes → server-side **Track Egress** recording, LSL-anchored).
-> The WebRTC-signaling-broker design described below (`bridge/signaling.py`, `WebRtcSender.cs`,
-> `VideoRecorder.cs`, browser `MediaRecorder`) is **superseded and removed from the code.**
-> For the current video architecture and setup, see
-> [`docs/HOW_IT_WORKS.md` §9](./docs/HOW_IT_WORKS.md) and [`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
-> The rest of this document (signals, rules, contracts, recording) remains the design reference.
+> **⚠ As-built deltas (read first).** This document is the original design reference; the
+> implementation has since moved on in the ways below. Where they conflict, the code +
+> [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) are authoritative.
+>
+> 1. **Video plane → LiveKit.** The participant-video plane was reimplemented on a **LiveKit SFU**
+>    (Unity publishes → browser subscribes → server-side **Track Egress** recording, LSL-anchored).
+>    The WebRTC-signaling-broker design below (`bridge/signaling.py`, `WebRtcSender.cs`,
+>    `VideoRecorder.cs`, browser `MediaRecorder`, MJPEG fallback) is **superseded and removed** —
+>    treat §2's `SIG`/SDP-ICE arrows, §3's WebRTC rows, and §11 as historical. Current video:
+>    [`docs/HOW_IT_WORKS.md` §9](./docs/HOW_IT_WORKS.md) + [`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
+> 2. **Abstract actions are implemented** (no longer a skeleton). A rule's `THEN` is now `set`
+>    (object status) **or** `action` (a parameterless command) — Contract **3c** (`action_request`),
+>    with a `VCoreAction` component on the Unity side. See [§5](#5-the-three-contracts-formal-specifications).
+> 3. **Two more contracts shipped:** **Contract 4 — VR Context** (`vr_context`) and **Contract 5 —
+>    Unity Behaviour** (`unity_behaviour`: a behaviour manifest + samples that flow through the same
+>    pipeline as sensor signals, feeding the dashboard, rule engine, and recorder).
+> 4. **Project-wide catalog.** Beyond the per-scene live manifest, the Unity client can bake and send
+>    an `object_status_catalog` of every object/action across all scenes + prefabs, so rules can be
+>    authored against not-yet-loaded scenes (the live manifest still drives dispatch + degradation).
+> 5. **ZMQ transport removed.** Only the WebSocket runtime transport exists; the `ActionSink`
+>    adapter seam remains for adding future transports.
+> 6. **Reusable Unity client** now ships as an embedded UPM package
+>    (`unity-poc/Packages/com.vcore.client`) with a one-component `VCoreLauncher` + `VCore` prefab.
+>
+> The rest (signals, rules, contracts, recording, degradation) remains accurate.
 
 > This document is the **single source of truth** for the V-CORE architecture. If the plan
 > changes, change this file and [`TODO.md`](./TODO.md) first.
@@ -78,8 +96,9 @@ contracts** that keep the core fixed:
 > **Amendment 1.** Contract 3 is **object-addressable**: each controllable Unity object
 > declares an `ObjectStatus` (discrete or continuous), V-CORE **auto-collects** these, uses
 > them — with the sensor pipeline's signals — to **auto-populate the rule builder**, and streams status-change
-> requests back. *Scene-level **abstract actions** are retained as a commented **skeleton**
-> for a future extension — see [§5](#contract-2--rule-grammar-rule-files--engineui).*
+> requests back. *Scene-level and object-level **abstract actions** are now **implemented** —
+> a rule's `THEN` may `set` a status **or** `action` a parameterless command (Contract 3c);
+> see [§5](#5-the-three-contracts-formal-specifications).*
 >
 > **Amendment 2.** The dashboard adds a **live video mirror of the participant's VR view**
 > during a session (WebRTC), the option to **record it synced to the signal data**, and a
@@ -181,7 +200,7 @@ flowchart LR
 | **LSL ingestion** | `pylsl` — mature BCI/physio standard; aligns with the Python pipeline | `node-lsl` — thin, under-maintained ⚠️ | `pylsl` — mature |
 | **Schema-driven UI + video** | React renderer registry + `<video>`/WebRTC are first-class in the browser | Same (React) | Hard / un-idiomatic; embedding live WebRTC video is painful |
 | **Rule engine + authoring** | Python; hot-reload files + a write-API; React form-builder | TypeScript | Python; native-GUI form-building is clumsy |
-| **Unity messaging** | **WebSocket** (control) + **WebRTC** (video) — both browser-native, no native deps | `zeromq.js` / WS | `pyzmq` / WS |
+| **Unity messaging** | **WebSocket** (control) + **LiveKit** (video) — browser-native, no native deps | WS lib | WS |
 | **Contract sharing** | JSON Schema is language-neutral → validated by **both** Python and TS | Single TS type source, but couples the contract to TS | Single Python source, no web type-gen |
 | **Testability / repro** | pytest + vitest/RTL + golden-payload contract tests | Good DX, one language | Native-GUI testing is harder |
 | **Primary risk** | Two runtimes + WS/WebRTC (well-trodden) | **LSL on Node is the weak link** | **Dynamic schema-driven UI + browser video is the weak link** |
@@ -199,11 +218,11 @@ flowchart LR
    [`contracts/`](./contracts) and validated on **both** sides (`jsonschema` / `pydantic`;
    `ajv` + `json-schema-to-typescript`). The contract — not either codebase — is the single
    source of truth.
-4. **WebSocket for control, WebRTC for video.** The Unity *control* link is bidirectional,
-   low-rate commands + a manifest handshake — a WebSocket's sweet spot, no NetMQ dependency,
-   ZMQ swappable behind the adapter. The participant *video* is real-time media → **WebRTC**
-   (UDP, encrypted, peer-to-peer), with V-CORE only as the signaling broker so video
-   bandwidth never touches the control/data plane.
+4. **WebSocket for control, LiveKit for video.** The Unity *control* link is bidirectional,
+   low-rate commands + a manifest handshake — a WebSocket's sweet spot, no native deps; the
+   transport stays isolated behind the `ActionSink` adapter for future swaps. The participant
+   *video* is real-time media carried on a **LiveKit SFU** (Unity publishes → browser subscribes →
+   server-side Track Egress recording), so video bandwidth never touches the control/data plane.
 
 ### Final stack
 
@@ -211,7 +230,7 @@ flowchart LR
 |---|---|
 | Backend runtime | **Python 3.11**, **FastAPI** + **uvicorn** |
 | LSL ingestion | **pylsl** |
-| Unity control messaging | **WebSocket** (FastAPI server ↔ Unity WS client); ZMQ swappable behind the adapter |
+| Unity control messaging | **WebSocket** (FastAPI server ↔ Unity WS client); transport isolated behind the `ActionSink` adapter |
 | Participant video | **WebRTC** (Unity `com.unity.webrtc` → browser); V-CORE = signaling broker; MJPEG-over-WS POC fallback |
 | Models / validation | **pydantic** + **jsonschema** |
 | Rule hot-reload / authoring | **watchdog** + FastAPI **Rules API** (`/api/rules`) → YAML/JSON files |
@@ -229,8 +248,8 @@ flowchart LR
   **participant video → a session video file**, all timestamp-synced via the LSL clock.
 - **Topology:** **three machines** — V-CORE/A, Unity/B, Pipeline/C — on a lab LAN; endpoints are
   configuration ([§10](#10-deployment--configuration)).
-- **Unity context model:** **per-object statuses** (primary) + an **abstract-action
-  skeleton**. **WebSocket** control transport. **Thin, package-ready Unity POC.** Rules
+- **Unity context model:** **per-object statuses** + **abstract actions** (both implemented).
+  **WebSocket** control transport. **Package-ready Unity POC** (embedded UPM package). Rules
   authored in the UI are **saved as files** via the Rules API.
 - **Participant video (Amendment 2):** **live mirror + recording synced to signals**, mono
   spectator camera, **WebRTC** transport with V-CORE as signaling broker.
@@ -245,7 +264,7 @@ Each pattern satisfies a specific requirement — not chosen for its own sake.
 |---|---|---|
 | **Registry** | `engine/registry.py` (rules); `frontend/renderers/registry.ts` (renderers) | Rules in hot-loaded files; indicators re-render purely from the manifest |
 | **Strategy / renderer-by-type** | dashboard component selection by `type`/`display.hint` | Schema-driven UI **and** a **fallback renderer** for unknown types |
-| **Adapter** | `ingestion/*` (sensors in), `outbound/*` (runtime out) | Swappable sensors & VR runtimes; transport (WS/ZMQ/LSL) isolated behind a stable interface |
+| **Adapter** | `ingestion/*` (sensors in), `outbound/*` (runtime out) | Swappable sensors & VR runtimes; transport (WS/LSL) isolated behind a stable interface |
 | **Publish/Subscribe (event bus)** | `core/eventbus.py` | Decoupled real-time flow: ingestion → engine → outbound, bus → WS → UI |
 | **Schema validation + semver** | `core/schema.py` + `contracts/` | Versioned contracts validated on both sides; basis for **graceful degradation** |
 | **Capability negotiation (handshake)** | `outbound/base.py` ↔ object-status manifest | Rule targets matched to a scene's real objects; disable-and-warn on mismatch |
@@ -263,7 +282,7 @@ Schema (draft 2020-12)**, the **single source of truth**, validated on both side
 examples (valid + deliberately-invalid) in `contracts/examples/` drive cross-language tests.
 
 > **Design note — open at the edges, strict at the core.** `display.hint`, status `name`s,
-> object `tags`, and the (skeleton) `action` are free **strings** on purpose: an unknown one
+> object `tags`, and `action` names are free **strings** on purpose: an unknown one
 > must **validate** so the system degrades gracefully (fallback renderer / disable-and-warn)
 > rather than rejecting the payload. Structural fields (`type`, `op`, `schema_version`) stay
 > strict.
@@ -330,8 +349,8 @@ This auto-populates the **IF** side of the Rule Builder.
 ### Contract 2 — Rule Grammar  *(Rule files ↔ Engine/UI)*
 
 One rule per file (YAML or JSON), hot-loaded by the registry **and** authored by the UI via
-the Rules API. The `THEN` clause sets an **object status**; scene-level **abstract actions**
-are present only as a documented `$comment` **skeleton**.
+the Rules API. The `THEN` clause fires exactly one output: **`set`** (an object status) or
+**`action`** (a parameterless abstract action, Contract 3c).
 
 ```jsonc
 // contracts/rule_grammar.schema.json
@@ -342,7 +361,7 @@ are present only as a documented `$comment` **skeleton**.
   "type": "object",
   "required": ["id", "schema_version", "when", "then"],
   "properties": {
-    "id":             { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "id":             { "type": "string", "minLength": 1 },
     "schema_version": { "type": "string", "pattern": "^\\d+\\.\\d+\\.\\d+$" },
     "description":    { "type": "string" },
     "enabled":        { "type": "boolean", "default": true },
@@ -352,12 +371,15 @@ are present only as a documented `$comment` **skeleton**.
   "$defs": {
     "condition": {
       "type": "object",
-      "required": ["signal", "op", "threshold"],
+      "required": ["signal", "op"],
       "properties": {
         "signal":    { "type": "string" },
         "op":        { "enum": [">", ">=", "<", "<=", "==", "!=", "between"] },
-        "threshold": { "type": ["number", "string", "array"] },  // number | category | [lo,hi] for "between"
-        "sustain_s": { "type": "number", "minimum": 0, "default": 0 }
+        "threshold": { "type": "number" },               // for >, >=, <, <=
+        "low":       { "type": "number" },               // for "between"
+        "high":      { "type": "number" },               // for "between"
+        "value":     { "type": "string" },               // for ==, != (category)
+        "sustain_s": { "type": "number", "minimum": 0 }
       }
     },
     "condition_group": {
@@ -371,12 +393,13 @@ are present only as a documented `$comment` **skeleton**.
     },
 
     "then": {
-      "$comment": "Amendment 1: THEN sets an object status. FUTURE (abstract actions): make `then` a oneOf [ {set,...}, {action,params,...} ] using $defs/abstract_action. Not wired in yet.",
+      "$comment": "THEN fires exactly one output: `set` (object status) or `action` (parameterless command).",
       "type": "object",
-      "required": ["set"],
+      "oneOf": [ { "required": ["set"] }, { "required": ["action"] } ],
       "properties": {
         "set":        { "$ref": "#/$defs/status_set" },
-        "cooldown_s": { "type": "number", "minimum": 0, "default": 0 }
+        "action":     { "$ref": "#/$defs/invoke_action" },
+        "cooldown_s": { "type": "number", "minimum": 0 }
       }
     },
     "status_set": {
@@ -396,11 +419,11 @@ are present only as a documented `$comment` **skeleton**.
       ]
     },
 
-    "abstract_action": {
-      "$comment": "SKELETON — future extension, NOT referenced by `then` yet. A scene-level semantic command (e.g. reduce_visual_load) interpreted by a scene manager.",
+    "invoke_action": {
+      "$comment": "Parameterless command. Omit `target` for a scene-level action; include a tag/id target for an object-level one.",
       "type": "object",
       "required": ["action"],
-      "properties": { "action": { "type": "string" }, "params": { "type": "object" } }
+      "properties": { "action": { "type": "string" }, "target": { "$ref": "#/$defs/target" } }
     }
   }
 }
@@ -423,10 +446,10 @@ then:
     value: 20                         # continuous 0–100  (a discrete status would use a string, e.g. "low")
   cooldown_s: 30
 
-# --- FUTURE (skeleton, not yet supported) — scene-level abstract action ---
+# --- Alternative THEN — invoke a parameterless action instead of setting a status ---
 # then:
-#   action: reduce_visual_load
-#   params: { intensity: 0.5 }
+#   action: { action: advance_scene }   # scene-level (omit target); or { action: open, target: { id: door_01 } }
+#   cooldown_s: 30
 ```
 
 **Semantics:** `between` expects `threshold:[lo,hi]`; `==`/`!=` may compare a category
@@ -494,7 +517,7 @@ Object-Status Manifest, is **disabled + warned** — never a crash.
       }
     },
     "abstract_actions": {
-      "$comment": "SKELETON — future extension. Scene-level semantic actions. Empty for now.",
+      "$comment": "Parameterless commands the scene exposes (VCoreAction). Each: { name, scope: object|scene, id?, tags? }. Rules target these via THEN action (Contract 3c).",
       "type": "array", "items": { "type": "object" }, "default": []
     }
   },
@@ -537,6 +560,31 @@ valid value, else it is **disabled + warned**. On fire (or manual trigger), the 
 a **Status-Change Request** down the same WebSocket; Unity's `OnRequest()` dispatches it.
 Unresolved targets are **dropped + warned**.
 
+**3c — Action Request** *(Engine → Unity, since A3)*: like 3a but invokes a parameterless
+**action** instead of setting a status — `{ schema_version, intent_id, timestamp, action, target?,
+source_rule, source }`. An omitted `target` = a scene-level action; a tag/id target fans out like a
+status. The runtime declares its actions in the manifest's `abstract_actions`; rules author them via
+`THEN action`. Validated + degraded the same way as `set`. See `contracts/action_request.schema.json`.
+
+### Contracts 4 & 5 — Unity → backend telemetry  *(since A2/A3)*
+
+Two Unity→backend contracts feed the dashboard and rule engine without changing the core loop:
+
+- **Contract 4 — VR Context** (`vr_context.schema.json`): a free-form `{ fields }` map of the
+  participant's current study step / scene context, rendered in the dashboard's VR Context panel.
+- **Contract 5 — Unity Behaviour** (`unity_behaviour.schema.json`): a `behaviour_manifest` (channel
+  declarations) + `behaviour_sample` frames. The backend merges these channels into the active
+  Signal Schema, so **Unity-sourced behavioural metrics flow through the same pipeline as sensor
+  signals** — charted, rule-evaluable, and recorded.
+
+### Project-wide catalog  *(since A3)*
+
+The per-scene Object-Status Manifest describes only what is **loaded now** (it drives dispatch +
+degradation). The Unity client can additionally bake an **`object_status_catalog`** (same shape) of
+every object/action across all build scenes + prefabs and send it on connect, so the rule builder
+can author against objects/actions in scenes that aren't loaded yet. A rule targeting an unloaded
+object is **disabled-and-warned** until its scene loads, then activates automatically.
+
 ---
 
 ## 6. Versioning & compatibility policy
@@ -557,7 +605,7 @@ Validators must **ignore unknown additive properties** rather than reject them.
 ## 7. File & folder structure
 
 ⛔ stable core · 🔌 extension point · ⭐ single source of truth · 🌐 network config ·
-1️⃣ Amendment 1 · 2️⃣ Amendment 2.
+1️⃣ Amendment 1 · 2️⃣ Amendment 2 · 3️⃣ A3 (actions · contracts 4/5 · catalog).
 
 ```
 p4p/
@@ -565,9 +613,12 @@ p4p/
 │
 ├── contracts/                          # ⭐ SINGLE SOURCE OF TRUTH — language-neutral JSON Schema
 │   ├── signal_schema.schema.json          #   Contract 1
-│   ├── rule_grammar.schema.json           #   Contract 2 (then.set + abstract-action skeleton)
+│   ├── rule_grammar.schema.json           #   Contract 2 (then.set | then.action)
 │   ├── status_request.schema.json      # 1️⃣ Contract 3a (engine → runtime)
-│   ├── object_status_manifest.schema.json # 1️⃣ Contract 3b (runtime → engine)
+│   ├── object_status_manifest.schema.json # 1️⃣ Contract 3b (runtime → engine; also the catalog)
+│   ├── action_request.schema.json      # 3️⃣ Contract 3c (engine → runtime: invoke action)
+│   ├── vr_context.schema.json          # 2️⃣ Contract 4 (Unity → backend: study/scene context)
+│   ├── unity_behaviour.schema.json     # 3️⃣ Contract 5 (Unity → backend: behaviour manifest+samples)
 │   ├── examples/                          #   golden payloads (valid + invalid) → contract tests
 │   └── VERSIONING.md
 │
@@ -580,12 +631,11 @@ p4p/
 │   │   ├── core/                       # ⛔ eventbus.py · schema.py · models.py
 │   │   ├── ingestion/                  # 🔌 base.py · lsl_source.py · replay_source.py
 │   │   ├── engine/                     #   registry.py · evaluator.py · degradation.py
-│   │   ├── outbound/                   # 🔌 base.py · ws_sink.py (1️⃣ primary) · zmq_sink.py (stub)
-│   │   ├── api/                        # 1️⃣ rules.py — POST/PUT/DELETE /api/rules + manual-trigger (2️⃣)
-│   │   ├── recording/                  #   xdf_writer.py · sqlite_store.py · video_store.py (2️⃣)
+│   │   ├── outbound/                   # 🔌 base.py (ActionSink) · ws_sink.py
+│   │   ├── api/                        # 1️⃣ rules.py (+ manual-trigger 2️⃣) · sessions.py · livekit.py (token mint, 2️⃣)
+│   │   ├── recording/                  #   xdf_writer.py · xdf_reader.py · sqlite_store.py · livekit_recorder.py (2️⃣)
 │   │   ├── bridge/
-│   │   │   ├── ws.py                   # 1️⃣ /ws/dashboard · /ws/runtime
-│   │   │   └── signaling.py            # 2️⃣ WebRTC SDP/ICE broker (no media relay)
+│   │   │   └── ws.py                   # 1️⃣ /ws/dashboard · /ws/runtime (manifest · catalog · telemetry)
 │   │   └── app.py                      #   composition root: loads config.yaml, wires adapters
 │   └── tests/
 │
@@ -599,21 +649,19 @@ p4p/
 │   │   │   ├── SessionMonitor/         # 2️⃣ charts + VideoFeed (participant view) + rule activity + manual trigger
 │   │   │   ├── RuleManager/            # 1️⃣ rule list + RuleBuilder
 │   │   │   └── DataHistory/ · SystemConfig/
-│   │   ├── video/                      # 2️⃣ WebRTC client (RTCPeerConnection) + VideoFeed component
+│   │   ├── video/                      # 2️⃣ LiveKit subscriber (VideoFeed + session provider)
 │   │   ├── ws/                         #   websocket client + reconnect
 │   │   └── store/
 │   └── tests/
 │
-├── unity-poc/                          # 1️⃣/2️⃣ thin Unity reference (package-ready)
-│   ├── Assets/Scripts/
-│   │   ├── ObjectStatus.cs             #   declare discrete/continuous statuses on a GameObject
-│   │   ├── VCoreConnection.cs          #   WS client (manifest up, requests down)
-│   │   ├── StatusCollector.cs          #   auto-collect ObjectStatus → manifest
-│   │   ├── RequestDispatcher.cs        #   OnRequest() → apply value to matching objects
-│   │   ├── SpectatorCamera.cs          # 2️⃣ mono camera mirroring the participant view
-│   │   ├── WebRtcSender.cs             # 2️⃣ encode + send the spectator cam (com.unity.webrtc)
-│   │   └── VideoRecorder.cs            # 2️⃣ record the spectator cam, LSL-stamped (optional)
-│   └── Assets/Scenes/Sample.unity
+├── unity-poc/                          # 1️⃣/2️⃣/3️⃣ thin Unity reference (consumes the package below)
+│   ├── Packages/com.vcore.client/      #   embedded UPM package — the reusable client
+│   │   ├── Runtime/                     #     ObjectStatus · VCoreAction (3️⃣) · VCoreConnection ·
+│   │   │                                #     StatusCollector · RequestDispatcher · BackendConfig ·
+│   │   │                                #     Behaviour/VrContext reporters (5️⃣/4️⃣) · SpectatorCamera ·
+│   │   │                                #     VCoreLauncher · LiveKit/LiveKitPublisher (2️⃣)
+│   │   └── Editor/                      #     VCoreCatalogBaker (3️⃣ project catalog) + build hook
+│   └── Assets/Scenes/Sample.unity       #   demo scene + StatusVisualizer
 │
 ├── tools/                              # schema→TS codegen · schema lint · mock_pipeline.py · mock_unity.py (WS)
 └── docs/
@@ -721,9 +769,7 @@ ingestion:
   # known_peers: ["192.168.1.42"]   # only if LSL multicast discovery is blocked across subnets
 
 outbound:
-  transport: ws                   # ws (default) | zmq
-  runtime_ws_path: /ws/runtime
-  # zmq_endpoint: tcp://machine-b.lan:5556
+  runtime_ws_path: /ws/runtime    # WebSocket is the only runtime transport
 
 video:                            # Amendment 2
   enabled: true
@@ -849,9 +895,10 @@ Defaults are chosen so none block progress; flag any to change.
 1. **Topology — 3 machines** (V-CORE/A, Unity/B, Pipeline/C) on an **isolated lab LAN** (flat
    subnet for LSL multicast; `known_peers` covers cross-subnet). Plaintext LSL accepted on an
    isolated network; WebRTC video is encrypted by default.
-2. **Unity control transport — RESOLVED: WebSocket** (Unity as WS client); ZMQ swappable.
-3. **Unity context model — RESOLVED: per-object statuses**; abstract actions are a documented
-   skeleton.
+2. **Unity control transport — RESOLVED: WebSocket** (Unity as WS client); transport isolated
+   behind the `ActionSink` adapter for future swaps.
+3. **Unity context model — RESOLVED: per-object statuses + abstract actions** (both implemented;
+   actions are parameterless, Contract 3c).
 4. **Unity ownership — RESOLVED:** thin, package-ready Unity POC (`unity-poc/`) doubling as
    the integration mock. *Open:* promote to a full UPM package later (stretch goal).
 5. **Rule authoring — RESOLVED:** UI writes rule **files** via `POST /api/rules`; files stay
@@ -876,11 +923,12 @@ Defaults are chosen so none block progress; flag any to change.
 | **WebRTC** | Real-time media transport (UDP, encrypted via **DTLS-SRTP**); carries the **participant video** peer-to-peer Unity → browser. V-CORE only brokers signaling. |
 | **Signaling** | The small SDP/ICE handshake that lets two WebRTC peers find each other; brokered by `bridge/signaling.py`. |
 | **Spectator camera** | A mono Unity camera mirroring the participant's headset view for the researcher. |
-| **ZMQ / NetMQ** | *ZeroMQ* + its C# port — the swappable alternative control transport behind the `ActionSink` adapter; not used by default. |
 | **ObjectStatus** | A Unity component declaring an object's settable statuses (discrete / continuous), addressed by tag/id. |
+| **VCoreAction** | A Unity component declaring a parameterless **action** (command), addressed by scene / tag / id; the free-form counterpart to ObjectStatus. |
+| **Object-status catalog** | A project-wide bake of every ObjectStatus/VCoreAction across all scenes + prefabs, sent to V-CORE for authoring rules against not-yet-loaded scenes. |
 | **Object-Status Manifest** | The runtime's self-description of controllable objects + statuses (Contract 3b). |
 | **Status-change request** | An `{target, status, value}` message sent when a rule fires or is manually triggered (Contract 3a). |
-| **Abstract action** | A scene-level semantic command — a *skeleton* for a future extension, not implemented. |
+| **Abstract action** | A parameterless command a scene exposes (`VCoreAction`), invoked by a rule's `THEN action` (Contract 3c). Scene- or object-scoped. |
 | **Renderer-by-type** | UI pattern: pick a component from a registry keyed on a channel's `type`/`display.hint`. |
 | **Graceful degradation** | On any mismatch, disable the affected element and surface a warning — never crash. |
 | **Sensor pipeline / Jerry** | The external Python signal pipeline, and the codename for the Unity runtime. |

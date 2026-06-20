@@ -45,7 +45,7 @@ export function SystemConfig() {
         </div>
         <p className="empty-state">
           Edit <code>backend/config.yaml</code> to configure LSL stream names,
-          WS bind address, and ZMQ endpoints.
+          the WS bind address, recording paths, and LiveKit settings.
         </p>
       </section>
     </div>

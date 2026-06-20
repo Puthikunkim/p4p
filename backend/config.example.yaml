@@ -18,13 +18,9 @@ ingestion:
   manifest_path: ../tools/fixtures/full_session.manifest.json
   # (wired) Seconds without a sample before the signal is marked stale.
   stale_timeout_s: 5
-  # (reference only) Offline replay fixture — ReplaySource is test-only.
-  # replay_fixture: tools/fixtures/sample_session.csv
 
 # ── Outbound (Unity runtime — Machine B) ─────────────────────────────────────
 outbound:
-  # (reference only) Only 'ws' is implemented; 'zmq' is a documented stub.
-  transport: ws
   # (wired) Standalone WsSink server bind, used by mock_unity / direct clients.
   # The real Unity POC instead connects to /ws/runtime on the main bridge port.
   ws_host: localhost
