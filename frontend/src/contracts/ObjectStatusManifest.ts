@@ -36,7 +36,8 @@ export interface StatusDeclaration {
   };
 }
 export interface AbstractAction {
-  action: string;
-  params_schema?: {};
-  [k: string]: unknown;
+  name: string;
+  scope: "object" | "scene";
+  id?: string;
+  tags?: string[];
 }

@@ -172,6 +172,7 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
 
 const EVENT_STYLES: Record<string, { label: string; color: string; bg: string }> = {
   rule_fired:         { label: 'Adaptation Trigger', color: '#7c3aed', bg: 'rgba(124,58,237,0.12)' },
+  action_fired:       { label: 'Action Invoked',     color: '#9333ea', bg: 'rgba(147,51,234,0.12)' },
   vr_context:         { label: 'Step Change',        color: '#0e7490', bg: 'rgba(14,116,144,0.12)' },
   link_status:        { label: 'Connectivity',       color: '#0369a1', bg: 'rgba(3,105,161,0.12)' },
   warning:            { label: 'Warning',            color: '#b45309', bg: 'rgba(180,83,9,0.12)' },

@@ -13,6 +13,11 @@ export type ConditionGroup =
        */
       any: [ConditionItem, ...ConditionItem[]];
     };
+export type ThenClause = {
+  set?: SetAction;
+  action?: InvokeAction;
+  cooldown_s?: number;
+} & ThenClause1;
 export type Target =
   | {
       tag: string;
@@ -20,6 +25,9 @@ export type Target =
   | {
       id: string;
     };
+export type ThenClause1 = {
+  [k: string]: unknown;
+};
 
 /**
  * Declarative IF→THEN rule files authored in the UI or dropped into backend/rules/. The engine hot-reloads these files via watchdog.
@@ -41,12 +49,12 @@ export interface ConditionItem {
   value?: string;
   sustain_s?: number;
 }
-export interface ThenClause {
-  set: SetAction;
-  cooldown_s?: number;
-}
 export interface SetAction {
   target: Target;
   status: string;
   value: number | string;
+}
+export interface InvokeAction {
+  action: string;
+  target?: Target;
 }

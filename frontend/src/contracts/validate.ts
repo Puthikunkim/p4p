@@ -5,6 +5,7 @@ import addFormats from 'ajv-formats'
 import signalSchema from '../../../contracts/signal_schema.schema.json'
 import ruleGrammar from '../../../contracts/rule_grammar.schema.json'
 import statusRequest from '../../../contracts/status_request.schema.json'
+import actionRequest from '../../../contracts/action_request.schema.json'
 import objectStatusManifest from '../../../contracts/object_status_manifest.schema.json'
 
 const ajv = new Ajv({ strict: false, allErrors: true })
@@ -14,6 +15,7 @@ const validators: Record<string, ValidateFunction> = {
   signal_schema: ajv.compile(signalSchema),
   rule_grammar: ajv.compile(ruleGrammar),
   status_request: ajv.compile(statusRequest),
+  action_request: ajv.compile(actionRequest),
   object_status_manifest: ajv.compile(objectStatusManifest),
 }
 

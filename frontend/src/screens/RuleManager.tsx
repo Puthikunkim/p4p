@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useVCoreStore } from '../ws/store'
 import { IconWarn } from '../components/icons'
-import type { ConditionItem, RuleGrammarContract2 } from '../contracts/RuleGrammar'
-import type { ObjectDeclaration } from '../contracts/ObjectStatusManifest'
+import type { ConditionItem, InvokeAction, RuleGrammarContract2 } from '../contracts/RuleGrammar'
+import type { AbstractAction, ObjectDeclaration } from '../contracts/ObjectStatusManifest'
 
 const TYPE_COLORS = 5  // cycles through .rule-card__type--0..4
 
@@ -29,6 +29,7 @@ export function RuleManager() {
 
   const channels = signalManifest?.channels ?? []
   const objects: ObjectDeclaration[] = objectStatusManifest?.objects ?? []
+  const abstractActions: AbstractAction[] = objectStatusManifest?.abstract_actions ?? []
 
   const [ruleId, setRuleId] = useState('')
   const [description, setDescription] = useState('')
@@ -41,6 +42,10 @@ export function RuleManager() {
   const [targetValue, setTargetValue] = useState('')
   const [statusName, setStatusName] = useState('')
   const [statusValue, setStatusValue] = useState('')
+  // THEN output: 'set' a status, or 'action' (invoke an abstract action)
+  const [thenMode, setThenMode] = useState<'set' | 'action'>('set')
+  const [actionKey, setActionKey] = useState('')  // index into abstractActions, or ''
+  const [actionName, setActionName] = useState('')  // free-text fallback (scene-level)
 
   function openNew() {
     setEditingRule(null)
@@ -55,13 +60,15 @@ export function RuleManager() {
     setTargetValue('')
     setStatusName('')
     setStatusValue('')
+    setThenMode('set')
+    setActionKey('')
+    setActionName('')
     setError(null)
     setShowBuilder(true)
   }
 
   function openEdit(rule: RuleGrammarContract2) {
     const cond = 'all' in rule.when ? rule.when.all[0] : rule.when.any[0]
-    const target = rule.then.set.target
     setEditingRule(rule)
     setRuleId(rule.id)
     setDescription(rule.description ?? '')
@@ -70,10 +77,27 @@ export function RuleManager() {
     setThreshold(String(cond?.threshold ?? cond?.value ?? ''))
     setSustainS(cond?.sustain_s !== undefined ? String(cond.sustain_s) : '')
     setCooldownS(rule.then.cooldown_s !== undefined ? String(rule.then.cooldown_s) : '')
-    setTargetType('tag' in target ? 'tag' : 'id')
-    setTargetValue('tag' in target ? (target as { tag: string }).tag : (target as { id: string }).id)
-    setStatusName(rule.then.set.status)
-    setStatusValue(String(rule.then.set.value))
+
+    if (rule.then.action) {
+      const a = rule.then.action
+      setThenMode('action')
+      setActionName(a.action)
+      const isScene = a.target == null
+      const idx = abstractActions.findIndex(
+        (d) => d.name === a.action && (d.scope === 'scene') === isScene,
+      )
+      setActionKey(idx >= 0 ? String(idx) : '')
+      // leave status/target fields at defaults
+      setTargetType('tag'); setTargetValue(''); setStatusName(''); setStatusValue('')
+    } else if (rule.then.set) {
+      const target = rule.then.set.target
+      setThenMode('set')
+      setTargetType('tag' in target ? 'tag' : 'id')
+      setTargetValue('tag' in target ? (target as { tag: string }).tag : (target as { id: string }).id)
+      setStatusName(rule.then.set.status)
+      setStatusValue(String(rule.then.set.value))
+      setActionKey(''); setActionName('')
+    }
     setError(null)
     setShowBuilder(true)
   }
@@ -88,9 +112,33 @@ export function RuleManager() {
     setError(null)
     if (!ruleId.trim()) { setError('Rule ID is required'); return }
     if (!signal) { setError('Pick a signal'); return }
-    if (!targetValue.trim()) { setError('Pick a target'); return }
-    if (!statusName.trim()) { setError('Pick a status'); return }
-    if (!statusValue.trim()) { setError('Enter a value'); return }
+
+    const cooldown_s = cooldownS ? parseFloat(cooldownS) : undefined
+    let then: RuleGrammarContract2['then']
+    if (thenMode === 'action') {
+      let action: InvokeAction
+      if (abstractActions.length > 0) {
+        if (!actionKey) { setError('Pick an action'); return }
+        const a = abstractActions[Number(actionKey)]
+        action = { action: a.name, target: a.scope === 'scene' ? undefined : { id: a.id! } }
+      } else {
+        if (!actionName.trim()) { setError('Enter an action name'); return }
+        action = { action: actionName.trim() }  // free-text → scene-level
+      }
+      then = { action, cooldown_s }
+    } else {
+      if (!targetValue.trim()) { setError('Pick a target'); return }
+      if (!statusName.trim()) { setError('Pick a status'); return }
+      if (!statusValue.trim()) { setError('Enter a value'); return }
+      then = {
+        set: {
+          target: targetType === 'tag' ? { tag: targetValue } : { id: targetValue },
+          status: statusName,
+          value: isNaN(Number(statusValue)) ? statusValue : Number(statusValue),
+        },
+        cooldown_s,
+      }
+    }
 
     const cond: ConditionItem = {
       signal,
@@ -106,14 +154,7 @@ export function RuleManager() {
       description: description || undefined,
       enabled: true,
       when: { all: [cond] },
-      then: {
-        set: {
-          target: targetType === 'tag' ? { tag: targetValue } : { id: targetValue },
-          status: statusName,
-          value: isNaN(Number(statusValue)) ? statusValue : Number(statusValue),
-        },
-        cooldown_s: cooldownS ? parseFloat(cooldownS) : undefined,
-      },
+      then,
     }
 
     const isEditing = editingRule !== null
@@ -208,6 +249,14 @@ export function RuleManager() {
           <fieldset className="form-section">
             <legend>THEN [ACTION]</legend>
             <div className="form-row">
+              <label>THEN do</label>
+              <select value={thenMode} onChange={(e) => setThenMode(e.target.value as 'set' | 'action')}>
+                <option value="set">Set status</option>
+                <option value="action">Invoke action</option>
+              </select>
+            </div>
+            {thenMode === 'set' && (<>
+            <div className="form-row">
               <label>Target type</label>
               <select value={targetType} onChange={(e) => setTargetType(e.target.value as 'tag' | 'id')}>
                 <option value="tag">tag</option>
@@ -269,6 +318,23 @@ export function RuleManager() {
                 </>
               )
             })()}
+            </>)}
+            {thenMode === 'action' && (
+              <div className="form-row">
+                <label>Action</label>
+                {abstractActions.length > 0
+                  ? <select value={actionKey} onChange={(e) => setActionKey(e.target.value)}>
+                      <option value="">— pick —</option>
+                      {abstractActions.map((a, i) => (
+                        <option key={i} value={String(i)}>
+                          {a.name} ({a.scope}{a.scope === 'object' && a.id ? `:${a.id}` : ''})
+                        </option>
+                      ))}
+                    </select>
+                  : <input value={actionName} onChange={(e) => setActionName(e.target.value)} placeholder="action name (scene-level)" />
+                }
+              </div>
+            )}
             <div className="form-row">
               <label>Cooldown (s)</label>
               <input type="number" min="0" value={cooldownS} onChange={(e) => setCooldownS(e.target.value)} />
@@ -322,7 +388,8 @@ function RuleCard({
 }) {
   const typeIdx = ruleTypeIndex(r.id)
   const conditions = 'all' in r.when ? [...r.when.all] : [...r.when.any]
-  const action = r.then?.set
+  const setAction = r.then?.set
+  const invokeAction = r.then?.action
   const sustain = conditions[0]?.sustain_s
 
   const typeTag = r.id.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || '???'
@@ -360,14 +427,32 @@ function RuleCard({
           </div>
         )}
 
-        {action && (
+        {setAction && (
           <div>
             <div className="rule-card__section-label">THEN [ACTION]</div>
             <div className="rule-card__action">
               <span>
-                {action.status} = <strong>{String(action.value)}</strong>
+                {setAction.status} = <strong>{String(setAction.value)}</strong>
                 {' '}on{' '}
-                {'tag' in action.target ? `tag:${action.target.tag}` : `id:${action.target.id}`}
+                {'tag' in setAction.target ? `tag:${setAction.target.tag}` : `id:${setAction.target.id}`}
+              </span>
+              {r.then.cooldown_s !== undefined && (
+                <span className="rule-card__action-tag">cooldown {r.then.cooldown_s}s</span>
+              )}
+            </div>
+          </div>
+        )}
+
+        {invokeAction && (
+          <div>
+            <div className="rule-card__section-label">THEN [ACTION]</div>
+            <div className="rule-card__action">
+              <span>
+                invoke <strong>{invokeAction.action}()</strong>
+                {' '}on{' '}
+                {invokeAction.target
+                  ? ('tag' in invokeAction.target ? `tag:${invokeAction.target.tag}` : `id:${invokeAction.target.id}`)
+                  : 'scene'}
               </span>
               {r.then.cooldown_s !== undefined && (
                 <span className="rule-card__action-tag">cooldown {r.then.cooldown_s}s</span>

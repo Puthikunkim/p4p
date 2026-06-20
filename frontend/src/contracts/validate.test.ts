@@ -16,6 +16,7 @@ const contracts = [
   'signal_schema',
   'rule_grammar',
   'status_request',
+  'action_request',
   'object_status_manifest',
 ] as const
 

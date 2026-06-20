@@ -57,6 +57,7 @@ export type ServerMessage =
   | { type: 'link_status'; payload: { link: string; state: string; detail?: string } }
   | { type: 'rule_list'; payload: { rules: RuleGrammarContract2[]; disabled: Record<string, string> } }
   | { type: 'rule_fired'; payload: { source_rule?: string; source: string; status: string; value: unknown; target: unknown } }
+  | { type: 'action_fired'; payload: { source_rule?: string; source: string; action: string; target?: unknown } }
   | { type: 'vr_context'; payload: { fields: Record<string, string | number | boolean>; ts?: number | null } }
 
 const MAX_HISTORY = 300  // samples per channel
@@ -121,6 +122,20 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
           const w: Warning = {
             source: ruleLabel,
             message: `${p.status} → ${p.value} on ${target}${p.source === 'manual' ? ' (manual)' : ''}`,
+            at: Date.now(),
+          }
+          return { adaptations: [w, ...state.adaptations].slice(0, 50) }
+        }
+
+        case 'action_fired': {
+          const p = msg.payload
+          const ruleLabel = p.source_rule ?? p.source
+          const target = p.target && typeof p.target === 'object'
+            ? ('tag' in p.target ? `tag:${(p.target as {tag:string}).tag}` : `id:${(p.target as {id:string}).id}`)
+            : 'scene'
+          const w: Warning = {
+            source: ruleLabel,
+            message: `invoke ${p.action}() on ${target}${p.source === 'manual' ? ' (manual)' : ''}`,
             at: Date.now(),
           }
           return { adaptations: [w, ...state.adaptations].slice(0, 50) }

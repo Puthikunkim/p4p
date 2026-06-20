@@ -21,6 +21,7 @@ const contracts = [
   { file: 'signal_schema.schema.json', out: 'SignalSchema.ts' },
   { file: 'rule_grammar.schema.json', out: 'RuleGrammar.ts' },
   { file: 'status_request.schema.json', out: 'StatusRequest.ts' },
+  { file: 'action_request.schema.json', out: 'ActionRequest.ts' },
   { file: 'object_status_manifest.schema.json', out: 'ObjectStatusManifest.ts' },
 ]
 
