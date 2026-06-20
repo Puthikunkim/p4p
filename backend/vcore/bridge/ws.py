@@ -62,6 +62,7 @@ class DashboardBridge:
     async def start(self) -> None:
         self._bus.subscribe(Topics.MANIFEST_UPDATED, self._on_manifest)
         self._bus.subscribe(Topics.OBJECT_STATUS_UPDATED, self._on_object_status)
+        self._bus.subscribe(Topics.OBJECT_STATUS_CATALOG_UPDATED, self._on_object_status_catalog)
         self._bus.subscribe(Topics.SAMPLE, self._on_sample)
         self._bus.subscribe(Topics.WARNING, self._on_warning)
         self._bus.subscribe(Topics.LINK_STATUS, self._on_link_status)
@@ -73,6 +74,7 @@ class DashboardBridge:
     async def stop(self) -> None:
         self._bus.unsubscribe(Topics.MANIFEST_UPDATED, self._on_manifest)
         self._bus.unsubscribe(Topics.OBJECT_STATUS_UPDATED, self._on_object_status)
+        self._bus.unsubscribe(Topics.OBJECT_STATUS_CATALOG_UPDATED, self._on_object_status_catalog)
         self._bus.unsubscribe(Topics.SAMPLE, self._on_sample)
         self._bus.unsubscribe(Topics.WARNING, self._on_warning)
         self._bus.unsubscribe(Topics.LINK_STATUS, self._on_link_status)
@@ -118,6 +120,8 @@ class DashboardBridge:
             await _send(ws, "signal_manifest", self._manifests.signal_manifest)
         if self._manifests.object_status_manifest is not None:
             await _send(ws, "object_status_manifest", self._manifests.object_status_manifest)
+        if self._manifests.object_status_catalog is not None:
+            await _send(ws, "object_status_catalog", self._manifests.object_status_catalog)
         await _send(ws, "rule_list", self._rule_list_payload())
         unity_state: Literal["up", "down"] = "up" if self._ws_sink.is_connected else "down"
         await _send(ws, "link_status", LinkStatusEvent(link="unity-ws", state=unity_state).model_dump(mode="json"))
@@ -137,6 +141,9 @@ class DashboardBridge:
 
     async def _on_object_status(self, payload: object) -> None:
         await self._broadcast("object_status_manifest", payload)
+
+    async def _on_object_status_catalog(self, payload: object) -> None:
+        await self._broadcast("object_status_catalog", payload)
 
     async def _on_sample(self, payload: object) -> None:
         if isinstance(payload, SampleEvent):

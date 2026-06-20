@@ -24,6 +24,8 @@ export interface VCoreStore {
   // manifests
   signalManifest: SignalSchemaContract1 | null
   objectStatusManifest: ObjectStatusManifestContract3B | null
+  // project-wide catalog (everything the project can expose, for authoring ahead of time)
+  objectStatusCatalog: ObjectStatusManifestContract3B | null
   // live values: channel name → latest sample value
   latestValues: Record<string, number | string>
   // history: channel name → circular buffer of [timestamp, value] pairs
@@ -52,6 +54,7 @@ export interface VCoreStore {
 export type ServerMessage =
   | { type: 'signal_manifest'; payload: SignalSchemaContract1 }
   | { type: 'object_status_manifest'; payload: ObjectStatusManifestContract3B }
+  | { type: 'object_status_catalog'; payload: ObjectStatusManifestContract3B }
   | { type: 'sample'; payload: { stream_name: string; timestamp: number; values: Record<string, number | string> } }
   | { type: 'warning'; payload: { source: string; message: string } }
   | { type: 'link_status'; payload: { link: string; state: string; detail?: string } }
@@ -65,6 +68,7 @@ const MAX_HISTORY = 300  // samples per channel
 export const useVCoreStore = create<VCoreStore>((set) => ({
   signalManifest: null,
   objectStatusManifest: null,
+  objectStatusCatalog: null,
   latestValues: {},
   history: {},
   rules: [],
@@ -84,6 +88,9 @@ export const useVCoreStore = create<VCoreStore>((set) => ({
 
         case 'object_status_manifest':
           return { objectStatusManifest: msg.payload }
+
+        case 'object_status_catalog':
+          return { objectStatusCatalog: msg.payload }
 
         case 'sample': {
           const newLatest = { ...state.latestValues, ...msg.payload.values }

@@ -12,6 +12,7 @@ scene, props, and `StatusVisualizer` stay in the project; everything reusable li
 |---|---|
 | Status loop (Contract 3) | `VCoreConnection` (WS link + reconnect + cross-scene lifetime), `StatusCollector` (manifest), `RequestDispatcher` (apply incoming changes), `ObjectStatus` (mark a GameObject adaptable) |
 | Actions (Contract 3c) | `VCoreAction` — parameterless commands the backend can invoke (scene- or object-scoped). Wire its `OnInvoke` UnityEvent to anything; the rule builder offers it on the THEN side as an alternative to setting a status |
+| Project catalog (Editor) | **V-CORE ▸ Bake Project Catalog** scans every Build-Settings scene + prefab for `ObjectStatus`/`VCoreAction` and writes `Assets/Resources/VCoreCatalog.json`. The client sends it on connect so the rule builder can author against objects/actions in scenes that aren't loaded yet |
 | Upstream telemetry (Contracts 4 & 5) | `BehaviourReporter`, `BehaviourMetric`, `VrContextReporter` |
 | Video (optional) | `SpectatorCamera`, and `LiveKitPublisher` in the separate **`VCore.Client.LiveKit`** assembly |
 | Setup | `VCoreLauncher` (one-component bootstrap with enable-toggles), `BackendConfig` (shared address asset), `VCoreVideoPublisher` (base type the launcher toggles) |

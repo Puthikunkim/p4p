@@ -98,6 +98,7 @@ class ActiveManifests:
         self._signal: dict[str, Any] | None = None
         self._behaviour_channels: list[dict[str, Any]] = []
         self._object_status: dict[str, Any] | None = None
+        self._catalog: dict[str, Any] | None = None
 
     # ── Signal Schema (Contract 1) ────────────────────────────────────────
 
@@ -152,6 +153,24 @@ class ActiveManifests:
     @property
     def object_status_manifest(self) -> dict[str, Any] | None:
         return self._object_status
+
+    # ── Object-Status Catalog (project-wide; same shape as the manifest) ──
+    # The manifest is what is loaded *now* (drives dispatch + degradation); the catalog
+    # is the full set of objects/actions the project can ever expose (for authoring rules
+    # ahead of time). Baked by the Unity editor and sent on connect.
+
+    def update_catalog(self, payload: dict[str, Any]) -> AcceptResult:
+        validate(payload, "object_status_manifest")
+        skew = check_version(payload["schema_version"], "object_status_manifest")
+        if skew == VersionSkew.REFUSE:
+            return AcceptResult(skew, f"object_status_catalog major version mismatch: {payload['schema_version']}")
+        self._catalog = payload
+        warning = f"object_status_catalog minor version skew: {payload['schema_version']}" if skew == VersionSkew.WARN else None
+        return AcceptResult(skew, warning)
+
+    @property
+    def object_status_catalog(self) -> dict[str, Any] | None:
+        return self._catalog
 
 
 # Module-level singleton — import and use directly.

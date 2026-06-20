@@ -12,6 +12,7 @@ import websockets
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import (
+    ActionRequest,
     LinkStatusEvent,
     SampleEvent,
     StatusRequest,
@@ -19,7 +20,7 @@ from vcore.core.models import (
     WarningEvent,
 )
 from vcore.core.schema import ActiveManifests
-from vcore.outbound.ws_sink import WsSink, _validate_request
+from vcore.outbound.ws_sink import WsSink, _validate_action, _validate_request
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -100,6 +101,64 @@ async def test_handshake_publishes_manifest() -> None:
     assert len(received) == 1
     assert manifests.object_status_manifest is not None
     assert manifests.object_status_manifest["scene"] == "test_scene"
+
+
+CATALOG_MANIFEST: dict[str, Any] = {
+    "schema_version": "1.0.0",
+    "scene": "(project catalog)",
+    "runtime": "catalog",
+    "objects": [
+        {"id": "door-1", "tags": ["door"],
+         "statuses": [{"name": "state", "type": "discrete", "values": ["open", "closed"]}]}
+    ],
+    "abstract_actions": [
+        {"name": "advance_scene", "scope": "scene"},
+        {"name": "open", "scope": "object", "id": "door-1", "tags": ["door"]},
+    ],
+}
+
+
+@pytest.mark.asyncio
+async def test_catalog_publishes_and_stores() -> None:
+    sink, bus, manifests = await _make_sink()
+    port = sink.bound_port
+    received: list[object] = []
+    bus.subscribe(Topics.OBJECT_STATUS_CATALOG_UPDATED, lambda p: received.append(p))
+
+    async with websockets.connect(f"ws://localhost:{port}") as ws:
+        await ws.send(json.dumps({"type": "object_status_catalog", "payload": CATALOG_MANIFEST}))
+        await asyncio.sleep(0.1)
+
+    await sink.stop()
+
+    assert len(received) == 1
+    assert manifests.object_status_catalog is not None
+    names = [a["name"] for a in manifests.object_status_catalog["abstract_actions"]]
+    assert "advance_scene" in names
+
+
+def _action_req(action: str, target: dict[str, str] | None = None) -> ActionRequest:
+    return ActionRequest(
+        schema_version="1.0.0", intent_id="x", timestamp="t",
+        action=action, target=target, source="engine",
+    )
+
+
+def test_validate_action_scene_ok() -> None:
+    manifest = {"objects": [], "abstract_actions": [{"name": "advance_scene", "scope": "scene"}]}
+    assert _validate_action(manifest, _action_req("advance_scene")) is None
+
+
+def test_validate_action_undeclared_rejected() -> None:
+    manifest = {"objects": [], "abstract_actions": []}
+    assert _validate_action(manifest, _action_req("ghost")) is not None
+
+
+def test_validate_action_object_by_tag_ok() -> None:
+    manifest = {"objects": [], "abstract_actions": [
+        {"name": "open", "scope": "object", "id": "door-1", "tags": ["door"]}
+    ]}
+    assert _validate_action(manifest, _action_req("open", {"tag": "door"})) is None
 
 
 @pytest.mark.asyncio

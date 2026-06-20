@@ -144,6 +144,8 @@ class WsSink(ActionSink):
         payload = msg.get("payload")
         if mtype == "object_status_manifest":
             await self._handle_object_status_manifest(payload)
+        elif mtype == "object_status_catalog":
+            await self._handle_object_status_catalog(payload)
         elif mtype == "vr_context":
             await self._handle_vr_context(payload)
         elif mtype == "behaviour_manifest":
@@ -183,6 +185,35 @@ class WsSink(ActionSink):
             self._manifests.object_status_manifest,
         )
         log.info("ws_sink: object-status manifest accepted")
+
+    async def _handle_object_status_catalog(self, payload: Any) -> None:
+        """Accept the project-wide Object-Status Catalog (same shape as the manifest):
+        every object/action the project can expose, baked by the Unity editor and sent on
+        connect. Used to author rules ahead of time; dispatch + degradation still use the
+        live manifest. A bad catalog is warned and ignored; the connection is never dropped."""
+        if not isinstance(payload, dict):
+            await self._bus.publish(
+                Topics.WARNING,
+                WarningEvent(source="ws_sink", message="object_status_catalog dropped: payload must be an object"),
+            )
+            return
+        try:
+            result = self._manifests.update_catalog(payload)
+        except Exception as exc:
+            await self._bus.publish(
+                Topics.WARNING,
+                WarningEvent(source="ws_sink", message=f"object_status_catalog rejected: {exc}"),
+            )
+            return
+        if result.warning:
+            await self._bus.publish(Topics.WARNING, WarningEvent(source="ws_sink", message=result.warning))
+        if not result.accepted:
+            return
+        await self._bus.publish(
+            Topics.OBJECT_STATUS_CATALOG_UPDATED,
+            self._manifests.object_status_catalog,
+        )
+        log.info("ws_sink: object-status catalog accepted")
 
     async def _handle_vr_context(self, payload: Any) -> None:
         if not isinstance(payload, dict) or not payload:

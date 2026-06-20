@@ -166,6 +166,16 @@ namespace VCore
             yield return new WaitUntil(() => manifestTask.IsCompleted);
             IsConnected = true;
 
+            // After the manifest handshake, send the project-wide catalog (if it was baked
+            // via "V-CORE ▸ Bake Project Catalog") so the dashboard can author rules against
+            // objects/actions in scenes that aren't loaded yet.
+            var catalogEnvelope = BuildCatalogEnvelope();
+            if (catalogEnvelope != null)
+            {
+                var catalogTask = SendRawAsync(catalogEnvelope);
+                yield return new WaitUntil(() => catalogTask.IsCompleted);
+            }
+
             // Receive loop runs on a thread pool thread; results are queued back to
             // the main thread via _inbound.
             _ = Task.Run(ReceiveLoop, _cts.Token);
@@ -176,6 +186,15 @@ namespace VCore
             _cts.Cancel();
             _ws.Dispose();
             Debug.Log("[VCore] Connection closed");
+        }
+
+        // Wrap the baked catalog (Resources/VCoreCatalog.json, the manifest-shaped payload)
+        // in its typed envelope, or null if no catalog has been baked.
+        private static string BuildCatalogEnvelope()
+        {
+            var asset = Resources.Load<TextAsset>("VCoreCatalog");
+            if (asset == null || string.IsNullOrEmpty(asset.text)) return null;
+            return "{\"type\":\"object_status_catalog\",\"payload\":" + asset.text + "}";
         }
 
         // ── send / receive ──────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useVCoreStore } from '../ws/store'
 import { IconWarn } from '../components/icons'
 import type { ConditionItem, InvokeAction, RuleGrammarContract2 } from '../contracts/RuleGrammar'
@@ -17,19 +17,47 @@ function formatCondition(c: ConditionItem): string {
   return `${c.signal} ${c.op} ${val}`
 }
 
+// Union the live (loaded-scene) manifest with the project-wide catalog so the builder
+// can author against everything the project can expose. Live entries win on conflict.
+function mergeObjects(live: ObjectDeclaration[], catalog: ObjectDeclaration[]): ObjectDeclaration[] {
+  const byId = new Map<string, ObjectDeclaration>()
+  for (const o of [...catalog, ...live]) {
+    const prev = byId.get(o.id)
+    if (!prev) { byId.set(o.id, { ...o, tags: [...o.tags], statuses: [...o.statuses] }); continue }
+    const tags = Array.from(new Set([...prev.tags, ...o.tags]))
+    const byName = new Map(prev.statuses.map((s) => [s.name, s]))
+    for (const s of o.statuses) byName.set(s.name, s)
+    byId.set(o.id, { ...prev, tags, statuses: Array.from(byName.values()) as ObjectDeclaration['statuses'] })
+  }
+  return Array.from(byId.values())
+}
+
+function mergeActions(live: AbstractAction[], catalog: AbstractAction[]): AbstractAction[] {
+  const byKey = new Map<string, AbstractAction>()
+  for (const a of [...catalog, ...live]) byKey.set(`${a.name}|${a.scope}|${a.id ?? ''}`, a)
+  return Array.from(byKey.values())
+}
+
 export function RuleManager() {
   const rules = useVCoreStore((s) => s.rules)
   const disabledRules = useVCoreStore((s) => s.disabledRules)
   const signalManifest = useVCoreStore((s) => s.signalManifest)
   const objectStatusManifest = useVCoreStore((s) => s.objectStatusManifest)
+  const objectStatusCatalog = useVCoreStore((s) => s.objectStatusCatalog)
   const [showBuilder, setShowBuilder] = useState(false)
   const [editingRule, setEditingRule] = useState<RuleGrammarContract2 | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const channels = signalManifest?.channels ?? []
-  const objects: ObjectDeclaration[] = objectStatusManifest?.objects ?? []
-  const abstractActions: AbstractAction[] = objectStatusManifest?.abstract_actions ?? []
+  const objects: ObjectDeclaration[] = useMemo(
+    () => mergeObjects(objectStatusManifest?.objects ?? [], objectStatusCatalog?.objects ?? []),
+    [objectStatusManifest, objectStatusCatalog],
+  )
+  const abstractActions: AbstractAction[] = useMemo(
+    () => mergeActions(objectStatusManifest?.abstract_actions ?? [], objectStatusCatalog?.abstract_actions ?? []),
+    [objectStatusManifest, objectStatusCatalog],
+  )
 
   const [ruleId, setRuleId] = useState('')
   const [description, setDescription] = useState('')

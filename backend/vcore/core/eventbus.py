@@ -15,6 +15,7 @@ class Topics:
     MANIFEST_UPDATED = "manifest.updated"
     SAMPLE = "sample"
     OBJECT_STATUS_UPDATED = "object_status.updated"
+    OBJECT_STATUS_CATALOG_UPDATED = "object_status.catalog_updated"
     RULE_FIRED = "rule.fired"
     RULES_UPDATED = "rules.updated"
     WARNING = "warning"
