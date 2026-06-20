@@ -2,9 +2,10 @@
 
 V-CORE stays the orchestrator: it mints access tokens for the Unity publisher and
 browser subscribers, and starts/stops a LiveKit Egress recording of the shared
-room per session. The recording is anchored to the LSL clock captured at egress
-start, so the MP4 lines up with the XDF signal timeline (start-point alignment:
-video t=0 ↔ the stored ``video_lsl_ts``).
+room per session. The recording is anchored to the LSL clock at egress start
+(``video_lsl_ts``) and at stop (``video_lsl_ts_end``); with the video duration the
+frontend linearly maps the video timeline to the XDF signal timeline, correcting
+clock drift over the session (two-point alignment).
 """
 from __future__ import annotations
 
@@ -72,13 +73,9 @@ class LiveKitRecorder:
             return
         from livekit import api
 
-        # Start-point sync anchor: capture LSL + wall clock at the moment egress starts.
-        lsl_ts = _lsl_now()
-        started_at = datetime.now(UTC).isoformat()
-
-        # Egress writes inside its container at egress_out_dir, which is mounted to the
-        # backend's video_dir on the host — so we store the backend-side path for serving.
-        # Track egress of a VP8 video track produces a WebM.
+        # Egress writes inside its container at egress_out_dir, mounted to the backend's
+        # video_dir on the host — so we store the backend-side path for serving. Track
+        # egress of a VP8 video track produces a WebM.
         egress_path = f"{self._cfg.egress_out_dir.rstrip('/')}/{session_id}.webm"
         backend_path = str(self._video_dir / f"{session_id}.webm")
 
@@ -86,6 +83,7 @@ class LiveKitRecorder:
         try:
             track_id = await self._find_video_track(lk)
             if track_id is None:
+                lsl_ts, started_at = _lsl_now(), datetime.now(UTC).isoformat()
                 self._store.set_video(session_id, None, started_at, lsl_ts)
                 log.warning(
                     "livekit: no video track in room %r — recording skipped "
@@ -93,6 +91,9 @@ class LiveKitRecorder:
                 )
                 return
 
+            # Quick win: capture the LSL/wall anchor immediately before the egress call
+            # (after the participant-lookup round-trip), so video t=0 ≈ this LSL timestamp.
+            lsl_ts, started_at = _lsl_now(), datetime.now(UTC).isoformat()
             info = await lk.egress.start_track_egress(
                 api.TrackEgressRequest(
                     room_name=self._cfg.room,
@@ -104,6 +105,7 @@ class LiveKitRecorder:
         except Exception as exc:
             # Recording is best-effort: a missing/unhealthy Egress must NOT abort the
             # session — signals and the live mirror continue. Still store the LSL anchor.
+            lsl_ts, started_at = _lsl_now(), datetime.now(UTC).isoformat()
             self._store.set_video(session_id, None, started_at, lsl_ts)
             log.warning(
                 "livekit: track egress did not start (%s); session continues "
@@ -113,7 +115,7 @@ class LiveKitRecorder:
         finally:
             await lk.aclose()
 
-        # Persist path + LSL anchor immediately (so review can align even before close).
+        # Persist path + start anchor immediately (so review can align even before close).
         self._store.set_video(session_id, backend_path, started_at, lsl_ts)
         log.info(
             "livekit: track egress %s started for %s (track=%s, lsl_ts=%.3f → %s)",
@@ -133,12 +135,17 @@ class LiveKitRecorder:
                     return str(track.sid)
         return None
 
-    async def stop(self) -> None:
-        """Stop the active egress, if any."""
+    async def stop(self, session_id: str | None = None) -> None:
+        """Stop the active egress and record the LSL clock at stop (the second anchor).
+
+        With the start anchor (``video_lsl_ts``) and the video's duration, the frontend
+        linearly maps media-time → LSL across the session, correcting clock drift
+        (two-point alignment) instead of assuming a fixed offset."""
         if not self._cfg.enabled or self._egress_id is None:
             return
         from livekit import api
 
+        lsl_end = _lsl_now()  # ≈ recording end; the file's last frame maps to ~here
         lk = api.LiveKitAPI(self._cfg.api_url, self._cfg.api_key, self._cfg.api_secret)
         try:
             await lk.egress.stop_egress(api.StopEgressRequest(egress_id=self._egress_id))
@@ -146,5 +153,7 @@ class LiveKitRecorder:
             log.warning("livekit: stop_egress failed: %s", exc)
         finally:
             await lk.aclose()
-        log.info("livekit: egress %s stopped", self._egress_id)
+        if session_id is not None:
+            self._store.set_video_end(session_id, lsl_end)
+        log.info("livekit: egress %s stopped (lsl_end=%.3f)", self._egress_id, lsl_end)
         self._egress_id = None

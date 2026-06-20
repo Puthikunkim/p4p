@@ -11,6 +11,7 @@ interface Session {
   video_path: string | null
   video_started_at?: string | null
   video_lsl_ts?: number | null
+  video_lsl_ts_end?: number | null
   status: string
   event_count: number
 }
@@ -83,9 +84,11 @@ function hashStr(str: string): number {
 
 // ── recorded-signals chart (small multiples + a shared, video-synced cursor) ────
 
-function RealSignalChart({ signals, videoLslTs, playhead, showCursor, onSeek }: {
+function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, playhead, showCursor, onSeek }: {
   signals: Signals
   videoLslTs: number | null
+  videoLslTsEnd: number | null
+  videoDuration: number
   playhead: number
   showCursor: boolean
   onSeek: (videoSeconds: number) => void
@@ -95,9 +98,16 @@ function RealSignalChart({ signals, videoLslTs, playhead, showCursor, onSeek }: 
     return <p className="empty-state" style={{ padding: 16 }}>No numeric signals recorded for this session.</p>
   }
 
-  // Each sample's x is "video seconds" = its LSL time minus the LSL clock at video start.
+  // Map each sample's LSL time to video media-time. Two-point drift correction: with the
+  // start + stop LSL anchors and the video duration we get the LSL-seconds-per-media-second
+  // rate (≈1 ± drift); fall back to 1:1 (start-anchor only) when the end anchor is missing.
   const t0 = videoLslTs ?? times[0]
-  const xs = times.map((t) => t - t0)
+  let rate = 1
+  if (videoLslTs != null && videoLslTsEnd != null && videoDuration > 1) {
+    const r = (videoLslTsEnd - videoLslTs) / videoDuration
+    if (r > 0.5 && r < 2) rate = r
+  }
+  const xs = times.map((t) => (t - t0) / rate)
   const xMin = xs[0]
   const xMax = xs[xs.length - 1]
   const span = Math.max(0.001, xMax - xMin)
@@ -226,6 +236,7 @@ export function DataHistory() {
   const [selected, setSelected] = useState<SessionDetail | null>(null)
   const [signals, setSignals] = useState<Signals | null>(null)
   const [playhead, setPlayhead] = useState(0)
+  const [videoDuration, setVideoDuration] = useState(0)
   const [loading, setLoading] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
 
@@ -239,6 +250,7 @@ export function DataHistory() {
   async function openSession(id: string) {
     setSignals(null)
     setPlayhead(0)
+    setVideoDuration(0)
     const r = await fetch(`/api/sessions/${id}`)
     setSelected(await r.json() as SessionDetail)
     try {
@@ -253,6 +265,7 @@ export function DataHistory() {
     setSelected(null)
     setSignals(null)
     setPlayhead(0)
+    setVideoDuration(0)
   }
 
   if (loading) return <div className="screen"><p className="empty-state">Loading…</p></div>
@@ -350,6 +363,8 @@ export function DataHistory() {
                 src={`/api/sessions/${s.id}/video`}
                 onTimeUpdate={() => setPlayhead(videoRef.current?.currentTime ?? 0)}
                 onSeeked={() => setPlayhead(videoRef.current?.currentTime ?? 0)}
+                onLoadedMetadata={() => { const d = videoRef.current?.duration ?? 0; if (Number.isFinite(d)) setVideoDuration(d) }}
+                onDurationChange={() => { const d = videoRef.current?.duration ?? 0; if (Number.isFinite(d)) setVideoDuration(d) }}
               />
             </div>
           )}
@@ -366,6 +381,8 @@ export function DataHistory() {
               <RealSignalChart
                 signals={signals}
                 videoLslTs={s.video_lsl_ts ?? null}
+                videoLslTsEnd={s.video_lsl_ts_end ?? null}
+                videoDuration={videoDuration}
                 playhead={playhead}
                 showCursor={hasVideo}
                 onSeek={seekTo}

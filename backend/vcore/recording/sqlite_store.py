@@ -48,6 +48,7 @@ class SqliteStore:
             ("video_path", "TEXT"),
             ("video_started_at", "TEXT"),
             ("video_lsl_ts", "REAL"),
+            ("video_lsl_ts_end", "REAL"),
         ]
         for col, typ in new_cols:
             with suppress(sqlite3.OperationalError):
@@ -122,6 +123,14 @@ class SqliteStore:
         self._conn.execute(
             "UPDATE sessions SET video_path=?, video_started_at=?, video_lsl_ts=? WHERE id=?",
             (video_path, video_started_at, video_lsl_ts, session_id),
+        )
+        self._conn.commit()
+
+    def set_video_end(self, session_id: str, video_lsl_ts_end: float) -> None:
+        """Store the LSL clock captured at recording stop (second alignment anchor)."""
+        self._conn.execute(
+            "UPDATE sessions SET video_lsl_ts_end=? WHERE id=?",
+            (video_lsl_ts_end, session_id),
         )
         self._conn.commit()
 
