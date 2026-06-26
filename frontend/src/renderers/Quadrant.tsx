@@ -1,10 +1,13 @@
 import type { RendererProps } from './registry'
 
+// Affective-state cells (active cell keeps white text, so each colour is a mid-saturation
+// hue that stays legible on the dark card). Distinct from the brand lime, which is too light
+// to carry white text.
 const QUADRANT_COLORS: Record<string, string> = {
-  calm: '#0e9f6e',
-  engaged: '#4338ca',
-  stressed: '#d4322a',
-  bored: '#8b94a4',
+  calm: '#12b886',     // teal-green
+  engaged: '#6366f1',  // indigo
+  stressed: '#ef4444', // red
+  bored: '#64748b',    // slate
 }
 
 export function Quadrant({ channel, value }: RendererProps) {
@@ -19,7 +22,7 @@ export function Quadrant({ channel, value }: RendererProps) {
           <div
             key={cat}
             className={`renderer__quadrant-cell ${current === cat ? 'renderer__quadrant-cell--active' : ''}`}
-            style={current === cat ? { background: QUADRANT_COLORS[cat] ?? '#475063' } : {}}
+            style={current === cat ? { background: QUADRANT_COLORS[cat] ?? '#475569' } : {}}
           >
             {cat}
           </div>

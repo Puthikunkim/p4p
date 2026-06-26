@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, type MouseEvent } from 'react'
+import { useState, useEffect, useRef, useMemo, useId, type MouseEvent, type CSSProperties } from 'react'
 import { IconWarn, IconCheck, IconArrowLeft, IconTrash } from '../components/icons'
 import { signalTimeRate } from './signalTime'
 
@@ -87,6 +87,20 @@ function hashStr(str: string): number {
 
 const CHART_W = 1000, CHART_H = 46  // viewBox units; SVG stretches to container width
 
+// Per-channel palette so each sensor signal is distinguishable at a glance. Brand-led
+// (lime, orange) then spread across hues that avoid the alarm trio (ok/warn/danger), so a
+// data line is never mistaken for a status colour. Cycles if there are more channels.
+const SIGNAL_PALETTE = [
+  '#b6f24a', // lime (brand)
+  '#f7901e', // orange (brand)
+  '#38bdf8', // cyan
+  '#a78bfa', // violet
+  '#f472b6', // pink
+  '#2dd4bf', // teal
+  '#fbbf24', // gold
+  '#60a5fa', // blue
+]
+
 // Closest index in a sorted-ascending array (binary search) — for the cursor value readout.
 function nearestIndex(xs: number[], target: number): number {
   const n = xs.length
@@ -111,9 +125,14 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
   showCursor: boolean
   onSeek: (videoSeconds: number) => void
 }) {
-  // Static geometry — the per-channel SVG polylines and time axis. Recomputed ONLY when the
-  // recorded data / alignment changes, never when the cursor moves. This is what keeps
+  // Stable per-chart prefix so each channel's gradient gets a unique SVG id (ids are global).
+  const gradPrefix = useId()
+
+  // Static geometry — the per-channel SVG polylines/areas and time axis. Recomputed ONLY when
+  // the recorded data / alignment changes, never when the cursor moves. This is what keeps
   // seeking and scrubbing smooth: a playhead change no longer rebuilds every channel's path.
+  // The per-channel colour is static, so it's computed here too — nothing colour-related
+  // recomputes on cursor moves.
   const geom = useMemo(() => {
     const times = signals.timestamps
     if (times.length === 0 || signals.channels.length === 0) return null
@@ -126,7 +145,7 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
     const xMin = xs[0]
     const xMax = xs[xs.length - 1]
     const span = Math.max(0.001, xMax - xMin)
-    const channels = signals.channels.map((name) => {
+    const channels = signals.channels.map((name, ci) => {
       const vals = signals.series[name] ?? []
       let vMin = Infinity, vMax = -Infinity
       for (const v of vals) { if (v < vMin) vMin = v; if (v > vMax) vMax = v }
@@ -136,7 +155,12 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
         const y = 3 + (CHART_H - 6) - ((v - vMin) / vSpan) * (CHART_H - 6)
         return `${x.toFixed(1)},${y.toFixed(1)}`
       }).join(' ')
-      return { name, vals, pts }
+      // Closed polygon for the area fill: drop to the baseline at the first & last sample x.
+      const x0 = vals.length ? ((xs[0] - xMin) / span) * CHART_W : 0
+      const xN = vals.length ? ((xs[vals.length - 1] - xMin) / span) * CHART_W : 0
+      const area = vals.length ? `${x0.toFixed(1)},${CHART_H} ${pts} ${xN.toFixed(1)},${CHART_H}` : ''
+      const color = SIGNAL_PALETTE[ci % SIGNAL_PALETTE.length]
+      return { name, vals, pts, area, color }
     })
     return { xs, xMin, xMax, span, channels }
   }, [signals, videoLslTs, videoLslTsEnd, videoDuration])
@@ -159,46 +183,63 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
 
   return (
     <div className="signal-charts">
-      {channels.map(({ name, vals, pts }) => (
-        <div className="signal-chart-row" key={name}>
-          <div className="signal-chart-row__head">
-            <span className="signal-chart-row__name">{name}</span>
-            <span className="signal-chart-row__value">{inRange ? formatVal(vals[curIdx]) : '—'}</span>
+      {channels.map(({ name, vals, pts, area, color }, ci) => {
+        const gid = `${gradPrefix}-sig-${ci}`
+        return (
+          <div className="signal-chart-row" key={name} style={{ '--sig-color': color } as CSSProperties}>
+            <div className="signal-chart-row__head">
+              <span className="signal-chart-row__name">
+                <span className="signal-chart-row__swatch" aria-hidden="true" />
+                {name}
+              </span>
+              <span className="signal-chart-row__value" style={{ color }}>
+                {inRange ? formatVal(vals[curIdx]) : '—'}
+              </span>
+            </div>
+            <svg
+              viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+              preserveAspectRatio="none"
+              className="signal-chart-svg"
+              onClick={handleClick}
+            >
+              <defs>
+                <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor={color} stopOpacity={0.28} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              {area && <polygon points={area} fill={`url(#${gid})`} stroke="none" />}
+              <polyline points={pts} fill="none" stroke={color} strokeWidth={1.5}
+                vectorEffect="non-scaling-stroke" />
+              {inRange && (
+                <line x1={cursorFrac * CHART_W} x2={cursorFrac * CHART_W} y1={0} y2={CHART_H}
+                  strokeWidth={1} vectorEffect="non-scaling-stroke" style={{ stroke: 'var(--danger)' }} />
+              )}
+            </svg>
           </div>
-          <svg
-            viewBox={`0 0 ${CHART_W} ${CHART_H}`}
-            preserveAspectRatio="none"
-            className="signal-chart-svg"
-            onClick={handleClick}
-          >
-            <polyline points={pts} fill="none" stroke="#4338ca" strokeWidth={1.5}
-              vectorEffect="non-scaling-stroke" />
-            {inRange && (
-              <line x1={cursorFrac * CHART_W} x2={cursorFrac * CHART_W} y1={0} y2={CHART_H}
-                stroke="#d4322a" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-            )}
-          </svg>
-        </div>
-      ))}
+        )
+      })}
     </div>
   )
 }
 
 // ── event display helpers ─────────────────────────────────────────────────────
 
+// Bright-on-dark categorical colours (the old saturated mid-tones + 12%-tint backgrounds
+// were tuned for a light surface and read as muddy on the dark cards).
 const EVENT_STYLES: Record<string, { label: string; color: string; bg: string }> = {
-  rule_fired:         { label: 'Adaptation Trigger', color: '#7c3aed', bg: 'rgba(124,58,237,0.12)' },
-  action_fired:       { label: 'Action Invoked',     color: '#9333ea', bg: 'rgba(147,51,234,0.12)' },
-  vr_context:         { label: 'Step Change',        color: '#0e7490', bg: 'rgba(14,116,144,0.12)' },
-  link_status:        { label: 'Connectivity',       color: '#0369a1', bg: 'rgba(3,105,161,0.12)' },
-  warning:            { label: 'Warning',            color: '#b45309', bg: 'rgba(180,83,9,0.12)' },
-  baseline_establish: { label: 'Baseline Establish', color: '#15803d', bg: 'rgba(21,128,61,0.12)' },
-  session_start:      { label: 'Session Start',      color: '#1d4ed8', bg: 'rgba(29,78,216,0.12)' },
-  session_end:        { label: 'Session End',        color: '#15803d', bg: 'rgba(21,128,61,0.12)' },
+  rule_fired:         { label: 'Adaptation Trigger', color: '#a78bfa', bg: 'rgba(167,139,250,0.16)' },
+  action_fired:       { label: 'Action Invoked',     color: '#c084fc', bg: 'rgba(192,132,252,0.16)' },
+  vr_context:         { label: 'Step Change',        color: '#38bdf8', bg: 'rgba(56,189,248,0.16)' },
+  link_status:        { label: 'Connectivity',       color: '#60a5fa', bg: 'rgba(96,165,250,0.16)' },
+  warning:            { label: 'Warning',            color: '#f4c430', bg: 'rgba(244,196,48,0.16)' },
+  baseline_establish: { label: 'Baseline Establish', color: '#2fd58a', bg: 'rgba(47,213,138,0.16)' },
+  session_start:      { label: 'Session Start',      color: '#b6f24a', bg: 'rgba(182,242,74,0.16)' },
+  session_end:        { label: 'Session End',        color: '#2dd4bf', bg: 'rgba(45,212,191,0.16)' },
 }
 
 function getEventStyle(type: string) {
-  return EVENT_STYLES[type] ?? { label: type, color: '#4b5563', bg: 'rgba(75,85,99,0.12)' }
+  return EVENT_STYLES[type] ?? { label: type, color: '#94a3b8', bg: 'rgba(148,163,184,0.16)' }
 }
 
 function summarizePayload(payload: string): string {

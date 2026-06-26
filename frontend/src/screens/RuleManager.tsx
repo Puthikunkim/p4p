@@ -4,14 +4,6 @@ import { IconWarn } from '../components/icons'
 import type { ConditionItem, InvokeAction, RuleGrammarContract2 } from '../contracts/RuleGrammar'
 import type { AbstractAction, ObjectDeclaration } from '../contracts/ObjectStatusManifest'
 
-const TYPE_COLORS = 5  // cycles through .rule-card__type--0..4
-
-function ruleTypeIndex(id: string): number {
-  let hash = 0
-  for (let i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) | 0
-  return Math.abs(hash) % TYPE_COLORS
-}
-
 function formatCondition(c: ConditionItem): string {
   const val = c.threshold !== undefined ? c.threshold : (c.value ?? '')
   return `${c.signal} ${c.op} ${val}`
@@ -249,7 +241,7 @@ export function RuleManager() {
             <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional" />
           </div>
 
-          <fieldset className="form-section">
+          <fieldset className="form-section form-section--if">
             <legend>IF [TRIGGER]</legend>
             <div className="form-row">
               <label>Signal</label>
@@ -274,7 +266,7 @@ export function RuleManager() {
             </div>
           </fieldset>
 
-          <fieldset className="form-section">
+          <fieldset className="form-section form-section--then">
             <legend>THEN [ACTION]</legend>
             <div className="form-row">
               <label>THEN do</label>
@@ -414,13 +406,10 @@ function RuleCard({
   onEdit: (rule: RuleGrammarContract2) => void
   onDelete: (id: string) => void
 }) {
-  const typeIdx = ruleTypeIndex(r.id)
   const conditions = 'all' in r.when ? [...r.when.all] : [...r.when.any]
   const setAction = r.then?.set
   const invokeAction = r.then?.action
   const sustain = conditions[0]?.sustain_s
-
-  const typeTag = r.id.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase() || '???'
 
   return (
     <div
@@ -432,7 +421,6 @@ function RuleCard({
       style={{ cursor: 'pointer' }}
     >
       <div className="rule-card__header">
-        <span className={`rule-card__type rule-card__type--${typeIdx}`}>{typeTag}</span>
         <span className="rule-card__title">{r.description || r.id}</span>
         <span className="rule-card__id-label">Id: {r.id}</span>
         <span className={`rule-card__state rule-card__state--${disabled ? 'disabled' : 'active'}`}>
@@ -443,7 +431,7 @@ function RuleCard({
       <div className="rule-card__body">
         {conditions.length > 0 && (
           <div>
-            <div className="rule-card__section-label">IF [TRIGGER]</div>
+            <div className="rule-card__section-label rule-card__section-label--if">IF [TRIGGER]</div>
             {conditions.map((c, i) => (
               <div key={i} className="rule-card__condition">
                 {formatCondition(c)}
@@ -457,7 +445,7 @@ function RuleCard({
 
         {setAction && (
           <div>
-            <div className="rule-card__section-label">THEN [ACTION]</div>
+            <div className="rule-card__section-label rule-card__section-label--then">THEN [ACTION]</div>
             <div className="rule-card__action">
               <span>
                 {setAction.status} = <strong>{String(setAction.value)}</strong>
@@ -473,7 +461,7 @@ function RuleCard({
 
         {invokeAction && (
           <div>
-            <div className="rule-card__section-label">THEN [ACTION]</div>
+            <div className="rule-card__section-label rule-card__section-label--then">THEN [ACTION]</div>
             <div className="rule-card__action">
               <span>
                 invoke <strong>{invokeAction.action}()</strong>

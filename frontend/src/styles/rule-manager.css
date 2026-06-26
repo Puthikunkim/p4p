@@ -21,8 +21,8 @@
   font-family: var(--display);
   font-optical-sizing: auto;
   font-size: 17px;
-  font-weight: 470;
-  letter-spacing: -0.015em;
+  font-weight: 600;
+  letter-spacing: -0.02em;
   color: var(--text-h);
   text-transform: none;
 }
@@ -51,6 +51,10 @@
   letter-spacing: 0.08em;
   color: var(--text-soft);
 }
+
+/* Match the card's IF=orange / THEN=lime coding in the builder for a cohesive screen. */
+.form-section--if   legend { color: var(--accent-2); }
+.form-section--then legend { color: var(--accent); }
 
 .form-row {
   display: flex;
@@ -143,22 +147,6 @@
   border-bottom: 1px solid var(--border);
 }
 
-.rule-card__type {
-  font-size: 9.5px;
-  font-weight: 800;
-  letter-spacing: 0.07em;
-  padding: 3px 8px;
-  border-radius: 5px;
-  text-transform: uppercase;
-  flex-shrink: 0;
-}
-
-.rule-card__type--0 { background: var(--danger-bg); color: var(--danger); }
-.rule-card__type--1 { background: var(--accent-bg); color: var(--accent); }
-.rule-card__type--2 { background: var(--warn-bg); color: var(--warn); }
-.rule-card__type--3 { background: var(--ok-bg); color: var(--ok); }
-.rule-card__type--4 { background: rgba(124, 58, 237, 0.1); color: #6d28d9; }
-
 .rule-card__title {
   flex: 1;
   font-size: 13.5px;
@@ -191,30 +179,43 @@
   gap: 9px;
 }
 
+/* IF / THEN labels are small colour-coded chips so the two halves read at a glance:
+   IF = orange (the trigger), THEN = lime (the action the system takes). */
 .rule-card__section-label {
+  display: inline-block;
   font-size: 9.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   color: var(--text-soft);
-  margin-bottom: 4px;
+  margin-bottom: 6px;
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: var(--surface-2);
 }
 
+.rule-card__section-label--if   { color: var(--accent-2); background: var(--accent-2-bg); }
+.rule-card__section-label--then { color: var(--accent);   background: var(--accent-bg); }
+
+/* Each half is a bordered box (not just a left highlight) — orange for IF, lime for THEN —
+   so the trigger and the action are clearly separated and distinct, but still on-theme. */
 .rule-card__condition {
   font-size: 12.5px;
-  padding: 7px 11px;
-  background: var(--accent-bg);
-  border-left: 2.5px solid var(--accent-border);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 8px 11px;
+  background: var(--accent-2-bg);
+  border: 1px solid var(--accent-2-border);
+  border-left: 3px solid var(--accent-2);
+  border-radius: var(--radius-sm);
   color: var(--text-h);
 }
 
 .rule-card__action {
   font-size: 12.5px;
-  padding: 7px 11px;
-  background: var(--ok-bg);
-  border-left: 2.5px solid rgba(14, 159, 110, 0.4);
-  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  padding: 8px 11px;
+  background: var(--accent-bg);
+  border: 1px solid var(--accent-border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
   color: var(--text-h);
   display: flex;
   align-items: center;

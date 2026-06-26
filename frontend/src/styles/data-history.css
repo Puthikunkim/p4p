@@ -212,9 +212,9 @@
   font-family: var(--display);
   font-optical-sizing: auto;
   font-size: 23px;
-  font-weight: 470;
+  font-weight: 600;
   color: var(--text-h);
-  letter-spacing: -0.02em;
+  letter-spacing: -0.025em;
   line-height: 1.1;
 }
 
@@ -333,7 +333,15 @@
   padding: 10px 12px 12px;
 }
 
-.signal-chart-row { display: flex; flex-direction: column; gap: 2px; }
+/* Per-channel colour identity: a left accent bar (channel colour via --sig-color),
+   a matching swatch by the name, and the live value tinted to match (inline). */
+.signal-chart-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 2px solid var(--sig-color, var(--border));
+  padding-left: 9px;
+}
 
 .signal-chart-row__head {
   display: flex;
@@ -342,7 +350,21 @@
   font-size: 11px;
 }
 
-.signal-chart-row__name { font-weight: 600; color: var(--text-soft); }
+.signal-chart-row__name {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.signal-chart-row__swatch {
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: var(--sig-color, var(--accent));
+  flex-shrink: 0;
+}
 
 .signal-chart-row__value {
   font-family: var(--mono);
@@ -364,6 +386,6 @@
 
 /* ── Event log: video-synced highlighting ── */
 
-.detail-event-log .evlog-row--active td { background: rgba(212, 50, 42, 0.12); }
-.detail-event-log .evlog-row--active td:first-child { box-shadow: inset 3px 0 0 #d4322a; }
+.detail-event-log .evlog-row--active td { background: rgba(243, 86, 75, 0.14); }
+.detail-event-log .evlog-row--active td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
 .detail-event-log .evlog-row--future td { opacity: 0.4; }

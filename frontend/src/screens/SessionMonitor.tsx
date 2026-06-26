@@ -144,7 +144,7 @@ export function SessionMonitor() {
                           {new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
                         <td>
-                          <span className="event-type-badge" style={{ color: '#b45309', background: 'rgba(180,83,9,0.12)' }}>
+                          <span className="event-type-badge" style={{ color: 'var(--warn)', background: 'var(--warn-bg)' }}>
                             {w.source}
                           </span>
                         </td>

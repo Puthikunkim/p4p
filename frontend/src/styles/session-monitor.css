@@ -19,10 +19,10 @@
   border: 1px solid transparent;
 }
 
-.link-chip--up    { background: var(--ok-bg); color: var(--ok); border-color: rgba(14, 159, 110, 0.22); }
+.link-chip--up    { background: var(--ok-bg); color: var(--ok); border-color: rgba(47, 213, 138, 0.28); }
 .link-chip--down  { background: var(--surface-2); color: var(--text-soft); border-color: var(--border); }
-.link-chip--error { background: var(--danger-bg); color: var(--danger); border-color: rgba(212, 50, 42, 0.22); }
-.link-chip--stale, .link-chip--reconnecting { background: var(--warn-bg); color: var(--warn); border-color: rgba(178, 106, 7, 0.22); }
+.link-chip--error { background: var(--danger-bg); color: var(--danger); border-color: rgba(243, 86, 75, 0.28); }
+.link-chip--stale, .link-chip--reconnecting { background: var(--warn-bg); color: var(--warn); border-color: rgba(244, 196, 48, 0.28); }
 
 /* ── Renderer grid ── */
 

@@ -9,6 +9,10 @@ export function LineChart({ channel, history }: RendererProps) {
 
   useEffect(() => {
     if (!containerRef.current) return
+    // uPlot renders axes/grid/ticks onto a canvas (not via CSS), so the dark theme can't
+    // cascade to them — set legible colours explicitly. Series is brand lime with a soft fill.
+    const axisStroke = '#7c828e'
+    const gridStroke = 'rgba(255, 255, 255, 0.07)'
     const opts: uPlot.Options = {
       title: channel.display.label,
       width: containerRef.current.clientWidth || 320,
@@ -17,13 +21,14 @@ export function LineChart({ channel, history }: RendererProps) {
         {},
         {
           label: channel.display.label,
-          stroke: '#4338ca',
+          stroke: '#b6f24a',
+          fill: 'rgba(182, 242, 74, 0.12)',
           width: 2,
         },
       ],
       axes: [
-        { label: 't (s)' },
-        { label: channel.unit },
+        { label: 't (s)', stroke: axisStroke, grid: { stroke: gridStroke }, ticks: { stroke: gridStroke } },
+        { label: channel.unit, stroke: axisStroke, grid: { stroke: gridStroke }, ticks: { stroke: gridStroke } },
       ],
       scales: channel.range
         ? { y: { range: () => [channel.range!.min, channel.range!.max] } }

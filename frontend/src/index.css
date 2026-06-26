@@ -1,7 +1,10 @@
 /* ============================================================================
-   V-CORE — "Clinical precision" design system
+   V-CORE — "Dark signal" design system
    Display: Fraunces · Body: Hanken Grotesk · Data: JetBrains Mono
-   Single light theme. Tokens here are consumed across src/styles/*.
+   Single dark theme (lime brand, orange secondary). Inspired by the Nixtio
+   "Check Box" dashboard. Tokens here are consumed across src/styles/*.
+   Brand colours (lime/orange) are decorative; status colours (ok/warn/danger)
+   carry safety meaning and are kept deliberately distinct from the brand.
    ============================================================================ */
 
 :root {
@@ -11,49 +14,58 @@
   --mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', monospace;
   --heading: var(--display);
 
-  /* ── Surfaces ────────────────────────────────────────────────── */
-  --bg: #f4f6f9;
-  --bg-tint: #e9eef6;          /* faint cool wash on the canvas */
-  --surface: #ffffff;
-  --surface-2: #fafbfc;        /* nested panels / striped rows */
-  --surface-hover: #f3f6fc;
-  --code-bg: #f5f7f9;
+  /* ── Surfaces — near-black canvas, lifted charcoal cards ──────── */
+  --bg: #0a0b0d;
+  --bg-tint: #10131a;          /* faint lime wash sits over this */
+  --surface: #17181c;          /* cards */
+  --surface-2: #202228;        /* nested panels / striped rows */
+  --surface-hover: #23252b;
+  --code-bg: #16171b;
 
   /* ── Lines ───────────────────────────────────────────────────── */
-  --border: #e7e9ef;           /* hairline */
-  --border-strong: #d6dae3;
+  --border: #26282e;           /* hairline */
+  --border-strong: #363941;
 
   /* ── Ink ─────────────────────────────────────────────────────── */
-  --text: #4b5363;             /* body */
-  --text-soft: #8b94a4;        /* muted / labels */
-  --text-h: #0c1322;           /* headings, near-black */
+  --text: #c0c6d0;             /* body */
+  --text-soft: #7c828e;        /* muted / labels */
+  --text-h: #f3f5f8;           /* headings, near-white */
 
-  /* ── Accent — restrained indigo ──────────────────────────────── */
-  --accent: #4338ca;
-  --accent-hover: #382fae;
-  --accent-soft: #6366f1;
-  --accent-bg: rgba(67, 56, 202, 0.07);
-  --accent-border: rgba(67, 56, 202, 0.22);
+  /* ── Brand accent — lime (primary) ───────────────────────────── */
+  --accent: #b6f24a;
+  --accent-hover: #a6e636;
+  --accent-soft: #cdf978;      /* links / focus ring */
+  --accent-bg: rgba(182, 242, 74, 0.12);
+  --accent-border: rgba(182, 242, 74, 0.30);
+  --accent-ink: #11140a;       /* near-black text for fills ON lime */
 
-  /* ── Semantic signal colours ─────────────────────────────────── */
-  --ok: #0e9f6e;      --ok-bg: rgba(14, 159, 110, 0.10);
-  --warn: #b26a07;    --warn-bg: rgba(178, 106, 7, 0.10);
-  --danger: #d4322a;  --danger-bg: rgba(212, 50, 42, 0.10);
+  /* ── Brand accent — orange (secondary / decorative) ──────────── */
+  --accent-2: #f7901e;
+  --accent-2-bg: rgba(247, 144, 30, 0.12);
+  --accent-2-border: rgba(247, 144, 30, 0.32);
 
-  /* back-compat aliases used by older rules */
-  --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.05);
-  --shadow-md: 0 8px 24px -8px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(15, 23, 42, 0.05);
+  /* ── Semantic signal colours (meaning preserved, kept distinct) ─
+     ok = emerald (teal-green, ≠ yellow-green lime),
+     warn = golden yellow (≠ orange brand), danger = red. */
+  --ok: #2fd58a;      --ok-bg: rgba(47, 213, 138, 0.12);
+  --warn: #f4c430;    --warn-bg: rgba(244, 196, 48, 0.12);
+  --danger: #f3564b;  --danger-bg: rgba(243, 86, 75, 0.12);
+
+  /* shadows — deeper/black for a dark surface */
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.35);
+  --shadow-md: 0 12px 32px -10px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
 
   /* ── Geometry & motion ───────────────────────────────────────── */
-  --radius-sm: 7px;
-  --radius: 10px;
-  --radius-lg: 14px;
+  --radius-sm: 9px;
+  --radius: 14px;
+  --radius-lg: 20px;
+  --radius-pill: 999px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   font: 400 14.5px/1.55 var(--sans);
   font-optical-sizing: auto;
   letter-spacing: -0.003em;
-  color-scheme: light;
+  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -74,18 +86,19 @@
 body {
   margin: 0;
   background:
-    radial-gradient(1100px 560px at 100% -8%, var(--bg-tint), transparent 62%),
+    radial-gradient(1100px 560px at 100% -8%, rgba(182, 242, 74, 0.05), transparent 62%),
+    var(--bg-tint),
     var(--bg);
   background-attachment: fixed;
 }
 
-/* ── Headings — Fraunces display ─────────────────────────────────── */
+/* ── Headings — Fraunces display, heavier + tighter on the dark board ─ */
 h1, h2 {
   font-family: var(--display);
   font-optical-sizing: auto;
   color: var(--text-h);
-  font-weight: 470;
-  letter-spacing: -0.02em;
+  font-weight: 600;
+  letter-spacing: -0.025em;
   line-height: 1.12;
   margin: 0;
 }
