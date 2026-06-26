@@ -84,6 +84,10 @@ class LiveKitRecorder:
         # whole call chain (egress.*, aclose) doesn't trip mypy's no-untyped-call.
         lk: Any = api.LiveKitAPI(self._cfg.api_url, self._cfg.api_key, self._cfg.api_secret)
         try:
+            # Clean up any egress orphaned by a prior crash/restart/failed-stop before
+            # starting ours, so recorders don't pile up on the egress node and degrade
+            # this recording (we only ever run one egress per room at a time).
+            await self._stop_stale_egresses(lk)
             track_id = await self._find_video_track(lk)
             if track_id is None:
                 lsl_ts, started_at = _lsl_now(), datetime.now(UTC).isoformat()
@@ -137,6 +141,32 @@ class LiveKitRecorder:
                 if track.type == api.TrackType.VIDEO:
                     return str(track.sid)
         return None
+
+    async def _stop_stale_egresses(self, lk: Any) -> None:
+        """Stop every egress still active for our room.
+
+        Egress ids live only in memory, so a backend restart (or a failed ``stop_egress``)
+        orphans the running recorder; over time these accumulate and contend on the egress
+        node. Listing + stopping by room before each new recording makes cleanup self-healing.
+        Best-effort — a failure here must never block the new recording from starting."""
+        from livekit import api
+
+        try:
+            resp = await lk.egress.list_egress(
+                api.ListEgressRequest(room_name=self._cfg.room, active=True)
+            )
+        except Exception as exc:
+            log.warning("livekit: could not list egresses for cleanup: %s", exc)
+            return
+        for item in getattr(resp, "items", []):
+            try:
+                await lk.egress.stop_egress(api.StopEgressRequest(egress_id=item.egress_id))
+                log.info(
+                    "livekit: stopped orphaned egress %s for room %r",
+                    item.egress_id, self._cfg.room,
+                )
+            except Exception as exc:
+                log.warning("livekit: failed to stop orphaned egress %s: %s", item.egress_id, exc)
 
     async def stop(self, session_id: str | None = None) -> None:
         """Stop the active egress and record the LSL clock at stop (the second anchor).
