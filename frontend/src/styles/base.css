@@ -108,6 +108,12 @@
   font-size: 12px;
 }
 
+/* Icon-only button (square); pairs with .btn--small for table-row actions. */
+.btn--icon {
+  padding: 5px 6px;
+  gap: 0;
+}
+
 .btn svg { width: 15px; height: 15px; flex-shrink: 0; }
 
 /* ── Badges ── */

@@ -87,6 +87,12 @@ export const IconArrowLeft = (p: IconProps) => (
   <Svg {...p}><path d="M11 6 5 12l6 6M5 12h14" /></Svg>
 )
 
+export const IconTrash = (p: IconProps) => (
+  <Svg {...p}>
+    <path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M7 7l.8 12a1 1 0 0 0 1 1h6.4a1 1 0 0 0 1-1L18 7M10 11v6M14 11v6" />
+  </Svg>
+)
+
 /* Brand mark — concentric "core" reticle */
 export const IconCore = (p: IconProps) => (
   <Svg {...p}>

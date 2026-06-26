@@ -134,5 +134,18 @@ class SqliteStore:
         )
         self._conn.commit()
 
+    def delete_session(self, session_id: str) -> dict[str, Any] | None:
+        """Delete a session and its events. Returns the deleted row (so callers can clean
+        up the XDF/video files it referenced) or None if no such session exists."""
+        row = self._conn.execute(
+            "SELECT * FROM sessions WHERE id=?", (session_id,)
+        ).fetchone()
+        if row is None:
+            return None
+        self._conn.execute("DELETE FROM events WHERE session_id=?", (session_id,))
+        self._conn.execute("DELETE FROM sessions WHERE id=?", (session_id,))
+        self._conn.commit()
+        return dict(row)
+
     def close(self) -> None:
         self._conn.close()

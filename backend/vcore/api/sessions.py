@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
@@ -52,6 +53,25 @@ async def get_session(session_id: str, request: Request) -> dict[str, Any]:
     if session is None:
         raise HTTPException(404, "Session not found")
     return session
+
+
+@router.delete("/api/sessions/{session_id}")
+async def delete_session(session_id: str, request: Request) -> dict[str, str]:
+    """Delete a recorded session: its DB row + events, plus a best-effort cleanup of the
+    XDF and video files it referenced. The active (recording) session cannot be deleted."""
+    recorder: Any = request.app.state.recorder
+    if recorder.active_session_id == session_id:
+        raise HTTPException(409, "Cannot delete a session while it is recording; stop it first")
+    deleted: dict[str, Any] | None = recorder.store.delete_session(session_id)
+    if deleted is None:
+        raise HTTPException(404, "Session not found")
+    # A missing or locked file must not fail the delete — the DB row is already gone.
+    for key in ("xdf_path", "video_path"):
+        path = deleted.get(key)
+        if path:
+            with suppress(OSError):
+                Path(path).unlink(missing_ok=True)
+    return {"deleted": session_id}
 
 
 @router.get("/api/sessions/{session_id}/video")

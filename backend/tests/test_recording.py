@@ -358,6 +358,39 @@ def test_api_get_session_detail(client: TestClient) -> None:
     assert s["events"] == []
 
 
+def test_api_delete_session(client: TestClient) -> None:
+    sid = client.post("/api/sessions", json={"participant": "P01"}).json()["session_id"]
+    client.post(f"/api/sessions/{sid}/stop")
+    resp = client.delete(f"/api/sessions/{sid}")
+    assert resp.status_code == 200
+    assert resp.json()["deleted"] == sid
+    # Gone from both the detail endpoint and the list.
+    assert client.get(f"/api/sessions/{sid}").status_code == 404
+    assert client.get("/api/sessions").json() == []
+
+
+def test_api_delete_active_session_conflict(client: TestClient) -> None:
+    sid = client.post("/api/sessions", json={"participant": "P01"}).json()["session_id"]
+    # Still recording — must refuse so we never delete a live session out from under it.
+    assert client.delete(f"/api/sessions/{sid}").status_code == 409
+
+
+def test_api_delete_unknown_session(client: TestClient) -> None:
+    assert client.delete("/api/sessions/nope").status_code == 404
+
+
+def test_api_delete_removes_video_file(client: TestClient, tmp_path: Path) -> None:
+    sid = client.post("/api/sessions", json={"participant": "P01"}).json()["session_id"]
+    video = tmp_path / "data" / "video" / f"{sid}.webm"
+    video.parent.mkdir(parents=True, exist_ok=True)
+    video.write_bytes(b"FAKEWEBMDATA")
+    client.app.state.recorder.store.set_video(sid, str(video))
+    client.post(f"/api/sessions/{sid}/stop")
+
+    assert client.delete(f"/api/sessions/{sid}").status_code == 200
+    assert not video.exists()
+
+
 def test_api_video_playback(client: TestClient, tmp_path: Path) -> None:
     sid = client.post("/api/sessions", json={"participant": "P01"}).json()["session_id"]
     # Simulate what LiveKit Egress + the recorder do: a file on disk + its path stored.

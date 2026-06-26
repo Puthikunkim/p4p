@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type MouseEvent } from 'react'
-import { IconWarn, IconCheck, IconArrowLeft } from '../components/icons'
+import { IconWarn, IconCheck, IconArrowLeft, IconTrash } from '../components/icons'
 import { signalTimeRate } from './signalTime'
 
 interface Session {
@@ -266,6 +266,18 @@ export function DataHistory() {
     setVideoDuration(0)
   }
 
+  async function deleteSession(id: string) {
+    if (!window.confirm('Delete this session permanently? Its recording, signals and event log cannot be recovered.')) return
+    const r = await fetch(`/api/sessions/${id}`, { method: 'DELETE' })
+    if (!r.ok) {
+      const body = await r.json().catch(() => ({})) as { detail?: string }
+      window.alert(`Delete failed: ${body.detail ?? `HTTP ${r.status}`}`)
+      return
+    }
+    setSessions((prev) => prev.filter((s) => s.id !== id))
+    if (selected?.id === id) backToList()
+  }
+
   if (loading) return <div className="screen"><p className="empty-state">Loading…</p></div>
 
   if (!selected) {
@@ -294,7 +306,20 @@ export function DataHistory() {
                   <td>{formatDuration(s.started_at, s.ended_at)}</td>
                   <td>{s.event_count}</td>
                   <td><span className={`badge badge--${s.status === 'done' ? 'done' : 'running'}`}>{s.status}</span></td>
-                  <td><button className="btn btn--small" onClick={(e) => { e.stopPropagation(); openSession(s.id) }}>View</button></td>
+                  <td>
+                    <div className="history-table__actions">
+                      <button className="btn btn--small" onClick={(e) => { e.stopPropagation(); openSession(s.id) }}>View</button>
+                      <button
+                        className="btn btn--small btn--danger btn--icon"
+                        onClick={(e) => { e.stopPropagation(); deleteSession(s.id) }}
+                        disabled={s.status !== 'done'}
+                        title={s.status !== 'done' ? 'Stop the session before deleting' : 'Delete this session'}
+                        aria-label="Delete session"
+                      >
+                        <IconTrash />
+                      </button>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -338,6 +363,14 @@ export function DataHistory() {
           <span className="detail-session-date">{new Date(s.started_at).toLocaleDateString()}</span>
         </div>
         <div style={{ flex: 1 }} />
+        <button
+          className="btn btn--small btn--danger"
+          onClick={() => deleteSession(s.id)}
+          disabled={!isDone}
+          title={!isDone ? 'Stop the session before deleting' : 'Delete this session'}
+        >
+          <IconTrash /> Delete
+        </button>
         {s.xdf_path ? (
           <a className="btn btn--primary" href={`/api/sessions/${s.id}/download`} download>Download Report</a>
         ) : (
