@@ -189,12 +189,12 @@ export function SessionMonitor() {
                       </span>
                       <div className="rule-btn__meta">
                         {cond && (
-                          <span className="rule-btn__chip">
+                          <span className="rule-btn__chip rule-btn__chip--if">
                             {cond.signal} {cond.op} {cond.threshold ?? cond.value}
                           </span>
                         )}
                         {action && (
-                          <span className="rule-btn__chip" style={{ opacity: 0.75 }}>
+                          <span className="rule-btn__chip rule-btn__chip--then">
                             {action.status}={String(action.value)}
                           </span>
                         )}

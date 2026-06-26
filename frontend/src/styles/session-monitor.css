@@ -202,14 +202,18 @@
 
 .rule-btn__chip {
   font-size: 10px;
-  font-weight: 600;
-  padding: 2px 6px;
+  font-weight: 700;
+  padding: 2px 7px;
   border-radius: 5px;
-  background: var(--accent-bg);
-  color: var(--accent);
   text-transform: uppercase;
   letter-spacing: 0.03em;
+  border: 1px solid transparent;
 }
+
+/* Trigger = orange, action = lime — distinct from each other and consistent with the
+   IF/THEN coding on the Rule Manager cards. The border lifts them off the dark button. */
+.rule-btn__chip--if   { background: var(--accent-2-bg); color: var(--accent-2); border-color: var(--accent-2-border); }
+.rule-btn__chip--then { background: var(--accent-bg);   color: var(--accent);   border-color: var(--accent-border); }
 
 /* ── Adapt log ── */
 
