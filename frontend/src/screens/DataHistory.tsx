@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type MouseEvent } from 'react'
+import { useState, useEffect, useRef, useMemo, type MouseEvent } from 'react'
 import { IconWarn, IconCheck, IconArrowLeft, IconTrash } from '../components/icons'
 import { signalTimeRate } from './signalTime'
 
@@ -85,6 +85,23 @@ function hashStr(str: string): number {
 
 // ── recorded-signals chart (small multiples + a shared, video-synced cursor) ────
 
+const CHART_W = 1000, CHART_H = 46  // viewBox units; SVG stretches to container width
+
+// Closest index in a sorted-ascending array (binary search) — for the cursor value readout.
+function nearestIndex(xs: number[], target: number): number {
+  const n = xs.length
+  if (n === 0) return 0
+  if (target <= xs[0]) return 0
+  if (target >= xs[n - 1]) return n - 1
+  let lo = 0, hi = n - 1
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1
+    if (xs[mid] < target) lo = mid + 1
+    else hi = mid
+  }
+  return lo > 0 && Math.abs(xs[lo - 1] - target) <= Math.abs(xs[lo] - target) ? lo - 1 : lo
+}
+
 function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, playhead, showCursor, onSeek }: {
   signals: Signals
   videoLslTs: number | null
@@ -94,32 +111,45 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
   showCursor: boolean
   onSeek: (videoSeconds: number) => void
 }) {
-  const times = signals.timestamps
-  if (times.length === 0 || signals.channels.length === 0) {
+  // Static geometry — the per-channel SVG polylines and time axis. Recomputed ONLY when the
+  // recorded data / alignment changes, never when the cursor moves. This is what keeps
+  // seeking and scrubbing smooth: a playhead change no longer rebuilds every channel's path.
+  const geom = useMemo(() => {
+    const times = signals.timestamps
+    if (times.length === 0 || signals.channels.length === 0) return null
+    // Map each sample's LSL time to video media-time via the per-session drift rate (trusted
+    // only when close to 1; a grossly-short/corrupt video falls back to 1:1 so the full
+    // recorded signal data is plotted rather than compressed to the broken video length).
+    const t0 = videoLslTs ?? times[0]
+    const rate = signalTimeRate(videoLslTs, videoLslTsEnd, videoDuration)
+    const xs = times.map((t) => (t - t0) / rate)
+    const xMin = xs[0]
+    const xMax = xs[xs.length - 1]
+    const span = Math.max(0.001, xMax - xMin)
+    const channels = signals.channels.map((name) => {
+      const vals = signals.series[name] ?? []
+      let vMin = Infinity, vMax = -Infinity
+      for (const v of vals) { if (v < vMin) vMin = v; if (v > vMax) vMax = v }
+      const vSpan = Math.max(1e-9, vMax - vMin)
+      const pts = vals.map((v, i) => {
+        const x = ((xs[i] - xMin) / span) * CHART_W
+        const y = 3 + (CHART_H - 6) - ((v - vMin) / vSpan) * (CHART_H - 6)
+        return `${x.toFixed(1)},${y.toFixed(1)}`
+      }).join(' ')
+      return { name, vals, pts }
+    })
+    return { xs, xMin, xMax, span, channels }
+  }, [signals, videoLslTs, videoLslTsEnd, videoDuration])
+
+  if (!geom) {
     return <p className="empty-state" style={{ padding: 16 }}>No numeric signals recorded for this session.</p>
   }
+  const { xs, xMin, span, channels } = geom
 
-  // Map each sample's LSL time to video media-time via the per-session drift rate. The rate
-  // is trusted only when close to 1; a grossly-short/corrupt video falls back to 1:1 so the
-  // full recorded signal data is plotted rather than compressed to the broken video length.
-  const t0 = videoLslTs ?? times[0]
-  const rate = signalTimeRate(videoLslTs, videoLslTsEnd, videoDuration)
-  const xs = times.map((t) => (t - t0) / rate)
-  const xMin = xs[0]
-  const xMax = xs[xs.length - 1]
-  const span = Math.max(0.001, xMax - xMin)
-
-  // Nearest recorded sample to the playhead (for the value readout).
-  let curIdx = 0
-  let best = Infinity
-  for (let i = 0; i < xs.length; i++) {
-    const d = Math.abs(xs[i] - playhead)
-    if (d < best) { best = d; curIdx = i }
-  }
-  const inRange = showCursor && playhead >= xMin - 0.05 && playhead <= xMax + 0.05
+  // Cheap per-render bits that depend on the cursor position only.
+  const inRange = showCursor && playhead >= xMin - 0.05 && playhead <= geom.xMax + 0.05
   const cursorFrac = Math.max(0, Math.min(1, (playhead - xMin) / span))
-
-  const W = 1000, H = 46  // viewBox units; SVG stretches to container width
+  const curIdx = inRange ? nearestIndex(xs, playhead) : 0
 
   function handleClick(e: MouseEvent<SVGSVGElement>) {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -129,38 +159,27 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
 
   return (
     <div className="signal-charts">
-      {signals.channels.map((name) => {
-        const vals = signals.series[name] ?? []
-        let vMin = Infinity, vMax = -Infinity
-        for (const v of vals) { if (v < vMin) vMin = v; if (v > vMax) vMax = v }
-        const vSpan = Math.max(1e-9, vMax - vMin)
-        const pts = vals.map((v, i) => {
-          const x = ((xs[i] - xMin) / span) * W
-          const y = 3 + (H - 6) - ((v - vMin) / vSpan) * (H - 6)
-          return `${x.toFixed(1)},${y.toFixed(1)}`
-        }).join(' ')
-        return (
-          <div className="signal-chart-row" key={name}>
-            <div className="signal-chart-row__head">
-              <span className="signal-chart-row__name">{name}</span>
-              <span className="signal-chart-row__value">{inRange ? formatVal(vals[curIdx]) : '—'}</span>
-            </div>
-            <svg
-              viewBox={`0 0 ${W} ${H}`}
-              preserveAspectRatio="none"
-              className="signal-chart-svg"
-              onClick={handleClick}
-            >
-              <polyline points={pts} fill="none" stroke="#4338ca" strokeWidth={1.5}
-                vectorEffect="non-scaling-stroke" />
-              {inRange && (
-                <line x1={cursorFrac * W} x2={cursorFrac * W} y1={0} y2={H}
-                  stroke="#d4322a" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-              )}
-            </svg>
+      {channels.map(({ name, vals, pts }) => (
+        <div className="signal-chart-row" key={name}>
+          <div className="signal-chart-row__head">
+            <span className="signal-chart-row__name">{name}</span>
+            <span className="signal-chart-row__value">{inRange ? formatVal(vals[curIdx]) : '—'}</span>
           </div>
-        )
-      })}
+          <svg
+            viewBox={`0 0 ${CHART_W} ${CHART_H}`}
+            preserveAspectRatio="none"
+            className="signal-chart-svg"
+            onClick={handleClick}
+          >
+            <polyline points={pts} fill="none" stroke="#4338ca" strokeWidth={1.5}
+              vectorEffect="non-scaling-stroke" />
+            {inRange && (
+              <line x1={cursorFrac * CHART_W} x2={cursorFrac * CHART_W} y1={0} y2={CHART_H}
+                stroke="#d4322a" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+            )}
+          </svg>
+        </div>
+      ))}
     </div>
   )
 }
