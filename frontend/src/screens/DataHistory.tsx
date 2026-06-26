@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, type MouseEvent } from 'react'
 import { IconWarn, IconCheck, IconArrowLeft } from '../components/icons'
+import { signalTimeRate } from './signalTime'
 
 interface Session {
   id: string
@@ -98,15 +99,11 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
     return <p className="empty-state" style={{ padding: 16 }}>No numeric signals recorded for this session.</p>
   }
 
-  // Map each sample's LSL time to video media-time. Two-point drift correction: with the
-  // start + stop LSL anchors and the video duration we get the LSL-seconds-per-media-second
-  // rate (≈1 ± drift); fall back to 1:1 (start-anchor only) when the end anchor is missing.
+  // Map each sample's LSL time to video media-time via the per-session drift rate. The rate
+  // is trusted only when close to 1; a grossly-short/corrupt video falls back to 1:1 so the
+  // full recorded signal data is plotted rather than compressed to the broken video length.
   const t0 = videoLslTs ?? times[0]
-  let rate = 1
-  if (videoLslTs != null && videoLslTsEnd != null && videoDuration > 1) {
-    const r = (videoLslTsEnd - videoLslTs) / videoDuration
-    if (r > 0.5 && r < 2) rate = r
-  }
+  const rate = signalTimeRate(videoLslTs, videoLslTsEnd, videoDuration)
   const xs = times.map((t) => (t - t0) / rate)
   const xMin = xs[0]
   const xMax = xs[xs.length - 1]
