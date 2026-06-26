@@ -54,7 +54,7 @@ services:
     ports:
       - "7880:7880"     # signaling + server API
       - "7881:7881"     # RTC over TCP
-      - "50000-50100:50000-50100/udp"  # RTC media (UDP range)
+      - "7882:7882/udp" # RTC media (single UDP port; avoids the Windows-reserved 50000+ range)
     volumes:
       - ./livekit/livekit.yaml:/etc/livekit.yaml:ro
     depends_on:

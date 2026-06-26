@@ -3,8 +3,10 @@
 port: 7880
 rtc:
   tcp_port: 7881
-  port_range_start: 50000
-  port_range_end: 50100
+  # Single UDP media port (instead of a 50000–50100 range): Windows reserves ports in
+  # that high range (Hyper-V/WinNAT), so Docker can't bind them. One low port is plenty
+  # for a single-node dev/demo setup.
+  udp_port: 7882
   use_external_ip: false
   # Docker + clients on the host: LiveKit advertises this IP for WebRTC media so the
   # host-side Unity/browser AND the in-container Egress can all reach the media ports.
