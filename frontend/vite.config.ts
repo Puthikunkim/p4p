@@ -22,5 +22,10 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: './src/test-setup.ts',
+    // Run test files sequentially. Vitest 4's multi-worker pool intermittently races on
+    // startup under CPU contention on this stack (Node 26 + Vite 8), throwing "Vitest
+    // failed to find the runner". The suite is tiny, so sequential is plenty fast and
+    // fully deterministic.
+    fileParallelism: false,
   },
 })
