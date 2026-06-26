@@ -1,5 +1,5 @@
 import { useVCoreStore } from '../ws/store'
-import { linkLabel } from '../ws/links'
+import { LINK_ORDER, linkLabel } from '../ws/links'
 
 function stateLabel(state: string): string {
   const map: Record<string, string> = {
@@ -15,10 +15,13 @@ function stateLabel(state: string): string {
 export function SystemConfig() {
   const linkStatuses = useVCoreStore((s) => s.linkStatuses)
 
-  const chips = Object.entries(linkStatuses).map(([key, ls]) => ({
+  // Render the canonical links (Sensor Pipeline, Unity WS, Browser WS) in a stable order,
+  // defaulting any not-yet-reported link to "down" — same as SessionMonitor's link strip,
+  // so every page shows the same three indicators rather than only those already received.
+  const chips = LINK_ORDER.map((key) => ({
     key,
     name: linkLabel(key),
-    state: ls.state,
+    state: linkStatuses[key]?.state ?? 'down',
   }))
 
   return (

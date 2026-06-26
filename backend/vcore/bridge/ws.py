@@ -127,9 +127,17 @@ class DashboardBridge:
         await _send(ws, "link_status", LinkStatusEvent(link="unity-ws", state=unity_state).model_dump(mode="json"))
         if self._signal_source is not None:
             await _send(ws, "link_status", LinkStatusEvent(link="sensor-pipeline", state=self._signal_source.link_state).model_dump(mode="json"))
+        # This very client is, by definition, connected — report browser-ws "up" in the
+        # snapshot. The count-gated incremental publish in handle_dashboard is racy under
+        # reconnects (e.g. React StrictMode double-mount), so without this a client's own
+        # browser-ws may never reach its store.
+        await _send(ws, "link_status", LinkStatusEvent(link="browser-ws", state="up").model_dump(mode="json"))
         for key, payload in self._cached_link_states.items():
             if key == "sensor-pipeline" and self._signal_source is not None:
                 continue  # already pushed live state above
+            if key == "browser-ws":
+                continue  # this client's own connection is reported "up" above; a stale
+                # cached "down" (from a previous last-disconnect) must not overwrite it
             await _send(ws, "link_status", payload)
         if self._cached_vr_context is not None:
             await _send(ws, "vr_context", self._cached_vr_context)
