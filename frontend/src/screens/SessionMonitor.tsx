@@ -139,7 +139,7 @@ export function SessionMonitor() {
                   </thead>
                   <tbody>
                     {warnings.map((w, i) => (
-                      <tr key={i}>
+                      <tr key={i} className="warn-row">
                         <td className="detail-ts">
                           {new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
@@ -260,7 +260,7 @@ function VrContextPanel() {
   const entries = vrContext ? Object.entries(vrContext.fields) : []
 
   return (
-    <div className="signal-panel vr-context-panel">
+    <div className="signal-panel vr-context-panel signal-panel--vr_context">
       <div className="signal-panel__header">
         <span className="signal-panel__title">VR Context</span>
         <span className="signal-panel__live">LIVE</span>
@@ -293,7 +293,7 @@ function SignalPanel({ groupKey, channels, latestValues, history }: SignalPanelP
   const isVrContext = groupKey === 'vr_context'
 
   return (
-    <div className="signal-panel">
+    <div className={`signal-panel signal-panel--${groupKey}`}>
       <div className="signal-panel__header">
         <span className="signal-panel__title">{label}</span>
         {isVrContext && <span className="signal-panel__live">LIVE</span>}

@@ -24,6 +24,10 @@
 .link-chip--error { background: var(--danger-bg); color: var(--danger); border-color: rgba(243, 86, 75, 0.28); }
 .link-chip--stale, .link-chip--reconnecting { background: var(--warn-bg); color: var(--warn); border-color: rgba(244, 196, 48, 0.28); }
 
+/* Warnings list: a warn-yellow tag down the left of each row so every warning reads as
+   its own distinct, clearly-flagged entry. */
+.detail-event-log .warn-row td:first-child { box-shadow: inset 3px 0 0 var(--warn); }
+
 /* ── Renderer grid ── */
 
 .renderer-grid {
@@ -244,7 +248,7 @@
   padding: 7px 8px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
   max-height: 200px;
   overflow-y: auto;
 }
@@ -256,12 +260,16 @@
   font-style: italic;
 }
 
+/* Box each entry with a lime left-accent (lime = an adaptation action fired) so log
+   entries read as distinct events instead of one run-on block. */
 .adapt-log__entry {
   display: flex;
   align-items: flex-start;
   gap: 9px;
-  padding: 6px 7px;
+  padding: 7px 9px;
   border-radius: var(--radius-sm);
+  border-left: 2px solid var(--accent);
+  background: var(--surface-2);
   font-size: 12px;
 }
 
@@ -300,11 +308,17 @@
 .signal-panel {
   background: var(--surface);
   border: 1px solid var(--border);
+  border-top: 2px solid var(--panel-accent, var(--border-strong));
   border-radius: var(--radius);
   overflow: hidden;
   min-width: 0;
   box-shadow: var(--shadow);
 }
+
+/* Each section gets its own accent so the three panels are instantly distinguishable. */
+.signal-panel--physiological { --panel-accent: #38bdf8; } /* cyan */
+.signal-panel--behavioural   { --panel-accent: #a78bfa; } /* violet */
+.signal-panel--vr_context    { --panel-accent: #f472b6; } /* pink */
 
 .signal-panel__header {
   display: flex;
@@ -316,11 +330,23 @@
 }
 
 .signal-panel__title {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   font-size: 10.5px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--text-soft);
+  color: var(--panel-accent, var(--text-soft));
+}
+
+.signal-panel__title::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+  background: var(--panel-accent, var(--text-soft));
+  flex-shrink: 0;
 }
 
 .signal-panel__live {
@@ -352,18 +378,29 @@
   gap: 0;
 }
 
+/* Brighter metric titles + clearer separators so each readout within a panel stands out
+   (monochrome — no per-item colour coding). */
 .signal-panel__body .renderer {
   border: none;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--border-strong);
   border-radius: 0;
   padding: 11px 13px;
   box-shadow: none;
 }
 
-.signal-panel__body .renderer:hover { border-color: var(--border); }
+.signal-panel__body .renderer:hover {
+  border-color: var(--border-strong);
+  box-shadow: none;
+  background: var(--surface-hover);
+}
 
 .signal-panel__body .renderer:last-child {
   border-bottom: none;
+}
+
+.signal-panel__body .renderer__label {
+  color: var(--text);
+  font-weight: 700;
 }
 
 .signal-panel__body .renderer__value--big {
@@ -392,10 +429,10 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
   gap: 1px;
-  background: var(--border);
+  background: var(--border-strong);
   border-radius: var(--radius);
   overflow: hidden;
-  border: 1px solid var(--border);
+  border: 1px solid var(--border-strong);
 }
 
 .vr-context-item {
@@ -411,7 +448,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: var(--text-soft);
+  color: var(--text);
 }
 
 .vr-context-item__value {
