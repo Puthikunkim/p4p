@@ -11,6 +11,7 @@ import {
   IconMonitor, IconRules, IconHistory, IconConfig,
   IconPlus, IconStop, IconPause, IconCore,
 } from './components/icons'
+import { ThemeToggle } from './components/ThemeToggle'
 import type { ComponentType, SVGProps } from 'react'
 import './App.css'
 
@@ -107,6 +108,9 @@ function App() {
           ))}
         </nav>
 
+        <div className="sidebar__footer">
+          <ThemeToggle />
+        </div>
       </aside>
 
       {/* Main content */}

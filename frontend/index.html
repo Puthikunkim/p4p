@@ -9,6 +9,18 @@
     <title>V·CORE — Adaptive VR Console</title>
   </head>
   <body>
+    <script>
+      // Apply the persisted theme before first paint to avoid a flash.
+      (function () {
+        try {
+          var t = localStorage.getItem('vcore-theme');
+          if (!t) t = 'dark';
+          document.documentElement.classList.add(t === 'light' ? 'light' : 'dark');
+        } catch (e) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

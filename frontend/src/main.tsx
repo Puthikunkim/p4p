@@ -5,6 +5,8 @@ import '@fontsource-variable/hanken-grotesk'
 import '@fontsource-variable/jetbrains-mono'
 import './index.css'
 import App from './App.tsx'
+import { ThemeProvider } from './components/theme'
+import { TooltipProvider } from './components/ui/tooltip'
 import { registerRenderer, registerFallback } from './renderers/registry'
 import { StatCard } from './renderers/StatCard'
 import { LineChart } from './renderers/LineChart'
@@ -18,6 +20,10 @@ registerRenderer('quadrant', Quadrant)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ThemeProvider>
+      <TooltipProvider delayDuration={200}>
+        <App />
+      </TooltipProvider>
+    </ThemeProvider>
   </StrictMode>,
 )

@@ -1,71 +1,224 @@
+@import 'tailwindcss';
+@import 'tw-animate-css';
+
 /* ============================================================================
-   V-CORE — "Dark signal" design system
+   V-CORE — design system tokens
    Display: Fraunces · Body: Hanken Grotesk · Data: JetBrains Mono
-   Single dark theme (lime brand, orange secondary). Inspired by the Nixtio
-   "Check Box" dashboard. Tokens here are consumed across src/styles/*.
+
+   Two layers of tokens, both theme-aware (dark default, light via `.light`):
+     1. App tokens (--bg, --surface, --accent, --border, --radius …) — the
+        original "dark signal" system, consumed by src/styles/*.
+     2. shadcn/ui tokens, namespaced as --ui-* to avoid colliding with the app
+        tokens above, mapped into Tailwind's color/radius scale via @theme.
    Brand colours (lime/orange) are decorative; status colours (ok/warn/danger)
-   carry safety meaning and are kept deliberately distinct from the brand.
+   carry safety meaning and stay deliberately distinct from the brand.
    ============================================================================ */
 
-:root {
-  /* ── Type families ───────────────────────────────────────────── */
+@custom-variant dark (&:is(.dark *));
+
+/* ── DARK (default) ─────────────────────────────────────────────────────── */
+:root,
+.dark {
+  color-scheme: dark;
+
+  /* Type families */
   --display: 'Fraunces Variable', Georgia, 'Times New Roman', serif;
   --sans: 'Hanken Grotesk Variable', system-ui, sans-serif;
   --mono: 'JetBrains Mono Variable', ui-monospace, 'Cascadia Code', monospace;
   --heading: var(--display);
 
-  /* ── Surfaces — near-black canvas, lifted charcoal cards ──────── */
+  /* Surfaces — near-black canvas, lifted charcoal cards */
   --bg: #0a0b0d;
-  --bg-tint: #10131a;          /* faint lime wash sits over this */
-  --surface: #17181c;          /* cards */
-  --surface-2: #202228;        /* nested panels / striped rows */
+  --bg-tint: #10131a;
+  --surface: #17181c;
+  --surface-2: #202228;
   --surface-hover: #23252b;
   --code-bg: #16171b;
 
-  /* ── Lines ───────────────────────────────────────────────────── */
-  --border: #26282e;           /* hairline */
+  /* Lines */
+  --border: #26282e;
   --border-strong: #363941;
 
-  /* ── Ink ─────────────────────────────────────────────────────── */
-  --text: #c0c6d0;             /* body */
-  --text-soft: #7c828e;        /* muted / labels */
-  --text-h: #f3f5f8;           /* headings, near-white */
+  /* Ink */
+  --text: #c0c6d0;
+  --text-soft: #7c828e;
+  --text-h: #f3f5f8;
 
-  /* ── Brand accent — lime (primary) ───────────────────────────── */
+  /* Brand accent — lime (primary) */
   --accent: #b6f24a;
   --accent-hover: #a6e636;
-  --accent-soft: #cdf978;      /* links / focus ring */
+  --accent-soft: #cdf978;
   --accent-bg: rgba(182, 242, 74, 0.12);
   --accent-border: rgba(182, 242, 74, 0.30);
-  --accent-ink: #11140a;       /* near-black text for fills ON lime */
+  --accent-ink: #11140a;
 
-  /* ── Brand accent — orange (secondary / decorative) ──────────── */
+  /* Brand accent — orange (secondary / decorative) */
   --accent-2: #f7901e;
   --accent-2-bg: rgba(247, 144, 30, 0.12);
   --accent-2-border: rgba(247, 144, 30, 0.32);
 
-  /* ── Semantic signal colours (meaning preserved, kept distinct) ─
-     ok = emerald (teal-green, ≠ yellow-green lime),
-     warn = golden yellow (≠ orange brand), danger = red. */
+  /* Semantic signal colours */
   --ok: #2fd58a;      --ok-bg: rgba(47, 213, 138, 0.12);
   --warn: #f4c430;    --warn-bg: rgba(244, 196, 48, 0.12);
   --danger: #f3564b;  --danger-bg: rgba(243, 86, 75, 0.12);
 
-  /* shadows — deeper/black for a dark surface */
+  /* Shadows — deep/diffuse on a dark surface */
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.35);
   --shadow-md: 0 12px 32px -10px rgba(0, 0, 0, 0.6), 0 2px 6px rgba(0, 0, 0, 0.4);
 
-  /* ── Geometry & motion ───────────────────────────────────────── */
+  /* Geometry & motion */
   --radius-sm: 9px;
   --radius: 14px;
   --radius-lg: 20px;
   --radius-pill: 999px;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
 
+  /* ── shadcn/ui token layer (namespaced) ── */
+  --ui-background: #0a0b0d;
+  --ui-foreground: #e8ebf0;
+  --ui-card: #17181c;
+  --ui-card-foreground: #f3f5f8;
+  --ui-popover: #1b1d22;
+  --ui-popover-foreground: #f3f5f8;
+  --ui-primary: #b6f24a;
+  --ui-primary-foreground: #11140a;
+  --ui-secondary: #202228;
+  --ui-secondary-foreground: #e8ebf0;
+  --ui-muted: #202228;
+  --ui-muted-foreground: #8b919d;
+  --ui-accent: #23252b;
+  --ui-accent-foreground: #f3f5f8;
+  --ui-destructive: #f3564b;
+  --ui-destructive-foreground: #ffffff;
+  --ui-border: #2a2c33;
+  --ui-input: #30333b;
+  --ui-ring: #b6f24a;
+  --ui-radius: 14px;
+
+  --ui-chart-1: #b6f24a;
+  --ui-chart-2: #2fd58a;
+  --ui-chart-3: #f7901e;
+  --ui-chart-4: #4aa8f2;
+  --ui-chart-5: #f4c430;
+}
+
+/* ── LIGHT ──────────────────────────────────────────────────────────────── */
+.light {
+  color-scheme: light;
+
+  /* Surfaces — warm off-white canvas, crisp white cards */
+  --bg: #f6f7f9;
+  --bg-tint: #fafbfc;
+  --surface: #ffffff;
+  --surface-2: #f1f3f6;
+  --surface-hover: #eceff4;
+  --code-bg: #f1f3f6;
+
+  /* Lines */
+  --border: #e4e7ec;
+  --border-strong: #d0d5dd;
+
+  /* Ink */
+  --text: #3d4453;
+  --text-soft: #6b7280;
+  --text-h: #0f1115;
+
+  /* Brand accent — deepened lime for contrast on light surfaces */
+  --accent: #5f8c0a;
+  --accent-hover: #527a06;
+  --accent-soft: #6fa015;
+  --accent-bg: rgba(95, 140, 10, 0.12);
+  --accent-border: rgba(95, 140, 10, 0.32);
+  --accent-ink: #f7fbef;
+
+  /* Brand accent — orange */
+  --accent-2: #d9730a;
+  --accent-2-bg: rgba(217, 115, 10, 0.12);
+  --accent-2-border: rgba(217, 115, 10, 0.32);
+
+  /* Semantic signal colours */
+  --ok: #15915b;      --ok-bg: rgba(21, 145, 91, 0.12);
+  --warn: #b7791f;    --warn-bg: rgba(183, 121, 31, 0.12);
+  --danger: #d64133;  --danger-bg: rgba(214, 65, 51, 0.12);
+
+  /* Shadows — soft/diffuse on light surfaces */
+  --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.08);
+  --shadow-md: 0 16px 36px -14px rgba(16, 24, 40, 0.18), 0 2px 6px rgba(16, 24, 40, 0.06);
+
+  /* ── shadcn/ui token layer (light) ── */
+  --ui-background: #f6f7f9;
+  --ui-foreground: #0f1115;
+  --ui-card: #ffffff;
+  --ui-card-foreground: #0f1115;
+  --ui-popover: #ffffff;
+  --ui-popover-foreground: #0f1115;
+  --ui-primary: #5f8c0a;
+  --ui-primary-foreground: #f7fbef;
+  --ui-secondary: #f1f3f6;
+  --ui-secondary-foreground: #1c2128;
+  --ui-muted: #f1f3f6;
+  --ui-muted-foreground: #6b7280;
+  --ui-accent: #eceff4;
+  --ui-accent-foreground: #0f1115;
+  --ui-destructive: #d64133;
+  --ui-destructive-foreground: #ffffff;
+  --ui-border: #e4e7ec;
+  --ui-input: #d8dde4;
+  --ui-ring: #5f8c0a;
+
+  --ui-chart-1: #5f8c0a;
+  --ui-chart-2: #15915b;
+  --ui-chart-3: #d9730a;
+  --ui-chart-4: #2563eb;
+  --ui-chart-5: #b7791f;
+}
+
+/* ── Tailwind / shadcn theme mapping ──────────────────────────────────────
+   Maps Tailwind's color + radius + font scale onto the namespaced --ui-*
+   tokens so shadcn utilities (bg-background, text-primary, rounded-lg …) work
+   without touching the app's own --accent / --border / --radius tokens. */
+@theme inline {
+  --color-background: var(--ui-background);
+  --color-foreground: var(--ui-foreground);
+  --color-card: var(--ui-card);
+  --color-card-foreground: var(--ui-card-foreground);
+  --color-popover: var(--ui-popover);
+  --color-popover-foreground: var(--ui-popover-foreground);
+  --color-primary: var(--ui-primary);
+  --color-primary-foreground: var(--ui-primary-foreground);
+  --color-secondary: var(--ui-secondary);
+  --color-secondary-foreground: var(--ui-secondary-foreground);
+  --color-muted: var(--ui-muted);
+  --color-muted-foreground: var(--ui-muted-foreground);
+  --color-accent: var(--ui-accent);
+  --color-accent-foreground: var(--ui-accent-foreground);
+  --color-destructive: var(--ui-destructive);
+  --color-destructive-foreground: var(--ui-destructive-foreground);
+  --color-border: var(--ui-border);
+  --color-input: var(--ui-input);
+  --color-ring: var(--ui-ring);
+
+  --color-chart-1: var(--ui-chart-1);
+  --color-chart-2: var(--ui-chart-2);
+  --color-chart-3: var(--ui-chart-3);
+  --color-chart-4: var(--ui-chart-4);
+  --color-chart-5: var(--ui-chart-5);
+
+  --font-sans: var(--sans);
+  --font-serif: var(--display);
+  --font-mono: var(--mono);
+
+  --radius-sm: calc(var(--ui-radius) - 5px);
+  --radius-md: calc(var(--ui-radius) - 3px);
+  --radius-lg: var(--ui-radius);
+  --radius-xl: calc(var(--ui-radius) + 4px);
+}
+
+/* ── Global base typography / chrome (theme-aware via tokens) ─────────────── */
+:root {
   font: 400 14.5px/1.55 var(--sans);
   font-optical-sizing: auto;
   letter-spacing: -0.003em;
-  color-scheme: dark;
   color: var(--text);
   background: var(--bg);
   font-synthesis: none;
@@ -92,7 +245,14 @@ body {
   background-attachment: fixed;
 }
 
-/* ── Headings — Fraunces display, heavier + tighter on the dark board ─ */
+.light body {
+  background:
+    radial-gradient(1100px 560px at 100% -8%, rgba(95, 140, 10, 0.06), transparent 62%),
+    var(--bg-tint),
+    var(--bg);
+}
+
+/* Headings — Fraunces display */
 h1, h2 {
   font-family: var(--display);
   font-optical-sizing: auto;
@@ -132,14 +292,14 @@ code {
 
 .tnum { font-variant-numeric: tabular-nums; }
 
-/* ── Focus ring (a11y) ───────────────────────────────────────────── */
+/* Focus ring (a11y) */
 :focus-visible {
   outline: 2px solid var(--accent-soft);
   outline-offset: 2px;
   border-radius: 5px;
 }
 
-/* ── Scrollbars ──────────────────────────────────────────────────── */
+/* Scrollbars */
 * { scrollbar-width: thin; scrollbar-color: var(--border-strong) transparent; }
 *::-webkit-scrollbar { width: 11px; height: 11px; }
 *::-webkit-scrollbar-thumb {
@@ -148,11 +308,11 @@ code {
   border: 3px solid transparent;
   background-clip: padding-box;
 }
-*::-webkit-scrollbar-thumb:hover { background: #c2c8d4; background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background: var(--text-soft); background-clip: padding-box; }
 
 ::selection { background: var(--accent-bg); color: var(--text-h); }
 
-/* ── Motion ──────────────────────────────────────────────────────── */
+/* Motion */
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(10px); }
   to   { opacity: 1; transform: none; }
@@ -167,5 +327,12 @@ code {
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
+  }
+}
+
+/* shadcn/ui base layer */
+@layer base {
+  * {
+    border-color: var(--color-border);
   }
 }
