@@ -2,6 +2,10 @@ import { useState } from 'react'
 import { useVCoreStore } from '../ws/store'
 import { LINK_ORDER, linkLabel } from '../ws/links'
 import { IconPlay } from '../components/icons'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import { Badge } from '../components/ui/badge'
+import { statusBadgeVariant } from '@/lib/utils'
 
 interface Props {
   onStarted?: () => void
@@ -77,8 +81,7 @@ export function NewSession({ onStarted }: Props) {
           <div className="ns-panel__body">
             <div className="ns-panel__row">
               <label className="ns-panel__label">Subject ID</label>
-              <input
-                className="ns-panel__input"
+              <Input
                 value={participant}
                 onChange={(e) => setParticipant(e.target.value)}
                 placeholder="e.g. SUBJ-0042"
@@ -101,9 +104,9 @@ export function NewSession({ onStarted }: Props) {
         <div className="ns-panel">
           <div className="ns-panel__header">
             <span>System Status</span>
-            <span className={`ns-panel__badge ${allConnected ? 'ns-panel__badge--ok' : ''}`}>
+            <Badge variant={allConnected ? 'success' : 'warning'}>
               {allConnected ? 'READY' : 'AWAITING SYNC'}
-            </span>
+            </Badge>
           </div>
           <div className="ns-panel__body" style={{ padding: '8px 14px' }}>
             {systemLinks.length === 0 ? (
@@ -113,7 +116,7 @@ export function NewSession({ onStarted }: Props) {
                 <div key={link.name} className="link-status-row">
                   <span className={`status-dot status-dot--${link.state}`} />
                   <span className="link-status-row__name">{link.name}</span>
-                  <span className={`badge badge--${link.state}`}>{link.state}</span>
+                  <Badge variant={statusBadgeVariant(link.state)}>{link.state}</Badge>
                 </div>
               ))
             )}
@@ -124,13 +127,12 @@ export function NewSession({ onStarted }: Props) {
       {error && <p className="form-error" style={{ marginBottom: 12 }}>{error}</p>}
 
       <div className="new-session-footer">
-        <button
-          className="btn btn--primary"
+        <Button
           onClick={startSession}
           disabled={!participant.trim() || starting}
         >
           {starting ? 'Starting…' : <><IconPlay /> Start VR Session</>}
-        </button>
+        </Button>
       </div>
     </div>
   )

@@ -1,6 +1,13 @@
 import { useState, useEffect, useRef, useMemo, useId, type MouseEvent, type CSSProperties } from 'react'
 import { IconWarn, IconCheck, IconArrowLeft, IconTrash } from '../components/icons'
 import { signalTimeRate } from './signalTime'
+import { useTheme } from '../components/theme'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '../components/ui/dialog'
+import { statusBadgeVariant } from '@/lib/utils'
 
 interface Session {
   id: string
@@ -90,7 +97,8 @@ const CHART_W = 1000, CHART_H = 46  // viewBox units; SVG stretches to container
 // Per-channel palette so each sensor signal is distinguishable at a glance. Brand-led
 // (lime, orange) then spread across hues that avoid the alarm trio (ok/warn/danger), so a
 // data line is never mistaken for a status colour. Cycles if there are more channels.
-const SIGNAL_PALETTE = [
+// Two variants: bright hues read on the dark canvas; deepened hues stay legible on white.
+const SIGNAL_PALETTE_DARK = [
   '#b6f24a', // lime (brand)
   '#f7901e', // orange (brand)
   '#38bdf8', // cyan
@@ -99,6 +107,16 @@ const SIGNAL_PALETTE = [
   '#2dd4bf', // teal
   '#fbbf24', // gold
   '#60a5fa', // blue
+]
+const SIGNAL_PALETTE_LIGHT = [
+  '#5f8c0a', // lime (brand, deepened)
+  '#d9730a', // orange (brand, deepened)
+  '#0e7fb8', // cyan
+  '#7c3aed', // violet
+  '#db2777', // pink
+  '#0d9488', // teal
+  '#b7791f', // gold
+  '#2563eb', // blue
 ]
 
 // Closest index in a sorted-ascending array (binary search) — for the cursor value readout.
@@ -127,6 +145,8 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
 }) {
   // Stable per-chart prefix so each channel's gradient gets a unique SVG id (ids are global).
   const gradPrefix = useId()
+  const { theme } = useTheme()
+  const palette = theme === 'light' ? SIGNAL_PALETTE_LIGHT : SIGNAL_PALETTE_DARK
 
   // Static geometry — the per-channel SVG polylines/areas and time axis. Recomputed ONLY when
   // the recorded data / alignment changes, never when the cursor moves. This is what keeps
@@ -145,7 +165,7 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
     const xMin = xs[0]
     const xMax = xs[xs.length - 1]
     const span = Math.max(0.001, xMax - xMin)
-    const channels = signals.channels.map((name, ci) => {
+    const channels = signals.channels.map((name) => {
       const vals = signals.series[name] ?? []
       let vMin = Infinity, vMax = -Infinity
       for (const v of vals) { if (v < vMin) vMin = v; if (v > vMax) vMax = v }
@@ -159,8 +179,7 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
       const x0 = vals.length ? ((xs[0] - xMin) / span) * CHART_W : 0
       const xN = vals.length ? ((xs[vals.length - 1] - xMin) / span) * CHART_W : 0
       const area = vals.length ? `${x0.toFixed(1)},${CHART_H} ${pts} ${xN.toFixed(1)},${CHART_H}` : ''
-      const color = SIGNAL_PALETTE[ci % SIGNAL_PALETTE.length]
-      return { name, vals, pts, area, color }
+      return { name, vals, pts, area }
     })
     return { xs, xMin, xMax, span, channels }
   }, [signals, videoLslTs, videoLslTsEnd, videoDuration])
@@ -183,8 +202,9 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
 
   return (
     <div className="signal-charts">
-      {channels.map(({ name, vals, pts, area, color }, ci) => {
+      {channels.map(({ name, vals, pts, area }, ci) => {
         const gid = `${gradPrefix}-sig-${ci}`
+        const color = palette[ci % palette.length]
         return (
           <div className="signal-chart-row" key={name} style={{ '--sig-color': color } as CSSProperties}>
             <div className="signal-chart-row__head">
@@ -225,21 +245,47 @@ function RealSignalChart({ signals, videoLslTs, videoLslTsEnd, videoDuration, pl
 
 // ── event display helpers ─────────────────────────────────────────────────────
 
-// Bright-on-dark categorical colours (the old saturated mid-tones + 12%-tint backgrounds
-// were tuned for a light surface and read as muddy on the dark cards).
-const EVENT_STYLES: Record<string, { label: string; color: string; bg: string }> = {
-  rule_fired:         { label: 'Adaptation Trigger', color: '#a78bfa', bg: 'rgba(167,139,250,0.16)' },
-  action_fired:       { label: 'Action Invoked',     color: '#c084fc', bg: 'rgba(192,132,252,0.16)' },
-  vr_context:         { label: 'Step Change',        color: '#38bdf8', bg: 'rgba(56,189,248,0.16)' },
-  link_status:        { label: 'Connectivity',       color: '#60a5fa', bg: 'rgba(96,165,250,0.16)' },
-  warning:            { label: 'Warning',            color: '#f4c430', bg: 'rgba(244,196,48,0.16)' },
-  baseline_establish: { label: 'Baseline Establish', color: '#2fd58a', bg: 'rgba(47,213,138,0.16)' },
-  session_start:      { label: 'Session Start',      color: '#b6f24a', bg: 'rgba(182,242,74,0.16)' },
-  session_end:        { label: 'Session End',        color: '#2dd4bf', bg: 'rgba(45,212,191,0.16)' },
+// Categorical event colours, per theme: bright-on-dark for the dark cards, saturated
+// mid-tones on faint tints for the white cards (bright hues are unreadable on light).
+const EVENT_LABELS: Record<string, string> = {
+  rule_fired: 'Adaptation Trigger',
+  action_fired: 'Action Invoked',
+  vr_context: 'Step Change',
+  link_status: 'Connectivity',
+  warning: 'Warning',
+  baseline_establish: 'Baseline Establish',
+  session_start: 'Session Start',
+  session_end: 'Session End',
 }
 
-function getEventStyle(type: string) {
-  return EVENT_STYLES[type] ?? { label: type, color: '#94a3b8', bg: 'rgba(148,163,184,0.16)' }
+const EVENT_COLORS_DARK: Record<string, { color: string; bg: string }> = {
+  rule_fired:         { color: '#a78bfa', bg: 'rgba(167,139,250,0.16)' },
+  action_fired:       { color: '#c084fc', bg: 'rgba(192,132,252,0.16)' },
+  vr_context:         { color: '#38bdf8', bg: 'rgba(56,189,248,0.16)' },
+  link_status:        { color: '#60a5fa', bg: 'rgba(96,165,250,0.16)' },
+  warning:            { color: '#f4c430', bg: 'rgba(244,196,48,0.16)' },
+  baseline_establish: { color: '#2fd58a', bg: 'rgba(47,213,138,0.16)' },
+  session_start:      { color: '#b6f24a', bg: 'rgba(182,242,74,0.16)' },
+  session_end:        { color: '#2dd4bf', bg: 'rgba(45,212,191,0.16)' },
+}
+
+const EVENT_COLORS_LIGHT: Record<string, { color: string; bg: string }> = {
+  rule_fired:         { color: '#7c3aed', bg: 'rgba(124,58,237,0.10)' },
+  action_fired:       { color: '#9333ea', bg: 'rgba(147,51,234,0.10)' },
+  vr_context:         { color: '#0e7490', bg: 'rgba(14,116,144,0.10)' },
+  link_status:        { color: '#0369a1', bg: 'rgba(3,105,161,0.10)' },
+  warning:            { color: '#b45309', bg: 'rgba(180,83,9,0.10)' },
+  baseline_establish: { color: '#15803d', bg: 'rgba(21,128,61,0.10)' },
+  session_start:      { color: '#1d4ed8', bg: 'rgba(29,78,216,0.10)' },
+  session_end:        { color: '#15803d', bg: 'rgba(21,128,61,0.10)' },
+}
+
+function getEventStyle(type: string, theme: 'dark' | 'light') {
+  const colors = theme === 'light' ? EVENT_COLORS_LIGHT : EVENT_COLORS_DARK
+  const fallback = theme === 'light'
+    ? { color: '#475569', bg: 'rgba(71,85,105,0.10)' }
+    : { color: '#94a3b8', bg: 'rgba(148,163,184,0.16)' }
+  return { label: EVENT_LABELS[type] ?? type, ...(colors[type] ?? fallback) }
 }
 
 function summarizePayload(payload: string): string {
@@ -297,6 +343,8 @@ export function DataHistory() {
   const [videoDuration, setVideoDuration] = useState(0)
   const [loading, setLoading] = useState(true)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const { theme } = useTheme()
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/sessions')
@@ -326,8 +374,7 @@ export function DataHistory() {
     setVideoDuration(0)
   }
 
-  async function deleteSession(id: string) {
-    if (!window.confirm('Delete this session permanently? Its recording, signals and event log cannot be recovered.')) return
+  async function performDelete(id: string) {
     const r = await fetch(`/api/sessions/${id}`, { method: 'DELETE' })
     if (!r.ok) {
       const body = await r.json().catch(() => ({})) as { detail?: string }
@@ -337,6 +384,29 @@ export function DataHistory() {
     setSessions((prev) => prev.filter((s) => s.id !== id))
     if (selected?.id === id) backToList()
   }
+
+  // Confirm dialog shared by the list-row and detail Delete buttons (rendered in both views).
+  const deleteDialog = (
+    <Dialog open={pendingDelete !== null} onOpenChange={(o) => { if (!o) setPendingDelete(null) }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Delete session?</DialogTitle>
+          <DialogDescription>
+            This permanently removes the recording, signals and event log. This cannot be undone.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setPendingDelete(null)}>Cancel</Button>
+          <Button
+            variant="destructive"
+            onClick={() => { const id = pendingDelete; setPendingDelete(null); if (id) performDelete(id) }}
+          >
+            Delete
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 
   if (loading) return <div className="screen"><p className="empty-state">Loading…</p></div>
 
@@ -365,19 +435,20 @@ export function DataHistory() {
                   <td>{new Date(s.started_at).toLocaleString()}</td>
                   <td>{formatDuration(s.started_at, s.ended_at)}</td>
                   <td>{s.event_count}</td>
-                  <td><span className={`badge badge--${s.status === 'done' ? 'done' : 'running'}`}>{s.status}</span></td>
+                  <td><Badge variant={statusBadgeVariant(s.status)}>{s.status}</Badge></td>
                   <td>
                     <div className="history-table__actions">
-                      <button className="btn btn--small" onClick={(e) => { e.stopPropagation(); openSession(s.id) }}>View</button>
-                      <button
-                        className="btn btn--small btn--danger btn--icon"
-                        onClick={(e) => { e.stopPropagation(); deleteSession(s.id) }}
+                      <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); openSession(s.id) }}>View</Button>
+                      <Button
+                        variant="destructive"
+                        size="icon-sm"
+                        onClick={(e) => { e.stopPropagation(); setPendingDelete(s.id) }}
                         disabled={s.status !== 'done'}
                         title={s.status !== 'done' ? 'Stop the session before deleting' : 'Delete this session'}
                         aria-label="Delete session"
                       >
                         <IconTrash />
-                      </button>
+                      </Button>
                     </div>
                   </td>
                 </tr>
@@ -385,6 +456,7 @@ export function DataHistory() {
             </tbody>
           </table>
         )}
+        {deleteDialog}
       </div>
     )
   }
@@ -417,24 +489,27 @@ export function DataHistory() {
     <div className="screen">
       {/* detail header */}
       <div className="screen-header">
-        <button className="btn btn--small" onClick={backToList}><IconArrowLeft /> Back</button>
+        <Button variant="outline" size="sm" onClick={backToList}><IconArrowLeft /> Back</Button>
         <div className="detail-session-label">
           <span className="detail-session-id">{s.participant}</span>
           <span className="detail-session-date">{new Date(s.started_at).toLocaleDateString()}</span>
         </div>
         <div style={{ flex: 1 }} />
-        <button
-          className="btn btn--small btn--danger"
-          onClick={() => deleteSession(s.id)}
+        <Button
+          variant="destructive"
+          size="sm"
+          onClick={() => setPendingDelete(s.id)}
           disabled={!isDone}
           title={!isDone ? 'Stop the session before deleting' : 'Delete this session'}
         >
           <IconTrash /> Delete
-        </button>
+        </Button>
         {s.xdf_path ? (
-          <a className="btn btn--primary" href={`/api/sessions/${s.id}/download`} download>Download Report</a>
+          <Button asChild>
+            <a href={`/api/sessions/${s.id}/download`} download>Download Report</a>
+          </Button>
         ) : (
-          <button className="btn btn--primary" disabled title="No export file available">Download Report</button>
+          <Button disabled title="No export file available">Download Report</Button>
         )}
       </div>
 
@@ -497,7 +572,7 @@ export function DataHistory() {
                   </thead>
                   <tbody>
                     {s.events.map((ev) => {
-                      const style = getEventStyle(ev.event_type)
+                      const style = getEventStyle(ev.event_type, theme)
                       let cls = ''
                       if (hasVideo) {
                         const evt = eventVideoTime(ev)
@@ -535,9 +610,9 @@ export function DataHistory() {
           <div className="detail-subject">
             <div className="detail-subject__label">SUBJECT</div>
             <div className="detail-subject__name">{s.participant}</div>
-            <span className={`badge badge--${isDone ? 'done' : 'running'}`} style={{ marginTop: 4 }}>
+            <Badge variant={statusBadgeVariant(s.status)} style={{ marginTop: 4 }}>
               {isDone ? <><IconCheck /> Verified</> : <><span className="status-dot status-dot--up" /> Active</>}
-            </span>
+            </Badge>
           </div>
 
           <div className="detail-stats">
@@ -549,6 +624,7 @@ export function DataHistory() {
           </div>
         </div>
       </div>
+      {deleteDialog}
     </div>
   )
 }

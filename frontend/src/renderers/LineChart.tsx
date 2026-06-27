@@ -2,17 +2,27 @@ import { useEffect, useRef } from 'react'
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
 import type { RendererProps } from './registry'
+import { useTheme } from '../components/theme'
+
+// uPlot paints axes/grid/series onto a canvas, so it can't inherit the CSS theme — colours
+// are chosen per-theme here and the plot is rebuilt when the theme changes.
+const CHART_THEME = {
+  dark:  { axis: '#7c828e', grid: 'rgba(255, 255, 255, 0.07)', stroke: '#b6f24a', fill: 'rgba(182, 242, 74, 0.12)' },
+  light: { axis: '#6b7280', grid: 'rgba(16, 24, 40, 0.10)',    stroke: '#5f8c0a', fill: 'rgba(95, 140, 10, 0.12)' },
+} as const
 
 export function LineChart({ channel, history }: RendererProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const plotRef = useRef<uPlot | null>(null)
+  const { theme } = useTheme()
+  // Keep the latest history without making it a plot-rebuild trigger, so a theme rebuild
+  // can re-apply the current data immediately rather than blanking the line.
+  const histRef = useRef(history)
+  useEffect(() => { histRef.current = history }, [history])
 
   useEffect(() => {
     if (!containerRef.current) return
-    // uPlot renders axes/grid/ticks onto a canvas (not via CSS), so the dark theme can't
-    // cascade to them — set legible colours explicitly. Series is brand lime with a soft fill.
-    const axisStroke = '#7c828e'
-    const gridStroke = 'rgba(255, 255, 255, 0.07)'
+    const c = CHART_THEME[theme]
     const opts: uPlot.Options = {
       title: channel.display.label,
       width: containerRef.current.clientWidth || 320,
@@ -21,26 +31,28 @@ export function LineChart({ channel, history }: RendererProps) {
         {},
         {
           label: channel.display.label,
-          stroke: '#b6f24a',
-          fill: 'rgba(182, 242, 74, 0.12)',
+          stroke: c.stroke,
+          fill: c.fill,
           width: 2,
         },
       ],
       axes: [
-        { label: 't (s)', stroke: axisStroke, grid: { stroke: gridStroke }, ticks: { stroke: gridStroke } },
-        { label: channel.unit, stroke: axisStroke, grid: { stroke: gridStroke }, ticks: { stroke: gridStroke } },
+        { label: 't (s)', stroke: c.axis, grid: { stroke: c.grid }, ticks: { stroke: c.grid } },
+        { label: channel.unit, stroke: c.axis, grid: { stroke: c.grid }, ticks: { stroke: c.grid } },
       ],
       scales: channel.range
         ? { y: { range: () => [channel.range!.min, channel.range!.max] } }
         : {},
     }
-    const data: uPlot.AlignedData = [[], []]
-    plotRef.current = new uPlot(opts, data, containerRef.current)
+    const plot = new uPlot(opts, [[], []], containerRef.current)
+    plotRef.current = plot
+    const h = histRef.current
+    if (h.length) plot.setData([h.map(([t]) => t), h.map(([, v]) => v)])
     return () => {
-      plotRef.current?.destroy()
+      plot.destroy()
       plotRef.current = null
     }
-  }, [channel])  // rebuild when channel definition changes
+  }, [channel, theme])  // rebuild when the channel definition OR theme changes
 
   useEffect(() => {
     if (!plotRef.current || history.length === 0) return

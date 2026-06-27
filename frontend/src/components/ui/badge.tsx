@@ -18,6 +18,10 @@ const badgeVariants = cva(
           "border-border text-foreground [a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         ghost: "[a&]:hover:bg-accent [a&]:hover:text-accent-foreground",
         link: "text-primary underline-offset-4 [a&]:hover:underline",
+        // Semantic status variants — mapped to the app's theme-aware signal tokens so the
+        // ok/warn/danger meaning (and light/dark adaptation) survives the swap.
+        success: "border-transparent bg-[var(--ok-bg)] text-[var(--ok)]",
+        warning: "border-transparent bg-[var(--warn-bg)] text-[var(--warn)]",
       },
     },
     defaultVariants: {

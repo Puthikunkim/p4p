@@ -320,6 +320,11 @@
 .signal-panel--behavioural   { --panel-accent: #a78bfa; } /* violet */
 .signal-panel--vr_context    { --panel-accent: #f472b6; } /* pink */
 
+/* Deepened variants so the section accents stay legible on the white light-theme cards. */
+.light .signal-panel--physiological { --panel-accent: #0e7fb8; }
+.light .signal-panel--behavioural   { --panel-accent: #7c3aed; }
+.light .signal-panel--vr_context    { --panel-accent: #db2777; }
+
 .signal-panel__header {
   display: flex;
   align-items: center;

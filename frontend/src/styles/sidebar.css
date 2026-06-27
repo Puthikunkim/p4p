@@ -121,3 +121,51 @@
 
 .sidebar__link:hover .sidebar__link-icon { color: var(--text); }
 .sidebar__link--active .sidebar__link-icon { color: var(--accent); }
+
+/* ── Footer / theme toggle ── */
+
+.sidebar__footer {
+  padding: 12px 14px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.theme-toggle {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+}
+
+.theme-toggle__option {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: none;
+  background: none;
+  border-radius: var(--radius-pill);
+  cursor: pointer;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  color: var(--text-soft);
+  transition: background 0.15s var(--ease), color 0.15s var(--ease),
+    box-shadow 0.15s var(--ease);
+}
+
+.theme-toggle__option svg { width: 14px; height: 14px; }
+
+.theme-toggle__option:hover { color: var(--text-h); }
+
+.theme-toggle__option--active {
+  background: var(--surface);
+  color: var(--text-h);
+  box-shadow: var(--shadow);
+}
+
+.theme-toggle__option--active svg { color: var(--accent); }

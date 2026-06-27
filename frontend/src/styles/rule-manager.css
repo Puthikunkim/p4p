@@ -72,26 +72,11 @@
   color: var(--text);
 }
 
-.form-row input,
-.form-row select,
-.form-row textarea {
+/* Inputs/selects are shadcn components now (they bring their own border/focus styling);
+   here we only lay them out in the row. data-slot targets the shadcn Input + SelectTrigger. */
+.form-row [data-slot="input"],
+.form-row [data-slot="select-trigger"] {
   flex: 1;
-  padding: 7px 10px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border-strong);
-  background: var(--surface);
-  color: var(--text-h);
-  font-size: 13px;
-  font-family: var(--sans);
-  transition: border-color 0.15s var(--ease), box-shadow 0.15s var(--ease);
-}
-
-.form-row input:focus,
-.form-row select:focus,
-.form-row textarea:focus {
-  outline: none;
-  border-color: var(--accent-soft);
-  box-shadow: 0 0 0 3px var(--accent-bg);
 }
 
 .form-row textarea { resize: vertical; }

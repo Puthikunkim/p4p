@@ -1,6 +1,14 @@
 import { useMemo, useState } from 'react'
 import { useVCoreStore } from '../ws/store'
 import { IconWarn } from '../components/icons'
+import { Button } from '../components/ui/button'
+import { Input } from '../components/ui/input'
+import {
+  Select, SelectTrigger, SelectValue, SelectContent, SelectItem,
+} from '../components/ui/select'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter,
+} from '../components/ui/dialog'
 import type { ConditionItem, InvokeAction, RuleGrammarContract2 } from '../contracts/RuleGrammar'
 import type { AbstractAction, ObjectDeclaration } from '../contracts/ObjectStatusManifest'
 
@@ -40,6 +48,7 @@ export function RuleManager() {
   const [editingRule, setEditingRule] = useState<RuleGrammarContract2 | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null)
 
   const channels = signalManifest?.channels ?? []
   const objects: ObjectDeclaration[] = useMemo(
@@ -201,8 +210,7 @@ export function RuleManager() {
     }
   }
 
-  async function deleteRule(id: string) {
-    if (!confirm(`Delete rule "${id}"?`)) return
+  async function performDeleteRule(id: string) {
     if (editingRule?.id === id) closeBuilder()
     await fetch(`/api/rules/${encodeURIComponent(id)}`, { method: 'DELETE' })
   }
@@ -216,9 +224,9 @@ export function RuleManager() {
             <div className="screen-subtitle">{rules.length} rule{rules.length !== 1 ? 's' : ''} loaded</div>
           )}
         </div>
-        <button className="btn" onClick={showBuilder && !editingRule ? closeBuilder : openNew}>
+        <Button variant="outline" onClick={showBuilder && !editingRule ? closeBuilder : openNew}>
           {showBuilder && !editingRule ? 'Cancel' : '+ New Rule'}
-        </button>
+        </Button>
       </div>
 
       {/* Rule builder / editor */}
@@ -226,43 +234,49 @@ export function RuleManager() {
         <div className="rule-builder">
           <div className="rule-builder__header">
             <h3>{editingRule ? `Edit Rule` : 'New Rule'}</h3>
-            {editingRule && <button className="btn btn--small" onClick={closeBuilder}>Cancel</button>}
+            {editingRule && <Button variant="outline" size="sm" onClick={closeBuilder}>Cancel</Button>}
           </div>
 
           <div className="form-row">
             <label>ID</label>
             {editingRule
               ? <span className="form-value-readonly">{ruleId}</span>
-              : <input value={ruleId} onChange={(e) => setRuleId(e.target.value)} placeholder="my-rule-id" />
+              : <Input value={ruleId} onChange={(e) => setRuleId(e.target.value)} placeholder="my-rule-id" />
             }
           </div>
           <div className="form-row">
             <label>Description</label>
-            <input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional" />
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="optional" />
           </div>
 
           <fieldset className="form-section form-section--if">
             <legend>IF [TRIGGER]</legend>
             <div className="form-row">
               <label>Signal</label>
-              <select value={signal} onChange={(e) => setSignal(e.target.value)}>
-                {channels.map((ch) => <option key={ch.name} value={ch.name}>{ch.display.label} ({ch.name})</option>)}
-                {channels.length === 0 && <option value={signal}>{signal || '— no manifest —'}</option>}
-              </select>
+              <Select value={signal || undefined} onValueChange={(v) => setSignal(v)}>
+                <SelectTrigger><SelectValue placeholder="— no manifest —" /></SelectTrigger>
+                <SelectContent>
+                  {channels.map((ch) => <SelectItem key={ch.name} value={ch.name}>{ch.display.label} ({ch.name})</SelectItem>)}
+                  {channels.length === 0 && signal && <SelectItem value={signal}>{signal}</SelectItem>}
+                </SelectContent>
+              </Select>
             </div>
             <div className="form-row">
               <label>Operator</label>
-              <select value={op} onChange={(e) => setOp(e.target.value as ConditionItem['op'])}>
-                {(['>', '>=', '<', '<=', '==', '!='] as const).map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
+              <Select value={op} onValueChange={(v) => setOp(v as ConditionItem['op'])}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {(['>', '>=', '<', '<=', '==', '!='] as const).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+                </SelectContent>
+              </Select>
             </div>
             <div className="form-row">
               <label>Threshold / value</label>
-              <input value={threshold} onChange={(e) => setThreshold(e.target.value)} />
+              <Input value={threshold} onChange={(e) => setThreshold(e.target.value)} />
             </div>
             <div className="form-row">
               <label>Sustained (s)</label>
-              <input type="number" min="0" value={sustainS} onChange={(e) => setSustainS(e.target.value)} placeholder="0" />
+              <Input type="number" min="0" value={sustainS} onChange={(e) => setSustainS(e.target.value)} placeholder="0" />
             </div>
           </fieldset>
 
@@ -270,34 +284,41 @@ export function RuleManager() {
             <legend>THEN [ACTION]</legend>
             <div className="form-row">
               <label>THEN do</label>
-              <select value={thenMode} onChange={(e) => setThenMode(e.target.value as 'set' | 'action')}>
-                <option value="set">Set status</option>
-                <option value="action">Invoke action</option>
-              </select>
+              <Select value={thenMode} onValueChange={(v) => setThenMode(v as 'set' | 'action')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="set">Set status</SelectItem>
+                  <SelectItem value="action">Invoke action</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             {thenMode === 'set' && (<>
             <div className="form-row">
               <label>Target type</label>
-              <select value={targetType} onChange={(e) => setTargetType(e.target.value as 'tag' | 'id')}>
-                <option value="tag">tag</option>
-                <option value="id">id</option>
-              </select>
+              <Select value={targetType} onValueChange={(v) => setTargetType(v as 'tag' | 'id')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="tag">tag</SelectItem>
+                  <SelectItem value="id">id</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="form-row">
               <label>Target value</label>
-              <select value={targetValue} onChange={(e) => {
-                setTargetValue(e.target.value)
-                setStatusName('')
-                setStatusValue('')
-              }}>
-                <option value="">— pick —</option>
-                {targetType === 'tag'
-                  ? [...new Set(objects.flatMap((o) => o.tags))].map((t) => <option key={t} value={t}>{t}</option>)
-                  : objects.map((o) => <option key={o.id} value={o.id}>{o.id}</option>)
-                }
-                {/* Show current value even if no manifest loaded */}
-                {targetValue && !objects.length && <option value={targetValue}>{targetValue}</option>}
-              </select>
+              <Select
+                value={targetValue || undefined}
+                onValueChange={(v) => { setTargetValue(v); setStatusName(''); setStatusValue('') }}
+              >
+                <SelectTrigger><SelectValue placeholder="— pick —" /></SelectTrigger>
+                <SelectContent>
+                  {targetType === 'tag'
+                    ? [...new Set(objects.flatMap((o) => o.tags))].map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)
+                    : objects.map((o) => <SelectItem key={o.id} value={o.id}>{o.id}</SelectItem>)
+                  }
+                  {/* Show current value even if no manifest loaded */}
+                  {targetValue && !objects.length && <SelectItem value={targetValue}>{targetValue}</SelectItem>}
+                </SelectContent>
+              </Select>
             </div>
             {targetValue && (() => {
               const matched = targetType === 'tag'
@@ -309,11 +330,13 @@ export function RuleManager() {
                   <div className="form-row">
                     <label>Status</label>
                     {statuses.length > 0
-                      ? <select value={statusName} onChange={(e) => { setStatusName(e.target.value); setStatusValue('') }}>
-                          <option value="">— pick —</option>
-                          {statuses.map((s) => <option key={s.name} value={s.name}>{s.name} ({s.type})</option>)}
-                        </select>
-                      : <input value={statusName} onChange={(e) => setStatusName(e.target.value)} placeholder="status name" />
+                      ? <Select value={statusName || undefined} onValueChange={(v) => { setStatusName(v); setStatusValue('') }}>
+                          <SelectTrigger><SelectValue placeholder="— pick —" /></SelectTrigger>
+                          <SelectContent>
+                            {statuses.map((s) => <SelectItem key={s.name} value={s.name}>{s.name} ({s.type})</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      : <Input value={statusName} onChange={(e) => setStatusName(e.target.value)} placeholder="status name" />
                     }
                   </div>
                   {statusName && (() => {
@@ -321,15 +344,17 @@ export function RuleManager() {
                     return st?.type === 'discrete' ? (
                       <div className="form-row">
                         <label>Value</label>
-                        <select value={statusValue} onChange={(e) => setStatusValue(e.target.value)}>
-                          <option value="">— pick —</option>
-                          {(st.values ?? []).map((v) => <option key={v} value={v}>{v}</option>)}
-                        </select>
+                        <Select value={statusValue || undefined} onValueChange={(v) => setStatusValue(v)}>
+                          <SelectTrigger><SelectValue placeholder="— pick —" /></SelectTrigger>
+                          <SelectContent>
+                            {(st.values ?? []).map((v) => <SelectItem key={v} value={v}>{v}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
                       </div>
                     ) : (
                       <div className="form-row">
                         <label>Value{st ? ` (${st.range?.min ?? 0}–${st.range?.max ?? 100})` : ''}</label>
-                        <input value={statusValue} onChange={(e) => setStatusValue(e.target.value)}
+                        <Input value={statusValue} onChange={(e) => setStatusValue(e.target.value)}
                           type={st ? 'number' : 'text'}
                           min={st?.range?.min} max={st?.range?.max} />
                       </div>
@@ -343,29 +368,31 @@ export function RuleManager() {
               <div className="form-row">
                 <label>Action</label>
                 {abstractActions.length > 0
-                  ? <select value={actionKey} onChange={(e) => setActionKey(e.target.value)}>
-                      <option value="">— pick —</option>
-                      {abstractActions.map((a, i) => (
-                        <option key={i} value={String(i)}>
-                          {a.name} ({a.scope}{a.scope === 'object' && a.id ? `:${a.id}` : ''})
-                        </option>
-                      ))}
-                    </select>
-                  : <input value={actionName} onChange={(e) => setActionName(e.target.value)} placeholder="action name (scene-level)" />
+                  ? <Select value={actionKey || undefined} onValueChange={(v) => setActionKey(v)}>
+                      <SelectTrigger><SelectValue placeholder="— pick —" /></SelectTrigger>
+                      <SelectContent>
+                        {abstractActions.map((a, i) => (
+                          <SelectItem key={i} value={String(i)}>
+                            {a.name} ({a.scope}{a.scope === 'object' && a.id ? `:${a.id}` : ''})
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  : <Input value={actionName} onChange={(e) => setActionName(e.target.value)} placeholder="action name (scene-level)" />
                 }
               </div>
             )}
             <div className="form-row">
               <label>Cooldown (s)</label>
-              <input type="number" min="0" value={cooldownS} onChange={(e) => setCooldownS(e.target.value)} />
+              <Input type="number" min="0" value={cooldownS} onChange={(e) => setCooldownS(e.target.value)} />
             </div>
           </fieldset>
 
           {error && <p className="form-error">{error}</p>}
           <div className="form-actions">
-            <button className="btn btn--primary" onClick={saveRule} disabled={saving}>
+            <Button onClick={saveRule} disabled={saving}>
               {saving ? 'Saving…' : editingRule ? 'Update Rule' : 'Save Rule'}
-            </button>
+            </Button>
           </div>
         </div>
       )}
@@ -384,11 +411,31 @@ export function RuleManager() {
               disabled={disabledRules[r.id]}
               isEditing={editingRule?.id === r.id}
               onEdit={openEdit}
-              onDelete={deleteRule}
+              onDelete={setPendingDeleteId}
             />
           ))
         )}
       </div>
+
+      <Dialog open={pendingDeleteId !== null} onOpenChange={(o) => { if (!o) setPendingDeleteId(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete rule?</DialogTitle>
+            <DialogDescription>
+              Delete rule <code>{pendingDeleteId}</code>? This removes its YAML from the rules directory.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPendingDeleteId(null)}>Cancel</Button>
+            <Button
+              variant="destructive"
+              onClick={() => { const id = pendingDeleteId; setPendingDeleteId(null); if (id) performDeleteRule(id) }}
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
@@ -485,8 +532,8 @@ function RuleCard({
       </div>
 
       <div className="rule-card__footer" onClick={(e) => e.stopPropagation()}>
-        <button className="btn btn--small" onClick={() => onEdit(r)}>Edit</button>
-        <button className="btn btn--small btn--danger" onClick={() => onDelete(r.id)}>Delete</button>
+        <Button variant="outline" size="sm" onClick={() => onEdit(r)}>Edit</Button>
+        <Button variant="destructive" size="sm" onClick={() => onDelete(r.id)}>Delete</Button>
       </div>
     </div>
   )

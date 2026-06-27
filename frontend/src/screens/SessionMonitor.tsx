@@ -2,6 +2,8 @@ import { useVCoreStore, useChannels } from '../ws/store'
 import { LINK_ORDER, linkLabel } from '../ws/links'
 import { getRenderer } from '../renderers/registry'
 import { VideoFeed } from '../video/VideoFeed'
+import { Button } from '../components/ui/button'
+import { Badge } from '../components/ui/badge'
 import type { Channel } from '../contracts/SignalSchema'
 
 const GROUP_LABELS: Record<string, string> = {
@@ -125,7 +127,7 @@ export function SessionMonitor() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span className="detail-event-count">{warnings.length}</span>
                 {warnings.length > 0 && (
-                  <button className="btn btn--small btn--ghost" onClick={clearWarnings}>Clear</button>
+                  <Button variant="ghost" size="sm" onClick={clearWarnings}>Clear</Button>
                 )}
               </div>
             </div>
@@ -144,9 +146,7 @@ export function SessionMonitor() {
                           {new Date(w.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                         </td>
                         <td>
-                          <span className="event-type-badge" style={{ color: 'var(--warn)', background: 'var(--warn-bg)' }}>
-                            {w.source}
-                          </span>
+                          <Badge variant="warning">{w.source}</Badge>
                         </td>
                         <td style={{ fontSize: 12, opacity: 0.85, lineHeight: 1.4 }}>{w.message}</td>
                       </tr>
@@ -211,9 +211,7 @@ export function SessionMonitor() {
             <div className="adapt-log__header">
               <span>Adaptation Log</span>
               {adaptations.length > 0 && (
-                <button className="btn btn--small btn--ghost" style={{ padding: '2px 8px', fontSize: 11 }} onClick={clearAdaptations}>
-                  Clear
-                </button>
+                <Button variant="ghost" size="sm" onClick={clearAdaptations}>Clear</Button>
               )}
             </div>
             <div className="adapt-log__list">

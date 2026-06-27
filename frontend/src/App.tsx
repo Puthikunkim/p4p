@@ -12,6 +12,7 @@ import {
   IconPlus, IconStop, IconPause, IconCore,
 } from './components/icons'
 import { ThemeToggle } from './components/ThemeToggle'
+import { Button } from './components/ui/button'
 import type { ComponentType, SVGProps } from 'react'
 import './App.css'
 
@@ -88,12 +89,12 @@ function App() {
           </span>
         </div>
 
-        <button
-          className="btn btn--primary sidebar__new-session-btn"
+        <Button
+          className="sidebar__new-session-btn"
           onClick={() => setScreen('new-session')}
         >
           <IconPlus /> New Session
-        </button>
+        </Button>
 
         <nav className="sidebar__nav">
           {NAV.map(({ id, label, icon: Icon }) => (
@@ -125,10 +126,10 @@ function App() {
               </div>
               <span className="session-bar__timer">{formatTime(elapsed)}</span>
               <span className="session-bar__spacer" />
-              <button className="btn btn--ghost btn--small"><IconPause /> Pause</button>
-              <button className="btn btn--danger btn--small" onClick={stopSession}>
+              <Button variant="ghost" size="sm"><IconPause /> Pause</Button>
+              <Button variant="destructive" size="sm" onClick={stopSession}>
                 <IconStop /> Stop Session
-              </button>
+              </Button>
             </>
           ) : (
             <div className="session-bar__indicator">
