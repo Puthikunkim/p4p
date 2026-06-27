@@ -6,7 +6,7 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -31,12 +31,19 @@ async def start_session(body: StartSessionBody, request: Request) -> dict[str, s
 
 
 @router.post("/api/sessions/{session_id}/stop")
-async def stop_session(session_id: str, request: Request) -> dict[str, Any]:
+async def stop_session(
+    session_id: str, request: Request, background_tasks: BackgroundTasks
+) -> dict[str, Any]:
     recorder: Any = request.app.state.recorder
     if recorder.active_session_id != session_id:
         raise HTTPException(404, "No active session with that ID")
-    await request.app.state.livekit_recorder.stop(session_id)  # no-op unless livekit.enabled
+    # End the session immediately (close the XDF + mark it done in the DB) so the UI flips
+    # to "stopped" right away. Stopping the LiveKit egress is a slow round-trip to the
+    # egress server (it finalises the WebM), so defer it to a background task rather than
+    # blocking the response on it. The egress keeps its own state, so it stops correctly
+    # even after the session row is marked ended.
     xdf_path: str | None = await recorder.stop_session()
+    background_tasks.add_task(request.app.state.livekit_recorder.stop, session_id)
     return {"session_id": session_id, "xdf_path": xdf_path}
 
 

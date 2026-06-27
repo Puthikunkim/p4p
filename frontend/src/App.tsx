@@ -64,8 +64,15 @@ function App() {
 
   async function stopSession() {
     if (!activeSessionId) return
-    await fetch(`/api/sessions/${activeSessionId}/stop`, { method: 'POST' })
-    setActiveSession(null)
+    const id = activeSessionId
+    setActiveSession(null)  // optimistic: flip the UI to "stopped" instantly
+    try {
+      const r = await fetch(`/api/sessions/${id}/stop`, { method: 'POST' })
+      if (!r.ok && r.status !== 404) throw new Error(`HTTP ${r.status}`)
+    } catch {
+      setActiveSession(id)  // it didn't actually stop — put the session back
+      window.alert('Failed to stop the session — please try again.')
+    }
   }
 
   return (
