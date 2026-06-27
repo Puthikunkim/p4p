@@ -277,7 +277,9 @@ h3 {
 }
 
 p { margin: 0; }
-a { color: var(--accent); text-decoration: none; }
+/* Exclude shadcn link-as-button (asChild <a>) so its text keeps the button's foreground
+   colour — the unlayered `a` rule otherwise beats Tailwind's layered text-* utilities. */
+a:not([data-slot="button"]) { color: var(--accent); text-decoration: none; }
 
 code {
   font-family: var(--mono);
