@@ -2,7 +2,8 @@
     "name": "VCore.Client.Editor",
     "rootNamespace": "VCore.Editor",
     "references": [
-        "VCore.Client"
+        "VCore.Client",
+        "VCore.Client.LiveKit"
     ],
     "includePlatforms": [
         "Editor"
@@ -15,6 +16,12 @@
     ],
     "autoReferenced": true,
     "defineConstraints": [],
-    "versionDefines": [],
+    "versionDefines": [
+        {
+            "name": "io.livekit.livekit-sdk",
+            "expression": "",
+            "define": "VCORE_LIVEKIT"
+        }
+    ],
     "noEngineReferences": false
 }

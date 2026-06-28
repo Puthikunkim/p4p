@@ -65,15 +65,22 @@ exactly one place. (Components also have inline `host`/`port` fallbacks used onl
 
 ---
 
-## 3. Add the launcher (`VCoreLauncher`) — the one-component setup
+## 3. Add the client to your scene (`VCoreLauncher`)
 
-`VCoreLauncher` is the entry point: add it to one GameObject (call it e.g. **VCoreManager**) and
-it brings up the whole client on `Awake`. You don't wire the sub-components by hand — adding the
-launcher's `VCoreConnection` auto-adds `StatusCollector` + `RequestDispatcher` (via
-`[RequireComponent]`), and the launcher adds/enables the reporters per its toggles.
+**Fastest path — `V-CORE ▸ Add to Scene`.** This editor command creates a **VCoreManager**
+GameObject (launcher + core link + reporters), finds-or-creates a `BackendConfig` and assigns it,
+and — when the LiveKit SDK is installed — adds a spectator-camera rig wired to the launcher. Run
+it, set the `BackendConfig` host/port (step 2), and skip to step 4 to add adaptable objects.
 
-> The package ships no prefab; you add the `VCoreLauncher` component. (The POC's
-> `Assets/Prefabs/VCore.prefab` is a ready-made example you can copy into your project.)
+**By hand.** `VCoreLauncher` is the entry point: add it to one GameObject (call it e.g.
+**VCoreManager**) and it brings up the whole client on `Awake`. You don't wire the sub-components
+yourself — adding the launcher's `VCoreConnection` auto-adds `StatusCollector` +
+`RequestDispatcher` (via `[RequireComponent]`), and the launcher adds/enables the reporters per
+its toggles.
+
+> **No prefab, by design.** A prefab shipped inside a package is read-only for consumers and
+> can't pre-wire your project's own `BackendConfig`, so it would save little over the launcher.
+> Use **Add to Scene** above, or copy the POC's `Assets/Prefabs/VCore.prefab` as a starting point.
 
 Configure it in the Inspector — this is the single place you set up the stack:
 
