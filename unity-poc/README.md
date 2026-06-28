@@ -2,7 +2,7 @@
 
 Thin Unity reference implementation for the V-CORE platform. Demonstrates the full
 Contract 3 loop — Object-Status Manifest (3b) up, Status-Change Requests (3a) down —
-plus the Amendment 2 WebRTC video plane.
+plus the Amendment 2 video plane (a **LiveKit** SFU; recording via LiveKit Egress).
 
 **Target Unity version:** 2022.3 LTS (any 2022.3.x patch)
 
@@ -297,14 +297,17 @@ dashboard's **Data History** screen.
 
 ---
 
-## Promoting to a UPM package
+## Using this client in another project
 
-Each script has no inter-project dependencies beyond `Newtonsoft.Json` and the LiveKit Unity
-SDK (`io.livekit.livekit-sdk`). To package:
-
-1. Move the scripts to a folder named `com.vcore.unity-poc/` with a `package.json`.
-2. Add the package to any Unity project via the Package Manager's **Add package from disk**
-   or a Git URL.
+The reusable client is **already a UPM package** —
+[`Packages/com.vcore.client`](Packages/com.vcore.client/README.md) (assembly `VCore.Client`, plus
+`VCore.Client.LiveKit` for the optional video publisher; its only hard dependency is
+`Newtonsoft.Json`). To consume it in **another** Unity project, copy that folder into the target
+project's `Packages/`, or reference it by path in the project's `manifest.json`
+(`"com.vcore.client": "file:../path/to/com.vcore.client"`); add the LiveKit SDK
+(`io.livekit.livekit-sdk`, a git-URL package) too if you want video. Then drop the `VCore` prefab
+or add a `VCoreLauncher` and assign a `BackendConfig`. Full install + API reference:
+[`com.vcore.client/README.md`](Packages/com.vcore.client/README.md).
 
 ---
 
@@ -314,6 +317,6 @@ SDK (`io.livekit.livekit-sdk`). To package:
 |---|---|
 | `[VCore] Connect failed` | Is V-CORE running? Is the host/port correct in the Inspector? |
 | `[Dispatcher] No object with tag '…'` | Check that the `ObjectStatus` has the expected tag set in the Inspector |
-| `[WebRTC] Signaling connect failed` | Is the dashboard also connected? V-CORE's signaling broker needs at least one subscriber before it is useful |
-| Missing `Unity.WebRTC` namespace error | Package Manager hasn't resolved yet — wait for the reimport to finish |
-| Scene opens with broken script references (yellow ?) | Unity couldn't find the scripts. Check that the `.cs` files are in `Assets/Scripts/` and Unity has finished importing |
+| No video mirror in the dashboard | Is `livekit.enabled: true` and the LiveKit + Egress stack up? Is `node_ip` set to your LAN IP? See [`../docs/LIVEKIT_SETUP.md`](../docs/LIVEKIT_SETUP.md) |
+| Missing LiveKit/WebRTC namespace error | The LiveKit SDK isn't installed/resolved yet (the video publisher is guarded by `VCORE_LIVEKIT`) — add `io.livekit.livekit-sdk` and wait for the reimport |
+| Scene opens with broken script references (yellow ?) | Unity couldn't resolve the `com.vcore.client` package — wait for the Package Manager + reimport to finish (the scripts live in `Packages/com.vcore.client/Runtime/`, not `Assets/`) |

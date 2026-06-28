@@ -537,6 +537,20 @@ flowchart TB
 > Two earlier dead-code recorders were removed: the Unity-side `VideoRecorder.cs` (PNG frames →
 > a non-existent endpoint) and the browser-side `MediaRecorder` upload path.
 
+### 6.1 Reusing the Unity client as a package
+
+The client is an embedded **UPM package** (`com.vcore.client`), so it can be dropped into *any*
+Unity project — not just this POC. To consume it elsewhere: copy
+[`unity-poc/Packages/com.vcore.client/`](../unity-poc/Packages/com.vcore.client) into the target
+project's `Packages/`, or reference it by path in that project's `manifest.json`
+(`"com.vcore.client": "file:../path/to/com.vcore.client"`); for video, also add the LiveKit Unity
+SDK. Then drop the `VCore` prefab (or add a `VCoreLauncher` component) and assign a `BackendConfig`.
+
+Full instructions live with the package:
+[`com.vcore.client/README.md`](../unity-poc/Packages/com.vcore.client/README.md) (install + the
+component/API reference) and [`unity-poc/README.md`](../unity-poc/README.md) (the field-by-field
+"drop V-CORE into your own scene" walkthrough).
+
 ---
 
 ## 7. The sensor pipeline & mock tooling

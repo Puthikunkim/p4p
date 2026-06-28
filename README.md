@@ -101,9 +101,12 @@ Read in this order:
    differs from the code, HOW_IT_WORKS is authoritative.
 3. **[`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md)** — runbook for the participant-video
    plane (LiveKit + Egress) and what to change for your network.
-4. **[`contracts/`](./contracts)** — the language-neutral JSON Schemas (the single source of
+4. **[`unity-poc/`](./unity-poc/README.md)** — the Unity reference client, and how to **import
+   the `com.vcore.client` package** into your own Unity project and use it (package install + API:
+   [`com.vcore.client/README.md`](./unity-poc/Packages/com.vcore.client/README.md)).
+5. **[`contracts/`](./contracts)** — the language-neutral JSON Schemas (the single source of
    truth for cross-component messages) plus golden valid/invalid examples.
-5. **[`TODO.md`](./TODO.md)** — phase-by-phase implementation checklist.
+6. **[`TODO.md`](./TODO.md)** — phase-by-phase implementation checklist.
 
 ## Tech stack (summary)
 
