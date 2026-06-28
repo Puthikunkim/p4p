@@ -78,7 +78,7 @@ flowchart LR
     REC -. "start/stop Track Egress (server API)" .-> LK
   end
 
-  subgraph B["Machine B — Unity runtime (unity-poc or real 'Jerry')"]
+  subgraph B["Machine B — Unity runtime (unity-poc or your own Unity project)"]
     UNITY["VCoreConnection + LiveKitPublisher"]
   end
 
@@ -475,7 +475,7 @@ track to `<VideoFeed>` for the live mirror. It only *views* — **recording is s
 ## 6. The Unity POC deep dive
 
 `unity-poc/` is a thin, package-ready Unity reference implementation that plays the role of
-the VR runtime ("Jerry") so the whole loop is demonstrable without the partner's real Unity
+the VR runtime so the whole loop is demonstrable without the partner's real Unity
 project. The reusable client ships as an embedded **UPM package** — its scripts live in
 [`unity-poc/Packages/com.vcore.client/Runtime/`](../unity-poc/Packages/com.vcore.client/Runtime)
 and are namespaced `VCore`. (The demo scene's `Assets/Scripts/` holds only `StatusVisualizer.cs`.)

@@ -20,7 +20,7 @@ namespace VCore
         public string sceneName = "sample_scene";
 
         [Tooltip("Runtime identifier included in the manifest.")]
-        public string runtimeId = "jerry-unity";
+        public string runtimeId = "unity";
 
         // ── public API ──────────────────────────────────────────────────────────────
 

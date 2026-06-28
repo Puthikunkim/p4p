@@ -119,7 +119,7 @@ V-CORE is one component of a larger research effort; its neighbours are referenc
 through their contracts:
 
 - **Sensor pipeline** — the Python signal-processing pipeline; emits self-describing channels over **LSL**.
-- **"Jerry"** — a Unity runtime (one of several swappable environments; *need not be VR*).
+- **Unity runtime** — one of several swappable environments (*need not be VR*).
   Each scene declares an **Object-Status Manifest**. Because the partner *will not
   co-develop*, V-CORE ships a **thin Unity reference POC** (`unity-poc/`) so the whole loop —
   including the video mirror — is demonstrable on its own.
@@ -505,7 +505,7 @@ Object-Status Manifest, is **disabled + warned** — never a crash.
 ```
 
 ```json
-{ "schema_version": "1.0.0", "scene": "calm_forest", "runtime": "jerry-unity",
+{ "schema_version": "1.0.0", "scene": "calm_forest", "runtime": "unity",
   "objects": [
     { "id": "campfire_01", "tags": ["ambient_light", "fire"],
       "statuses": [
@@ -682,7 +682,7 @@ test in Phase 8 of [`TODO.md`](./TODO.md).
 | Machine | Runs | Talks to |
 |---|---|---|
 | **A** | V-CORE (backend + dashboard) + **LiveKit SFU/Egress** | ← LSL from C · ↔ WS with B · → WS to browsers · mints LiveKit tokens + drives Egress |
-| **B** | Unity VR runtime "Jerry" | ↔ WS with A · publishes spectator-cam video to LiveKit |
+| **B** | Unity VR runtime | ↔ WS with A · publishes spectator-cam video to LiveKit |
 | **C** | Sensor pipeline | → LSL to A |
 
 The dashboard is served by A and opened from any LAN machine. Participant video flows through
@@ -802,4 +802,4 @@ Defaults are chosen so none block progress; flag any to change.
 | **Abstract action** | A parameterless command a scene exposes (`VCoreAction`), invoked by a rule's `THEN action` (Contract 3c). Scene- or object-scoped. |
 | **Renderer-by-type** | UI pattern: pick a component from a registry keyed on a channel's `type`/`display.hint`. |
 | **Graceful degradation** | On any mismatch, disable the affected element and surface a warning — never crash. |
-| **Sensor pipeline / Jerry** | The external Python signal pipeline, and the codename for the Unity runtime. |
+| **Sensor pipeline** | The external Python signal-processing pipeline; emits self-describing signal channels over LSL. |

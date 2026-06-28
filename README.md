@@ -4,7 +4,7 @@
 real-time VR cognitive-state monitoring and adaptation.
 
 V-CORE is the **middleware** between a physiological-sensing pipeline and a swappable
-Unity runtime ("Jerry"). It provides a **schema-driven dashboard** that renders whatever
+Unity runtime. It provides a **schema-driven dashboard** that renders whatever
 signal channels the pipeline declares (and lets you **author rules from the browser**, and —
 during a study session — shows a **live mirror of the participant's VR view** beside the
 signals), and a **rule engine** that evaluates declarative rules against live signals and
@@ -97,7 +97,7 @@ Read in this order:
 1. **[`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md)** — **start here.** As-built, end-to-end
    walkthrough of the running system; the canonical "how it works" reference.
 2. **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — the original design: rationale, design patterns,
-   the contract specifications, and folder layout. Treat it as *design background* — where it
+   the contract specifications, and folder layout. Treat it as _design background_ — where it
    differs from the code, HOW_IT_WORKS is authoritative.
 3. **[`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md)** — runbook for the participant-video
    plane (LiveKit + Egress) and what to change for your network.

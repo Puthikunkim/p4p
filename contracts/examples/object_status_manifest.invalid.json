@@ -2,7 +2,7 @@
   "_invalid_reason": "discrete status 'crackle' is missing the required 'values' field",
   "schema_version": "1.0.0",
   "scene": "calm_forest",
-  "runtime": "jerry-unity",
+  "runtime": "unity",
   "objects": [
     {
       "id": "campfire_01",

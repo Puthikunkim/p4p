@@ -174,7 +174,7 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   backendConfig: {fileID: 11400000, guid: c0ffee00beef1234567890abcdef0002, type: 2}
   sceneName: sample_scene
-  runtimeId: jerry-unity
+  runtimeId: unity
   persistAcrossScenes: 1
   behaviourMetrics: 1
   vrContext: 1
@@ -230,7 +230,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   sceneName: sample_scene
-  runtimeId: jerry-unity
+  runtimeId: unity
 --- !u!114 &104
 MonoBehaviour:
   m_ObjectHideFlags: 0
