@@ -46,7 +46,7 @@ OBJECT_MANIFEST: dict[str, Any] = {
 def client(tmp_path: Path) -> TestClient:
     rules_dir = tmp_path / "rules"
     rules_dir.mkdir()
-    app = create_app(rules_dir=rules_dir, sink_port=0)
+    app = create_app(rules_dir=rules_dir)
     return TestClient(app)
 
 
@@ -148,7 +148,7 @@ def test_trigger_without_manifest_returns_422(client: TestClient) -> None:
 def test_trigger_with_manifest_fires(tmp_path: Path) -> None:
     rules_dir = tmp_path / "rules"
     rules_dir.mkdir()
-    app = create_app(rules_dir=rules_dir, sink_port=0)
+    app = create_app(rules_dir=rules_dir)
     with TestClient(app) as c:
         # Load manifests directly onto app state, then post rule, then trigger
         app.state.manifests.update_object_status_manifest(OBJECT_MANIFEST)

@@ -44,7 +44,7 @@ OBJECT_MANIFEST = {
 def app(tmp_path: Path):  # type: ignore[return]
     rules_dir = tmp_path / "rules"
     rules_dir.mkdir()
-    return create_app(rules_dir=rules_dir, sink_port=0)
+    return create_app(rules_dir=rules_dir)
 
 
 # ── on-connect state push ─────────────────────────────────────────────────────

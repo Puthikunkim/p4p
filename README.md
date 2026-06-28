@@ -70,8 +70,8 @@ python tools/mock_pipeline.py --manifest path/to/my.manifest.json
 ### 4. Mock Unity client (no Unity required)
 
 ```bash
-# connects to WsSink, sends Object-Status Manifest, prints incoming StatusRequests
-python tools/mock_unity.py --port 9001
+# connects to /ws/runtime, sends Object-Status Manifest, prints incoming StatusRequests
+python tools/mock_unity.py
 ```
 
 ### Running tests

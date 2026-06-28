@@ -33,8 +33,7 @@
 > 4. **Project-wide catalog.** Beyond the per-scene live manifest, the Unity client can bake and send
 >    an `object_status_catalog` of every object/action across all scenes + prefabs, so rules can be
 >    authored against not-yet-loaded scenes (the live manifest still drives dispatch + degradation).
-> 5. **ZMQ transport removed.** Only the WebSocket runtime transport exists; the `ActionSink`
->    adapter seam remains for adding future transports.
+> 5. **ZMQ transport removed.** Only the WebSocket runtime transport exists.
 > 6. **Reusable Unity client** now ships as an embedded UPM package
 >    (`unity-poc/Packages/com.vcore.client`) with a one-component `VCoreLauncher` + `VCore` prefab.
 >
@@ -179,8 +178,7 @@ An in-process **event bus** decouples every producer from every consumer inside 
    `ajv` + `json-schema-to-typescript`). The contract — not either codebase — is the single
    source of truth.
 4. **WebSocket for control, LiveKit for video.** The Unity *control* link is bidirectional,
-   low-rate commands + a manifest handshake — a WebSocket's sweet spot, no native deps; the
-   transport stays isolated behind the `ActionSink` adapter for future swaps. The participant
+   low-rate commands + a manifest handshake — a WebSocket's sweet spot, no native deps. The participant
    *video* is real-time media carried on a **LiveKit SFU** (Unity publishes → browser subscribes →
    server-side Track Egress recording), so video bandwidth never touches the control/data plane.
 
@@ -190,7 +188,7 @@ An in-process **event bus** decouples every producer from every consumer inside 
 |---|---|
 | Backend runtime | **Python 3.11**, **FastAPI** + **uvicorn** |
 | LSL ingestion | **pylsl** |
-| Unity control messaging | **WebSocket** (FastAPI server ↔ Unity WS client); transport isolated behind the `ActionSink` adapter |
+| Unity control messaging | **WebSocket** (FastAPI server ↔ Unity WS client) |
 | Participant video | **LiveKit SFU** — Unity publishes the spectator cam → browser subscribes (live mirror); server-side **Track Egress** records `.webm`; V-CORE mints tokens + drives egress (never relays media) |
 | Models / validation | **pydantic** + **jsonschema** |
 | Rule hot-reload / authoring | **watchdog** + FastAPI **Rules API** (`/api/rules`) → YAML/JSON files |
@@ -592,7 +590,7 @@ p4p/
 │   │   ├── core/                       # ⛔ eventbus.py · schema.py · models.py
 │   │   ├── ingestion/                  # 🔌 base.py · lsl_source.py · replay_source.py
 │   │   ├── engine/                     #   registry.py · evaluator.py · degradation.py
-│   │   ├── outbound/                   # 🔌 base.py (ActionSink) · ws_sink.py
+│   │   ├── outbound/                   # 🔌 ws_sink.py (/ws/runtime handler)
 │   │   ├── api/                        # 1️⃣ rules.py (+ manual-trigger 2️⃣) · sessions.py · livekit.py (token mint, 2️⃣)
 │   │   ├── recording/                  #   xdf_writer.py · xdf_reader.py · sqlite_store.py · livekit_recorder.py (2️⃣)
 │   │   ├── bridge/
@@ -762,8 +760,7 @@ Defaults are chosen so none block progress; flag any to change.
 1. **Topology — 3 machines** (V-CORE/A, Unity/B, Pipeline/C) on an **isolated lab LAN** (flat
    subnet for LSL multicast; `known_peers` covers cross-subnet). Plaintext LSL accepted on an
    isolated network; WebRTC video is encrypted by default.
-2. **Unity control transport — RESOLVED: WebSocket** (Unity as WS client); transport isolated
-   behind the `ActionSink` adapter for future swaps.
+2. **Unity control transport — RESOLVED: WebSocket** (Unity as WS client).
 3. **Unity context model — RESOLVED: per-object statuses + abstract actions** (both implemented;
    actions are parameterless, Contract 3c).
 4. **Unity ownership — RESOLVED:** thin, package-ready Unity POC (`unity-poc/`) doubling as

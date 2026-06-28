@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
 """Headless Unity mock client for local development and CI.
 
-Connects to WsSink, sends an Object-Status Manifest (handshake), then prints
-any StatusRequests that arrive. It also:
+Connects to V-CORE's /ws/runtime (the same endpoint the real Unity client uses),
+sends an Object-Status Manifest (handshake), then prints any StatusRequests that
+arrive. It also:
   - walks a fake study session, pushing a vr_context message per "step", and
   - declares behavioural channels and streams behaviour_sample frames so the
     Behavioural panel updates live and the rule engine has signals to act on.
@@ -10,7 +11,6 @@ Keeps the connection open until interrupted.
 
 Usage:
     python tools/mock_unity.py [--host HOST] [--port PORT]
-    python tools/mock_unity.py --port 9001
     python tools/mock_unity.py --context-interval 4     # advance step every 4 s
     python tools/mock_unity.py --behaviour-interval 0.5 # stream behaviour at 2 Hz
     python tools/mock_unity.py --context-interval 0 --behaviour-interval 0  # manifest only
@@ -126,7 +126,7 @@ async def _context_loop(ws: Any, interval: float) -> None:
 
 
 async def run(host: str, port: int, context_interval: float, behaviour_interval: float) -> None:
-    uri = f"ws://{host}:{port}"
+    uri = f"ws://{host}:{port}/ws/runtime"
     print(f"[mock_unity] connecting to {uri}", flush=True)
     async with websockets.connect(uri) as ws:
         await ws.send(json.dumps({"type": "object_status_manifest", "payload": MANIFEST}))
@@ -142,7 +142,7 @@ async def run(host: str, port: int, context_interval: float, behaviour_interval:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", default="localhost")
-    parser.add_argument("--port", type=int, default=9001)
+    parser.add_argument("--port", type=int, default=8000)
     parser.add_argument(
         "--context-interval",
         type=float,

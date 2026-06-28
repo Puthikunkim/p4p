@@ -8,13 +8,12 @@ Stack wired in this test
   ReplaySource    — reads fixture CSV + manifest, publishes SampleEvents on bus
   RuleRegistry    — loads a single YAML rule from tmp_path/rules/
   RuleEvaluator   — evaluates rules against each sample
-  WsSink          — real WebSocket server (port 0 = OS-assigned)
+  WsSink          — the /ws/runtime handler, driven in-memory (no socket)
   Recorder        — SQLite persistence via an in-memory tmp path
-  mock Unity WS   — a bare websockets client that sends the Object-Status Manifest
+  mock Unity WS   — an in-memory fake that sends the Object-Status Manifest
                     and collects incoming StatusRequests
 
-No TestClient, no FastAPI app, no external processes.  Pure asyncio + real
-network sockets bound to loopback.
+No TestClient, no FastAPI app, no external processes, no sockets — pure asyncio.
 """
 from __future__ import annotations
 
@@ -26,7 +25,6 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-import websockets
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import SampleEvent
@@ -93,19 +91,30 @@ def data_dir(tmp_path: Path) -> Path:
     return d
 
 
-async def _mock_unity(port: int, received: list[dict[str, Any]]) -> None:
-    """Connect to WsSink, send manifest, collect StatusRequests until cancelled."""
-    uri = f"ws://127.0.0.1:{port}"
-    async with websockets.connect(uri) as ws:
-        await ws.send(json.dumps({"type": "object_status_manifest", "payload": _OBJECT_MANIFEST}))
-        while True:
-            try:
-                msg = await asyncio.wait_for(ws.recv(), timeout=10.0)
-                received.append(json.loads(msg))
-            except TimeoutError:
-                break
-            except websockets.exceptions.ConnectionClosed:
-                break
+class _FakeUnityWs:
+    """In-memory Unity connection driving WsSink.handle_connection (no real socket)."""
+
+    remote_address = "mock-unity:0"
+
+    def __init__(self, received: list[dict[str, Any]]) -> None:
+        self._inbox: asyncio.Queue[str] = asyncio.Queue()
+        self._received = received
+
+    async def recv(self) -> str:
+        return await self._inbox.get()
+
+    async def send(self, data: str) -> None:
+        self._received.append(json.loads(data))
+
+    async def client_send(self, frame: str) -> None:
+        await self._inbox.put(frame)
+
+
+async def _mock_unity(sink: WsSink, received: list[dict[str, Any]]) -> None:
+    """Drive WsSink.handle_connection: send the manifest, collect forwarded StatusRequests."""
+    ws = _FakeUnityWs(received)
+    await ws.client_send(json.dumps({"type": "object_status_manifest", "payload": _OBJECT_MANIFEST}))
+    await sink.handle_connection(ws)
 
 
 @pytest.mark.asyncio
@@ -121,10 +130,9 @@ async def test_signal_to_unity_and_sqlite(
     registry.load_all()
     evaluator = RuleEvaluator(registry, bus, manifests)
 
-    # --- outbound: real WS server on loopback, OS-assigned port ---
-    sink = WsSink("127.0.0.1", 0, bus=bus, manifests=manifests)
+    # --- outbound: the /ws/runtime handler, driven in-memory ---
+    sink = WsSink(bus=bus, manifests=manifests)
     await sink.start()
-    port = sink.bound_port
 
     # --- recorder ---
     recorder = Recorder(
@@ -148,7 +156,7 @@ async def test_signal_to_unity_and_sqlite(
 
     try:
         # Start mock Unity client — it connects, sends manifest, waits for requests
-        unity_task = asyncio.create_task(_mock_unity(port, received))
+        unity_task = asyncio.create_task(_mock_unity(sink, received))
         # Give the WS connection time to establish and the manifest to propagate
         await asyncio.sleep(0.1)
 

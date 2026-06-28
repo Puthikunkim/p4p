@@ -305,7 +305,6 @@ def client(tmp_path: Path) -> TestClient:
     app = create_app(
         rules_dir=tmp_path / "rules",
         data_dir=tmp_path / "data",
-        sink_port=0,
     )
     return TestClient(app)
 

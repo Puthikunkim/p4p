@@ -19,13 +19,6 @@ ingestion:
   # (wired) Seconds without a sample before the signal is marked stale.
   stale_timeout_s: 5
 
-# ── Outbound (Unity runtime — Machine B) ─────────────────────────────────────
-outbound:
-  # (wired) Standalone WsSink server bind, used by mock_unity / direct clients.
-  # The real Unity POC instead connects to /ws/runtime on the main bridge port.
-  ws_host: localhost
-  ws_port: 9001
-
 # ── WebSocket bridge (V-CORE server — Machine A) ──────────────────────────────
 bridge:
   # (wired via `python -m vcore.app`) Interface and port to bind.
@@ -33,8 +26,6 @@ bridge:
   # NB: `uvicorn vcore.app:app` ignores these — pass --host/--port on the CLI.
   host: 0.0.0.0
   port: 8000
-  # (reference only) Auth is not implemented yet.
-  # bearer_token: "change-me-before-use"
 
 # ── Recording (fully granular — each path independently configurable) ─────────
 recording:

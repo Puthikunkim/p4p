@@ -27,18 +27,10 @@ class IngestionConfig(BaseModel):
     stale_timeout_s: float = 5.0
 
 
-class OutboundConfig(BaseModel):
-    # Standalone WsSink server bind, used by mock_unity / direct websockets clients. (wired)
-    ws_host: str = "localhost"
-    ws_port: int = 9001
-
-
 class BridgeConfig(BaseModel):
     # Bind interface/port — used when launched via ``python -m vcore.app``. (wired via runner)
     host: str = "0.0.0.0"
     port: int = 8000
-    # Optional bearer token; auth is not implemented yet. (reference only)
-    bearer_token: str | None = None
 
 
 class RecordingConfig(BaseModel):
@@ -76,7 +68,6 @@ class LiveKitConfig(BaseModel):
 
 class VCoreConfig(BaseModel):
     ingestion: IngestionConfig = Field(default_factory=IngestionConfig)
-    outbound: OutboundConfig = Field(default_factory=OutboundConfig)
     bridge: BridgeConfig = Field(default_factory=BridgeConfig)
     recording: RecordingConfig = Field(default_factory=RecordingConfig)
     rules: RulesConfig = Field(default_factory=RulesConfig)

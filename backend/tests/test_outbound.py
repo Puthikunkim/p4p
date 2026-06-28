@@ -1,14 +1,21 @@
-"""Phase 5 tests — outbound WsSink (integration + target-matching unit tests)."""
+"""Phase 5 tests — the WsSink /ws/runtime handler (integration + target-matching unit tests).
+
+WsSink no longer runs its own socket server; the ``/ws/runtime`` route hands it each
+connection. These tests drive :meth:`WsSink.handle_connection` directly with an in-memory
+fake WebSocket (``FakeWs``) — same protocol coverage, no real socket bind.
+"""
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import json
 import uuid
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from datetime import UTC, datetime
 from typing import Any
 
 import pytest
-import websockets
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import (
@@ -21,6 +28,62 @@ from vcore.core.models import (
 )
 from vcore.core.schema import ActiveManifests
 from vcore.outbound.ws_sink import WsSink, _validate_action, _validate_request
+
+# ── in-memory fake WebSocket ──────────────────────────────────────────────────
+
+_CLOSE = object()
+
+
+class _ClientGone(Exception):
+    """Raised by FakeWs.recv when the simulated client disconnects."""
+
+
+class FakeWs:
+    """Duck-typed WebSocket driving WsSink.handle_connection without a real socket.
+
+    The test plays the client: ``client_send()`` pushes a frame to the handler;
+    ``sent`` collects the frames the handler sends back.
+    """
+
+    remote_address = "test:0"
+
+    def __init__(self) -> None:
+        self._inbox: asyncio.Queue[Any] = asyncio.Queue()
+        self.sent: list[str] = []
+
+    # server-facing surface (called by handle_connection)
+    async def recv(self) -> str:
+        item = await self._inbox.get()
+        if item is _CLOSE:
+            raise _ClientGone
+        assert isinstance(item, str)
+        return item
+
+    async def send(self, data: str) -> None:
+        self.sent.append(data)
+
+    # client-facing helpers (called by the test)
+    async def client_send(self, frame: str) -> None:
+        await self._inbox.put(frame)
+
+    def disconnect(self) -> None:
+        self._inbox.put_nowait(_CLOSE)
+
+
+@asynccontextmanager
+async def _connect(sink: WsSink) -> AsyncIterator[FakeWs]:
+    """Open a simulated Unity connection: run handle_connection in the background,
+    yield the fake socket, then disconnect and await teardown (the link-down publish)."""
+    ws = FakeWs()
+    task = asyncio.create_task(sink.handle_connection(ws))
+    await asyncio.sleep(0.02)  # let the handler register the connection + publish link-up
+    try:
+        yield ws
+    finally:
+        ws.disconnect()
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(task, timeout=1.0)
+
 
 # ── fixtures ──────────────────────────────────────────────────────────────────
 
@@ -78,7 +141,7 @@ def _make_req(
 async def _make_sink() -> tuple[WsSink, EventBus, ActiveManifests]:
     bus = EventBus()
     manifests = ActiveManifests()
-    sink = WsSink("localhost", 0, bus=bus, manifests=manifests)
+    sink = WsSink(bus=bus, manifests=manifests)
     await sink.start()
     return sink, bus, manifests
 
@@ -88,13 +151,12 @@ async def _make_sink() -> tuple[WsSink, EventBus, ActiveManifests]:
 @pytest.mark.asyncio
 async def test_handshake_publishes_manifest() -> None:
     sink, bus, manifests = await _make_sink()
-    port = sink.bound_port
     received: list[object] = []
     bus.subscribe(Topics.OBJECT_STATUS_UPDATED, lambda p: received.append(p))
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
-        await asyncio.sleep(0.1)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
+        await asyncio.sleep(0.05)
 
     await sink.stop()
 
@@ -121,12 +183,11 @@ CATALOG_MANIFEST: dict[str, Any] = {
 @pytest.mark.asyncio
 async def test_catalog_publishes_and_stores() -> None:
     sink, bus, manifests = await _make_sink()
-    port = sink.bound_port
     received: list[object] = []
     bus.subscribe(Topics.OBJECT_STATUS_CATALOG_UPDATED, lambda p: received.append(p))
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(json.dumps({"type": "object_status_catalog", "payload": CATALOG_MANIFEST}))
+    async with _connect(sink) as ws:
+        await ws.client_send(json.dumps({"type": "object_status_catalog", "payload": CATALOG_MANIFEST}))
         await asyncio.sleep(0.1)
 
     await sink.stop()
@@ -164,7 +225,6 @@ def test_validate_action_object_by_tag_ok() -> None:
 @pytest.mark.asyncio
 async def test_handshake_publishes_link_up_and_down() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     events: list[LinkStatusEvent] = []
 
     async def on_link(p: object) -> None:
@@ -173,11 +233,11 @@ async def test_handshake_publishes_link_up_and_down() -> None:
 
     bus.subscribe(Topics.LINK_STATUS, on_link)
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.1)
     # connection is now closed
-    await asyncio.sleep(0.1)
+    await asyncio.sleep(0.05)
     await sink.stop()
 
     states = [e.state for e in events]
@@ -191,21 +251,17 @@ async def test_handshake_publishes_link_up_and_down() -> None:
 @pytest.mark.asyncio
 async def test_status_request_delivered_to_unity() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     received_by_client: list[dict[str, Any]] = []
 
-    async def client() -> None:
-        async with websockets.connect(f"ws://localhost:{port}") as ws:
-            await ws.send(_OBJECT_FRAME)
-            await asyncio.sleep(0.05)  # let manifest be processed
-            # Fire a StatusRequest on the bus
-            req = _make_req(tag="ambient_light", status="brightness", value=30.0)
-            await bus.publish(Topics.RULE_FIRED, req)
-            # Read the forwarded message
-            msg = await asyncio.wait_for(ws.recv(), timeout=1.0)
-            received_by_client.append(json.loads(msg))
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
+        await asyncio.sleep(0.05)  # let manifest be processed
+        # Fire a StatusRequest on the bus
+        req = _make_req(tag="ambient_light", status="brightness", value=30.0)
+        await bus.publish(Topics.RULE_FIRED, req)
+        await asyncio.sleep(0.05)
+        received_by_client = [json.loads(m) for m in ws.sent]
 
-    await client()
     await sink.stop()
 
     assert len(received_by_client) == 1
@@ -229,7 +285,6 @@ async def test_no_delivery_without_connection() -> None:
 @pytest.mark.asyncio
 async def test_unresolved_tag_emits_warning() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     warnings: list[WarningEvent] = []
 
     async def on_warn(p: object) -> None:
@@ -238,8 +293,8 @@ async def test_unresolved_tag_emits_warning() -> None:
 
     bus.subscribe(Topics.WARNING, on_warn)
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         req = _make_req(tag="nonexistent_tag")
         await bus.publish(Topics.RULE_FIRED, req)
@@ -253,12 +308,11 @@ async def test_unresolved_tag_emits_warning() -> None:
 @pytest.mark.asyncio
 async def test_out_of_range_value_emits_warning() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     warnings: list[WarningEvent] = []
     bus.subscribe(Topics.WARNING, lambda p: warnings.append(p) if isinstance(p, WarningEvent) else None)
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         req = _make_req(tag="ambient_light", status="brightness", value=999.0)
         await bus.publish(Topics.RULE_FIRED, req)
@@ -272,12 +326,11 @@ async def test_out_of_range_value_emits_warning() -> None:
 @pytest.mark.asyncio
 async def test_invalid_discrete_value_emits_warning() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     warnings: list[WarningEvent] = []
     bus.subscribe(Topics.WARNING, lambda p: warnings.append(p) if isinstance(p, WarningEvent) else None)
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         req = _make_req(tag="fog", status="density", value="extreme")
         await bus.publish(Topics.RULE_FIRED, req)
@@ -293,7 +346,6 @@ async def test_invalid_discrete_value_emits_warning() -> None:
 @pytest.mark.asyncio
 async def test_vr_context_message_publishes_event() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     events: list[VrContextEvent] = []
 
     async def on_ctx(p: object) -> None:
@@ -302,10 +354,10 @@ async def test_vr_context_message_publishes_event() -> None:
 
     bus.subscribe(Topics.VR_CONTEXT, on_ctx)
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
-        await ws.send(json.dumps({
+        await ws.client_send(json.dumps({
             "type": "vr_context",
             "payload": {"scene": "Aisle 2", "step": "3 / 8", "items_left": 4, "assist": True},
         }))
@@ -320,17 +372,16 @@ async def test_vr_context_message_publishes_event() -> None:
 @pytest.mark.asyncio
 async def test_vr_context_without_scalar_fields_is_dropped_with_warning() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     events: list[object] = []
     warnings: list[WarningEvent] = []
     bus.subscribe(Topics.VR_CONTEXT, lambda p: events.append(p))
     bus.subscribe(Topics.WARNING, lambda p: warnings.append(p) if isinstance(p, WarningEvent) else None)
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
         # Nested object is not a scalar field, so nothing survives → dropped.
-        await ws.send(json.dumps({"type": "vr_context", "payload": {"nested": {"a": 1}}}))
+        await ws.client_send(json.dumps({"type": "vr_context", "payload": {"nested": {"a": 1}}}))
         await asyncio.sleep(0.1)
 
     await sink.stop()
@@ -343,18 +394,17 @@ async def test_vr_context_without_scalar_fields_is_dropped_with_warning() -> Non
 async def test_unknown_inbound_type_is_ignored() -> None:
     """A message Unity sends that isn't a known type must not crash the read loop."""
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     events: list[object] = []
     bus.subscribe(Topics.VR_CONTEXT, lambda p: events.append(p))
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
-        await ws.send(json.dumps({"type": "something_else", "payload": {"x": 1}}))
-        await ws.send("not json at all")
+        await ws.client_send(json.dumps({"type": "something_else", "payload": {"x": 1}}))
+        await ws.client_send("not json at all")
         await asyncio.sleep(0.1)
         # Still alive: a following vr_context still gets through.
-        await ws.send(json.dumps({"type": "vr_context", "payload": {"step": "1"}}))
+        await ws.client_send(json.dumps({"type": "vr_context", "payload": {"step": "1"}}))
         await asyncio.sleep(0.1)
 
     await sink.stop()
@@ -366,7 +416,6 @@ async def test_unknown_inbound_type_is_ignored() -> None:
 async def test_object_status_manifest_can_be_resent_mid_session() -> None:
     """A re-sent manifest (e.g. on a Unity scene change) replaces the active one."""
     sink, bus, manifests = await _make_sink()
-    port = sink.bound_port
     updates: list[object] = []
     bus.subscribe(Topics.OBJECT_STATUS_UPDATED, lambda p: updates.append(p))
 
@@ -381,10 +430,10 @@ async def test_object_status_manifest_can_be_resent_mid_session() -> None:
         "abstract_actions": [],
     }
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)        # initial handshake
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)        # initial handshake
         await asyncio.sleep(0.05)
-        await ws.send(_frame(scene_two))    # scene-change re-send
+        await ws.client_send(_frame(scene_two))    # scene-change re-send
         await asyncio.sleep(0.1)
 
     await sink.stop()
@@ -416,14 +465,13 @@ _BEHAVIOUR_CH = [
 async def test_behaviour_manifest_merges_into_signal_manifest() -> None:
     sink, bus, manifests = await _make_sink()
     manifests.update_signal_manifest(_PHYS_MANIFEST)
-    port = sink.bound_port
     updates: list[object] = []
     bus.subscribe(Topics.MANIFEST_UPDATED, lambda p: updates.append(p))
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
-        await ws.send(json.dumps({"type": "behaviour_manifest", "payload": {"channels": _BEHAVIOUR_CH}}))
+        await ws.client_send(json.dumps({"type": "behaviour_manifest", "payload": {"channels": _BEHAVIOUR_CH}}))
         await asyncio.sleep(0.1)
 
     await sink.stop()
@@ -436,7 +484,6 @@ async def test_behaviour_manifest_merges_into_signal_manifest() -> None:
 @pytest.mark.asyncio
 async def test_behaviour_sample_emitted_as_signal_event() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     samples: list[SampleEvent] = []
 
     async def on_sample(p: object) -> None:
@@ -445,10 +492,10 @@ async def test_behaviour_sample_emitted_as_signal_event() -> None:
 
     bus.subscribe(Topics.SAMPLE, on_sample)
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
-        await ws.send(json.dumps({"type": "behaviour_sample", "payload": {"response_latency": 9.2, "idle_time": 3}}))
+        await ws.client_send(json.dumps({"type": "behaviour_sample", "payload": {"response_latency": 9.2, "idle_time": 3}}))
         await asyncio.sleep(0.1)
 
     await sink.stop()
@@ -461,14 +508,13 @@ async def test_behaviour_sample_emitted_as_signal_event() -> None:
 @pytest.mark.asyncio
 async def test_behaviour_sample_non_numeric_dropped() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     samples: list[object] = []
     bus.subscribe(Topics.SAMPLE, lambda p: samples.append(p))
 
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
-        await ws.send(json.dumps({"type": "behaviour_sample", "payload": {"response_latency": "slow"}}))
+        await ws.client_send(json.dumps({"type": "behaviour_sample", "payload": {"response_latency": "slow"}}))
         await asyncio.sleep(0.1)
 
     await sink.stop()
@@ -480,7 +526,6 @@ async def test_behaviour_sample_non_numeric_dropped() -> None:
 @pytest.mark.asyncio
 async def test_reconnect_brings_link_back_up() -> None:
     sink, bus, _ = await _make_sink()
-    port = sink.bound_port
     up_count = 0
     down_count = 0
 
@@ -495,14 +540,14 @@ async def test_reconnect_brings_link_back_up() -> None:
     bus.subscribe(Topics.LINK_STATUS, on_link)
 
     # First connection
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
     await asyncio.sleep(0.05)
 
     # Second connection (reconnect)
-    async with websockets.connect(f"ws://localhost:{port}") as ws:
-        await ws.send(_OBJECT_FRAME)
+    async with _connect(sink) as ws:
+        await ws.client_send(_OBJECT_FRAME)
         await asyncio.sleep(0.05)
     await asyncio.sleep(0.05)
 

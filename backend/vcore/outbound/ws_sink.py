@@ -1,13 +1,9 @@
 from __future__ import annotations
 
-import asyncio
-import contextlib
 import json
 import logging
 import time
 from typing import Any
-
-import websockets
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import (
@@ -21,21 +17,25 @@ from vcore.core.models import (
     WarningEvent,
 )
 from vcore.core.schema import ActiveManifests
-from vcore.outbound.base import ActionSink
 
 log = logging.getLogger(__name__)
 
 
-class WsSink(ActionSink):
-    """WebSocket server that the Unity runtime connects to.
+class WsSink:
+    """Handles the Unity runtime's ``/ws/runtime`` WebSocket connection.
+
+    The composition root constructs one instance; the ``/ws/runtime`` route hands
+    each connection to :meth:`handle_connection` via a thin adapter.
 
     Protocol (one connection at a time): every Unity → V-CORE frame is a typed
     JSON envelope ``{"type": ..., "payload": ...}``, routed through _handle_inbound:
       - ``object_status_manifest`` (Contract 3b) — sent on connect and re-sent on
         scene changes; validated, stored, published as OBJECT_STATUS_UPDATED.
+      - ``object_status_catalog`` — the project-wide catalog, for authoring rules
+        against objects/actions in scenes that aren't loaded yet.
       - ``vr_context`` (Contract 4), ``behaviour_manifest`` / ``behaviour_sample``
         (Contract 5) — routed onto the event bus.
-    V-CORE sends a StatusRequest JSON string whenever the rule engine fires.
+    V-CORE sends a StatusRequest / ActionRequest JSON string whenever the rule engine fires.
 
     Link status events are published on connect and disconnect. Incoming
     StatusRequests are validated against the active manifest before delivery;
@@ -44,60 +44,25 @@ class WsSink(ActionSink):
 
     def __init__(
         self,
-        host: str,
-        port: int,
         *,
         bus: EventBus,
         manifests: ActiveManifests,
     ) -> None:
-        self._host = host
-        self._port = port
         self._bus = bus
         self._manifests = manifests
         self._conn: Any = None
-        self._server: Any = None
-        self._serve_task: asyncio.Task[None] | None = None
-        self._ready: asyncio.Event = asyncio.Event()
 
     # ── lifecycle ─────────────────────────────────────────────────────────────
 
     async def start(self) -> None:
-        self._ready = asyncio.Event()
         self._bus.subscribe(Topics.RULE_FIRED, self._on_rule_fired)
-        self._serve_task = asyncio.create_task(self._serve())
-        await self._ready.wait()
 
     async def stop(self) -> None:
         self._bus.unsubscribe(Topics.RULE_FIRED, self._on_rule_fired)
-        if self._serve_task and not self._serve_task.done():
-            self._serve_task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await self._serve_task
-        if self._server is not None:
-            self._server.close()
-            with contextlib.suppress(Exception):
-                await self._server.wait_closed()
-            self._server = None
 
     @property
     def is_connected(self) -> bool:
         return self._conn is not None
-
-    @property
-    def bound_port(self) -> int:
-        """Actual port the server is listening on (valid after start())."""
-        if self._server is None:
-            raise RuntimeError("server not started")
-        return int(self._server.sockets[0].getsockname()[1])
-
-    # ── server loop ───────────────────────────────────────────────────────────
-
-    async def _serve(self) -> None:
-        async with websockets.serve(self.handle_connection, self._host, self._port) as server:
-            self._server = server
-            self._ready.set()
-            log.info("ws_sink: listening on ws://%s:%d", self._host, self._port)
-            await asyncio.Future()  # run until cancelled
 
     # ── connection handler ────────────────────────────────────────────────────
 
@@ -105,7 +70,7 @@ class WsSink(ActionSink):
         """Handle one Unity WebSocket connection.
 
         `ws` must expose: ``recv() -> str``, ``send(str) -> None``, ``remote_address``.
-        Compatible with both the *websockets* library and a thin FastAPI adapter.
+        Satisfied by the ``/ws/runtime`` FastAPI adapter (and the in-memory test fake).
         """
         log.info("ws_sink: Unity connected from %s", ws.remote_address)
         self._conn = ws

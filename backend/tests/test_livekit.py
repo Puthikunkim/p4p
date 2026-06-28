@@ -32,7 +32,6 @@ def test_token_endpoint_returns_409_when_disabled(tmp_path: Path) -> None:
         config=VCoreConfig(),
         rules_dir=tmp_path / "rules",
         data_dir=tmp_path / "data",
-        sink_port=0,
     )
     client = TestClient(app)
     resp = client.get("/api/livekit/token", params={"identity": "x"})

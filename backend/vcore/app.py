@@ -50,8 +50,6 @@ def create_app(
     config_path: Path | str | None = None,
     rules_dir: Path | None = None,
     data_dir: Path | None = None,
-    sink_host: str | None = None,
-    sink_port: int | None = None,
 ) -> FastAPI:
     """Create and return the FastAPI application.
 
@@ -78,9 +76,6 @@ def create_app(
         video_dir = _resolve(config.recording.video_dir)
         sqlite_path = _resolve(config.recording.sqlite_path)
 
-    sink_host = sink_host if sink_host is not None else config.outbound.ws_host
-    sink_port = sink_port if sink_port is not None else config.outbound.ws_port
-
     manifest_path = _resolve(config.ingestion.manifest_path)
     stream_name = config.ingestion.lsl_streams[0] if config.ingestion.lsl_streams else None
 
@@ -88,7 +83,7 @@ def create_app(
     manifests = ActiveManifests()
     registry = RuleRegistry(rules_dir)
     evaluator = RuleEvaluator(registry, bus, manifests)
-    ws_sink = WsSink(sink_host, sink_port, bus=bus, manifests=manifests)
+    ws_sink = WsSink(bus=bus, manifests=manifests)
     bridge = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
     recorder = Recorder(
         bus, manifests,

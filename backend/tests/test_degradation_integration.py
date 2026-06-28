@@ -432,7 +432,7 @@ async def test_status_request_dropped_silently_when_unity_disconnected(tmp_path:
     manifests = ActiveManifests()
     manifests.update_object_status_manifest(_OBJECT_MANIFEST)
 
-    sink = WsSink("127.0.0.1", 0, bus=bus, manifests=manifests)
+    sink = WsSink(bus=bus, manifests=manifests)
     await sink.start()
 
     # No Unity connection — publish a StatusRequest directly
@@ -479,7 +479,7 @@ async def test_link_status_forwarded_to_dashboard(tmp_path: Path) -> None:
     registry = RuleRegistry(rules_dir)
     registry.load_all()
     evaluator = RuleEvaluator(registry, bus, manifests)
-    ws_sink = WsSink("127.0.0.1", 0, bus=bus, manifests=manifests)
+    ws_sink = WsSink(bus=bus, manifests=manifests)
 
     bridge = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
     await bridge.start()
@@ -519,7 +519,7 @@ async def test_stale_event_forwarded_to_dashboard_as_warning(tmp_path: Path) -> 
     registry = RuleRegistry(rules_dir)
     registry.load_all()
     evaluator = RuleEvaluator(registry, bus, manifests)
-    ws_sink = WsSink("127.0.0.1", 0, bus=bus, manifests=manifests)
+    ws_sink = WsSink(bus=bus, manifests=manifests)
 
     bridge = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
     await bridge.start()

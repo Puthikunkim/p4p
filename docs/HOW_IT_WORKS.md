@@ -62,7 +62,7 @@ flowchart LR
     LSL["LSLSource<br/>(ingestion)"]
     BUS[("EventBus<br/>in-process pub/sub")]
     ENG["RuleEvaluator + RuleRegistry<br/>+ degradation"]
-    SINK["WsSink<br/>(also listens on :9001)"]
+    SINK["WsSink<br/>(/ws/runtime handler)"]
     BRIDGE["DashboardBridge"]
     REC["Recorder (SQLite + XDF)<br/>+ LiveKitRecorder"]
     API["REST API<br/>/api/rules, /api/sessions,<br/>/api/livekit/token"]
@@ -108,10 +108,7 @@ flowchart LR
 **Ports at a glance** (defaults; configurable via `config.yaml` / `LIVEKIT_SETUP.md`):
 
 - **8000** — FastAPI: serves `/ws/dashboard`, `/ws/runtime`, and all REST (incl.
-  `/api/livekit/token`).
-- **9001** — A *second*, standalone WebSocket server run by `WsSink`. Used by the headless
-  `mock_unity.py`. The real Unity POC uses `8000/ws/runtime` instead. Both funnel into the
-  same handler.
+  `/api/livekit/token`). Both the real Unity POC and `mock_unity.py` connect on `/ws/runtime`.
 - **7880 / 7881 / 7882·udp** — LiveKit server: signaling + server API (7880), RTC over TCP
   (7881, fallback), and RTC media (UDP **7882** — a single port; the stack avoids the
   Windows-reserved 50000+ range). The video plane lives here, not in FastAPI.
@@ -182,7 +179,7 @@ bus       = EventBus()
 manifests = ActiveManifests()
 registry  = RuleRegistry(rules_dir)
 evaluator = RuleEvaluator(registry, bus, manifests)
-ws_sink   = WsSink("localhost", 9001, bus=bus, manifests=manifests)
+ws_sink   = WsSink(bus=bus, manifests=manifests)
 bridge    = DashboardBridge(bus, manifests, registry, evaluator, ws_sink)
 recorder  = Recorder(bus, manifests, xdf_dir=xdf_dir, sqlite_path=sqlite_path)
 livekit_recorder = LiveKitRecorder(config.livekit, recorder.store, video_dir)
@@ -320,12 +317,9 @@ then:
 ### 4.5 Outbound — talking to Unity (`WsSink`)
 
 [`outbound/ws_sink.py`](../backend/vcore/outbound/ws_sink.py) is the boundary with the Unity
-runtime, and it's busier than its name suggests. It is both:
-
-- a **standalone WebSocket server** on `localhost:9001` (for `mock_unity.py` / direct
-  clients), and
-- the **handler** for FastAPI's `/ws/runtime` on port 8000 (the real Unity POC connects here;
-  the bridge adapts the FastAPI socket and calls the same `handle_connection`).
+runtime — the handler for FastAPI's `/ws/runtime` (port 8000). Both the real Unity POC and the
+headless `mock_unity.py` connect here; `DashboardBridge.handle_runtime` adapts the FastAPI
+socket and calls `WsSink.handle_connection`.
 
 It holds a single active Unity connection. **Inbound** (Unity → backend) frames are typed
 envelopes `{"type": ..., "payload": ...}` and are routed by type:
@@ -574,7 +568,7 @@ index on the wire and decoded back by `LSLSource`.
 
 ### `tools/mock_unity.py` — fake Unity
 
-Connects to `WsSink` (default `:9001`), sends an **Object-Status Manifest** (a `light-1`
+Connects to `/ws/runtime`, sends an **Object-Status Manifest** (a `light-1`
 tagged `ambient_light` with continuous `brightness`, and a `fog-1` tagged `fog` with discrete
 `density`), then:
 
@@ -701,8 +695,8 @@ npm install && npm run dev
 # 3) Mock sensor pipeline (no hardware) — streams synthetic LSL
 uv run python tools/mock_pipeline.py
 
-# 4) Mock Unity (no Unity) — connects to WsSink on :9001
-uv run python tools/mock_unity.py --port 9001
+# 4) Mock Unity (no Unity) — connects to /ws/runtime on :8000
+uv run python tools/mock_unity.py
 ```
 
 Then open `http://localhost:5173`, create a session in **New Session**, and watch **Session
@@ -732,13 +726,12 @@ nobody is misled. None of them stop the system from running end-to-end.
 
 1. **Resolved — `config.yaml` is now read.** `create_app()` calls `load_config()` and sources
    the rules dir, the XDF/video dirs + SQLite path, LSL stream name, signal manifest path, stale timeout,
-   the standalone `WsSink` host/port, and (via `python -m vcore.app`) the bind host/port from
+   and (via `python -m vcore.app`) the bind host/port from
    [`config.yaml`](../backend/config.yaml). Defaults match the previous hardcoded values, so
    behaviour is unchanged. Keys that documented unbuilt or non-backend behaviour (the WS route
    paths, the Unity-side reconnect backoff, `sqlite_enabled`, and the whole `video` block) have
-   been removed, so the file now contains only keys the code reads — plus two still tagged
-   `(reference only)`: `outbound.transport` (only `ws` is implemented) and `bridge.bearer_token`
-   (auth not implemented). The `create_app()` keyword arguments remain as test overrides.
+   been removed, so the file now contains only keys the code reads. The `create_app()` keyword
+   arguments remain as test overrides.
 
 2. **Resolved — duplicate rule file removed.** Previously two files
    (`clear-fog-stressed.yaml` and `clear_fog_stressed.yaml`) both declared
@@ -762,9 +755,8 @@ nobody is misled. None of them stop the system from running end-to-end.
    running system also uses `vr_context` (④) and `unity_behaviour` (⑤), each with its own
    schema + golden examples in [`contracts/`](../contracts).
 
-5. **Two WebSocket entry points for Unity.** `WsSink` runs a standalone server on `:9001`
-   *and* handles `/ws/runtime` on `:8000`. `mock_unity.py` uses `:9001`; the real Unity POC
-   uses `:8000`. Only one Unity connection is tracked at a time.
+5. **One Unity connection at a time.** Both the real Unity POC and `mock_unity.py` connect to
+   `/ws/runtime` (`:8000`); `WsSink` tracks a single active Unity connection.
 
 6. **Resolved — recording paths are now config-driven and consistent.** SQLite is at
    `backend/data/vcore.db`, XDF at `backend/data/xdf/<session_id>.xdf`, and video at
