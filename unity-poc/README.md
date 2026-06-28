@@ -1,178 +1,106 @@
 # V-CORE Unity POC
 
-A thin Unity reference implementation for the V-CORE platform — a **ready-to-run demo** of the
-full Contract 3 loop (Object-Status Manifest up, Status-Change Requests down) plus the video
-plane (a **LiveKit** SFU; recording via LiveKit Egress). It exists so the whole backend ↔ runtime
-loop is demonstrable without a real VR project.
+A thin Unity reference project that **demonstrates** the [`com.vcore.client`](Packages/com.vcore.client/README.md)
+package end-to-end: a ready-to-run Sample scene that declares adaptable objects, streams behaviour
+and study-context upstream, and mirrors a spectator camera over LiveKit — so the whole backend ↔
+runtime loop is demonstrable without a real VR project. Open it, point it at a backend, press Play.
 
-**Target Unity version:** 2022.3 LTS (any 2022.3.x patch)
+**Target Unity version:** 2022.3 LTS (any 2022.3.x patch).
 
-> **Reusing the client in your own project?** The runtime code lives in the embedded UPM package
-> [`Packages/com.vcore.client`](Packages/com.vcore.client/README.md) — **its README is the
-> install + configuration + API reference.** This page is only about running *this* demo project.
-
----
-
-## What's in here
-
-The reusable client is the embedded package at
-[`Packages/com.vcore.client`](Packages/com.vcore.client/README.md) (assemblies `VCore.Client` +
-the optional `VCore.Client.LiveKit`). Only the **demo content** lives under `Assets/`: the
-`StatusVisualizer` script, the `VCore` prefab, and the Sample scene + props.
-
-The pre-built **Sample scene** (`Assets/Scenes/Sample.unity`) contains:
-
-| GameObject | Components |
-|---|---|
-| **VCoreManager** | `VCoreLauncher` · `VCoreConnection` · `StatusCollector` · `RequestDispatcher` · reporters |
-| **CampfireLight** | `Light` · two `ObjectStatus` components (`brightness` continuous + `crackle` discrete) |
-| **SpectatorCamera** | `Camera` · `SpectatorCamera` · `LiveKitPublisher` |
-| **Main Camera** | `Camera` · `AudioListener` |
-
-What each component does, and the full `VCoreLauncher` field reference, is in the
-[package README](Packages/com.vcore.client/README.md).
+> **This page only documents what *this demo* implements and how to run it.** The client itself —
+> install, configuration, every component, the full API — lives in the embedded UPM package and is
+> documented once in **[`Packages/com.vcore.client/README.md`](Packages/com.vcore.client/README.md)**.
+> If you want to *reuse* the client in your own project, start there, not here.
 
 ---
 
-## Step-by-step: open and run the demo
+## What package features this POC implements, and where
 
-### 1  Install Unity 2022.3 LTS via Unity Hub
+Everything below is a feature of the package; this table is just the map of where each one is
+wired up in the Sample scene (`Assets/Scenes/Sample.unity`). The **§** column points to the full
+explanation in the [package README](Packages/com.vcore.client/README.md).
 
-1. Open **Unity Hub** → **Installs** → **Install Editor**.
-2. Choose **2022.3.x LTS** (any patch).
-3. In the module selector, enable **Windows Build Support (IL2CPP)** (or the target platform
-   you need). You do **not** need Android/iOS/WebGL support for a desktop lab POC.
-4. Finish the install.
+| Package feature | Where it's wired in this demo | Docs |
+|---|---|---|
+| One-component setup (`VCoreLauncher`) | **VCoreManager** (with `VCoreConnection` · `StatusCollector` · `RequestDispatcher`) | [§5](Packages/com.vcore.client/README.md#5-add-the-client-to-your-scene-vcorelauncher) |
+| Adaptable object — **continuous** (`ObjectStatus`) | **CampfireLight** `brightness` (0–100) → already wired to the Light's `intensity`; **Cube** `brightness` → wired to `StatusVisualizer` (scales the cube) | [§6](Packages/com.vcore.client/README.md#6-make-objects-adaptable-objectstatus) |
+| Adaptable object — **discrete** (`ObjectStatus`) | **CampfireLight** `crackle` (`off`/`low`/`high`) — declared; effect left unwired (wire to your own audio) | [§6](Packages/com.vcore.client/README.md#6-make-objects-adaptable-objectstatus) |
+| **Tag fan-out** | **CampfireLight** and **Cube** are both tagged `ambient_light`, so one tag-targeted `brightness` rule drives both at once | [§6](Packages/com.vcore.client/README.md#6-make-objects-adaptable-objectstatus) |
+| Command (`VCoreAction`) | **VCoreManager** `advance_scene` (Scene scope) — declared; `On Invoke` left empty for you to fill | [§7](Packages/com.vcore.client/README.md#7-expose-commands-vcoreaction) |
+| Behaviour metrics (`BehaviourReporter`) | **VCoreManager** — 6 synthetic channels (response latency, accuracy, idle time, …) | [§8](Packages/com.vcore.client/README.md#8-stream-behaviour-metrics-behaviourreporter--behaviourmetric) |
+| Study context (`VrContextReporter`) | **VCoreManager** — a 4-step supermarket walkthrough on a timer | [§9](Packages/com.vcore.client/README.md#9-report-study-context-vrcontextreporter) |
+| Video — spectator mirror + recording (`SpectatorCamera` + `LiveKitPublisher`) | **SpectatorCamera** (1920×1080), published to LiveKit | [§10](Packages/com.vcore.client/README.md#10-video--spectator-mirror--recording-spectatorcamera--livekit) |
+| Multi-scene persistence | `Persist Across Scenes` ticked on **VCoreManager**'s `VCoreLauncher` | [§12](Packages/com.vcore.client/README.md#12-multi-scene-sessions) |
 
-### 2  Open the project
-
-1. Unity Hub → **Projects** → **Open** → browse to this folder (`unity-poc/`).
-2. Unity detects `ProjectSettings/ProjectVersion.txt` and opens the project.
-3. On first open Unity resolves the packages in `Packages/manifest.json` (needs internet) —
-   notably `com.unity.nuget.newtonsoft-json`. Wait for the **Package Manager** progress bar and
-   the **Asset Database** reimport to finish before touching anything (2–5 minutes on first open).
-
-> **Tip:** if Unity Hub can't find a 2022.3.x editor for this project it will prompt you to
-> install one — click "Install suggested version".
-
-### 3  Open the Sample scene
-
-In the **Project** panel: `Assets → Scenes → Sample`. Double-click `Sample` to open it. You
-should see four GameObjects in the Hierarchy:
+### Sample scene Hierarchy
 
 ```
-▼ VCoreManager       (VCoreLauncher + VCoreConnection / StatusCollector / RequestDispatcher / reporters)
-▼ CampfireLight      (Directional Light + two ObjectStatus components)
-▼ SpectatorCamera    (Camera + SpectatorCamera + LiveKitPublisher)
-▼ Main Camera        (Camera + AudioListener)
+VCoreManager     VCoreLauncher · VCoreConnection · StatusCollector · RequestDispatcher
+                 · BehaviourReporter · VrContextReporter · VCoreAction (advance_scene)
+CampfireLight    Light · ObjectStatus (brightness → Light.intensity) · ObjectStatus (crackle, discrete)
+Cube             MeshRenderer · ObjectStatus (brightness → StatusVisualizer) · StatusVisualizer
+SpectatorCamera  Camera · SpectatorCamera · LiveKitPublisher
+Main Camera      Camera · AudioListener
 ```
 
-### 4  Point it at your backend
+### Demo-only content (not part of the package)
 
-Select **VCoreManager** → on the **VCoreLauncher**, set `Backend Config` to the `BackendConfig`
-whose `Host`/`Port` point at your backend (Machine A). To change the address itself, edit the
-`BackendConfig` asset (`Assets/Settings/BackendConfig.asset`) — it flows to every V-CORE
-component. (Full launcher/`BackendConfig` field reference: [package README §4–5](Packages/com.vcore.client/README.md).)
+These live under `Assets/` and exist purely to make the demo tangible — they are **not** part of
+the reusable client:
 
-### 5  Wire the light-control event (the demo effect)
-
-The sample sends a brightness status request to `campfire_01` when V-CORE fires a rule. To
-actually see the light dim:
-
-1. Select **CampfireLight** in the Hierarchy.
-2. In the Inspector find the **ObjectStatus** with `Status Name = brightness`.
-3. Under **On Continuous Value (Single)** click **+** and drag the `CampfireLight` GameObject
-   into the object slot.
-4. In the function dropdown select **Light → intensity**.
-
-Now when V-CORE sends `{target:{tag:"ambient_light"}, status:"brightness", value:20}` the light's
-intensity is set to `20` (on the 0–100 scale you declared). The `crackle` ObjectStatus (discrete:
-`off / low / high`) works the same way — wire `On Discrete Value (String)` to drive an audio
-source, etc.
-
-### 6  Start the V-CORE backend
-
-From the repo root:
-
-```bash
-cd backend
-pip install -e ".[dev]"
-cp config.example.yaml config.yaml
-uvicorn vcore.app:app --reload --host 0.0.0.0 --port 8000
-```
-
-Or with Docker Compose: `docker compose up backend`.
-
-### 7  Press Play
-
-Press **▶ Play** in Unity. In the Console you should see:
-
-```
-[VCore] Connecting → ws://localhost:8000/ws/runtime
-[VCore] Connected to V-CORE
-[Dispatcher] Index built: 1 object(s), 2 tag(s)
-[LiveKit] connected → ws://localhost:7880
-[LiveKit] publishing spectator camera
-```
-
-V-CORE logs that it received the Object-Status Manifest and indexed it. The manifest exposes:
-
-```json
-{
-  "scene": "sample_scene",
-  "objects": [
-    {
-      "id": "campfire_01",
-      "tags": ["ambient_light", "fire"],
-      "statuses": [
-        { "name": "brightness", "type": "continuous", "range": {"min": 0, "max": 100} },
-        { "name": "crackle",    "type": "discrete",   "values": ["off", "low", "high"] }
-      ]
-    }
-  ]
-}
-```
-
-Open the **V-CORE dashboard** (`http://localhost:5173`) → **Rule Manager** → **New Rule**. The
-THEN side offers `campfire_01` with `brightness` and `crackle`.
+- `Assets/Scripts/StatusVisualizer.cs` — maps a continuous status value to a GameObject's scale, so
+  a rule's effect is visible in the camera feed (used by **Cube**).
+- The **CampfireLight** and **Cube** props and the **Sample** scene.
+- `Assets/Prefabs/VCore.prefab` — a pre-assembled **VCoreManager** you can drag into another scene
+  as a starting point (see package [§5](Packages/com.vcore.client/README.md#5-add-the-client-to-your-scene-vcorelauncher)).
 
 ---
 
-## Going further
+## Run this demo
 
-These are all **client features documented once in the
-[package README](Packages/com.vcore.client/README.md)** — the same package this POC consumes:
+The scene is already fully wired — there is **no in-Editor setup** beyond pointing it at a backend.
 
-- **Add your own adaptable objects / commands** — `ObjectStatus` (§6) and `VCoreAction` (§7).
-- **Stream behaviour & study context** — `BehaviourReporter` / `BehaviourMetric` and
-  `VrContextReporter`, with real-data snippets (§8–9).
-- **Author rules before scenes load** — **V-CORE ▸ Bake Project Catalog** (§11).
-- **Reuse the client in another project** — copy/reference the package and run
-  **V-CORE ▸ Add to Scene** (§3, §5).
+1. **Open the project.** Unity Hub → **Open** → select this `unity-poc/` folder. On first open, wait
+   for the Package Manager to resolve packages and the asset import to finish (a few minutes — it
+   pulls `com.unity.nuget.newtonsoft-json`). If Hub offers to install a matching 2022.3.x editor,
+   accept it.
+2. **Open the scene.** Project window → `Assets/Scenes/Sample`.
+3. **Point it at your backend.** Select `Assets/Settings/BackendConfig.asset` and set **Host**/**Port**
+   in the Inspector. Leave `localhost` / `8000` if the backend runs on the same machine; otherwise
+   enter the backend machine's LAN IP. (One asset feeds every component — see package
+   [§4](Packages/com.vcore.client/README.md#4-point-it-at-your-backend-backendconfig).)
+4. **Start the backend** (from the repo root):
 
-Multi-scene behaviour (`persistAcrossScenes`, manifest re-send on scene load) is covered there
-too.
+   ```bash
+   cd backend
+   pip install -e ".[dev]"
+   cp config.example.yaml config.yaml
+   uvicorn vcore.app:app --reload --host 0.0.0.0 --port 8000
+   ```
+
+   Or with Docker: `docker compose up backend`.
+5. **Press ▶ Play.** The Console shows the connect + manifest lines (the exact lines and how to
+   verify are in package [§13](Packages/com.vcore.client/README.md#13-verify-it-works)).
+
+**See it react:** open the dashboard (`http://localhost:5173`) → **Rule Manager ▸ New Rule**, and on
+the THEN side target tag `ambient_light`, status `brightness`. When the rule fires, the campfire
+dims **and** the cube scales — both objects respond to the one tag-targeted rule.
 
 ---
 
 ## Video & recording (in this demo)
 
-The SpectatorCamera rig publishes over a **LiveKit** SFU; the dashboard subscribes for the live
+The **SpectatorCamera** rig publishes over a LiveKit SFU; the dashboard subscribes for the live
 mirror, and the backend records it **server-side** (LiveKit Egress, anchored to the LSL clock) to
-`backend/data/video/<session_id>.webm`, playable in the dashboard's **Data History** screen.
-There's nothing to call from Unity. LiveKit + Egress run via Docker and need one per-machine value
-(`node_ip` = your LAN IP) — see [`../docs/LIVEKIT_SETUP.md`](../docs/LIVEKIT_SETUP.md).
+`backend/data/video/<session_id>.webm`, replayable in the dashboard's **Data History** screen.
+There is nothing to call from Unity. The LiveKit + Egress stack runs via Docker and needs one
+per-machine value (`node_ip` = your LAN IP) — see [`../docs/LIVEKIT_SETUP.md`](../docs/LIVEKIT_SETUP.md).
 
 ---
 
-## Troubleshooting
+## See also
 
-| Symptom | Check |
-|---|---|
-| `[VCore] Connect failed` | Is the backend running? Is the `BackendConfig` host/port correct? |
-| Scene opens with broken script references (yellow ?) | Unity hasn't resolved the `com.vcore.client` package yet — wait for Package Manager + reimport to finish (the scripts live in `Packages/com.vcore.client/Runtime/`, not `Assets/`). |
-| No video mirror in the dashboard | Is the LiveKit + Egress stack up and `node_ip` set to your LAN IP? See [`../docs/LIVEKIT_SETUP.md`](../docs/LIVEKIT_SETUP.md). |
-| `[Dispatcher] No object with tag '…'` | The `ObjectStatus` doesn't have the expected tag set in the Inspector. |
-
-More client-level troubleshooting (assemblies, LiveKit define, Newtonsoft) is in the
-[package README](Packages/com.vcore.client/README.md#troubleshooting).
+- [`Packages/com.vcore.client/README.md`](Packages/com.vcore.client/README.md) — the client: install,
+  configuration, every component, and troubleshooting (start here to reuse it).
+- [`../docs/HOW_IT_WORKS.md`](../docs/HOW_IT_WORKS.md) — how the whole V-CORE system fits together.
+- [`../docs/LIVEKIT_SETUP.md`](../docs/LIVEKIT_SETUP.md) — the video server (LiveKit + recording) setup.
