@@ -6,8 +6,7 @@
 >
 > **How it relates to [`ARCHITECTURE.md`](../ARCHITECTURE.md).** That file is the *design*
 > doc (the intended plan). This file is the *as-built* doc (what the code does today). Where
-> they differ, this document wins and the difference is called out in
-> [§11 As-built notes & discrepancies](#11-as-built-notes--discrepancies).
+> they differ, this document wins.
 
 ---
 
@@ -23,7 +22,6 @@
 8. [End-to-end walkthroughs](#8-end-to-end-walkthroughs)
 9. [The participant video plane (LiveKit)](#9-the-participant-video-plane-livekit)
 10. [How to run the whole thing locally](#10-how-to-run-the-whole-thing-locally)
-11. [As-built notes & discrepancies](#11-as-built-notes--discrepancies)
 
 ---
 
@@ -196,7 +194,7 @@ exists — starts an `LSLSource` reading the stream named `sensor.cognitive`.
 > the `backend/` directory, so behaviour is the same regardless of the working directory. The
 > keyword arguments to `create_app()` (used by tests) are **overrides** that win over config.
 > Not every key is consumed yet — each is tagged `(wired)` or `(reference only)` in
-> `config.yaml`. See [§11](#11-as-built-notes--discrepancies).
+> `config.yaml`.
 
 ### 4.2 The EventBus — the spine
 
@@ -236,11 +234,6 @@ time-synced biosignals over a network. `LSLSource`:
    channels from an index back to a string), and publishes a `SAMPLE` event.
 4. Runs a **watchdog**: if no sample arrives within `stale_timeout_s`, it emits a `STALE`
    event and flips the `sensor-pipeline` link to `stale`, then `down` if it stays silent.
-
-There's also [`ingestion/replay_source.py`](../backend/vcore/ingestion/replay_source.py) — a
-CSV-replay source that needs no LSL runtime — but it is **only used in tests**, not by
-`app.py`. Both implement the [`SignalSource`](../backend/vcore/ingestion/base.py) interface,
-which is the *adapter* pattern: swap the source without touching the engine.
 
 ### 4.4 The rule engine
 
@@ -716,52 +709,3 @@ cd backend  && uv run pytest        # backend
 cd frontend && npm test             # frontend (vitest)
 cd frontend && npm run build        # type-check + production build
 ```
-
----
-
-## 11. As-built notes & discrepancies
-
-These are places where the running code differs from the design doc / README, captured here so
-nobody is misled. None of them stop the system from running end-to-end.
-
-1. **Resolved — `config.yaml` is now read.** `create_app()` calls `load_config()` and sources
-   the rules dir, the XDF/video dirs + SQLite path, LSL stream name, signal manifest path, stale timeout,
-   and (via `python -m vcore.app`) the bind host/port from
-   [`config.yaml`](../backend/config.yaml). Defaults match the previous hardcoded values, so
-   behaviour is unchanged. Keys that documented unbuilt or non-backend behaviour (the WS route
-   paths, the Unity-side reconnect backoff, `sqlite_enabled`, and the whole `video` block) have
-   been removed, so the file now contains only keys the code reads. The `create_app()` keyword
-   arguments remain as test overrides.
-
-2. **Resolved — duplicate rule file removed.** Previously two files
-   (`clear-fog-stressed.yaml` and `clear_fog_stressed.yaml`) both declared
-   `id: clear-fog-stressed`; because the registry keys rules by `id`, one silently overwrote
-   the other. The hyphenated duplicate (which also had a `"stressedf"` typo and didn't match
-   the underscore naming of the other rule files) has been deleted.
-   [`clear_fog_stressed.yaml`](../backend/rules/clear_fog_stressed.yaml) is now the single
-   canonical version.
-
-3. **Video runs on LiveKit.** The participant video plane is a **LiveKit** SFU with server-side
-   **Track Egress** recording (§4.7, §9). The
-   one knob you must set per machine is LiveKit's `node_ip` (your LAN IP) — see
-   [`LIVEKIT_SETUP.md`](LIVEKIT_SETUP.md). LSL↔video sync uses **two-point** alignment — the
-   LSL clock is captured at egress **start** (`video_lsl_ts`) and **stop** (`video_lsl_ts_end`),
-   and the frontend linearly maps the video timeline to the LSL timeline (drift-corrected).
-   It is **not** frame-accurate: a fixed egress-start offset (up to ~1 s) plus residual jitter
-   remain, so it's good for review (≈±tenths of a second), not sub-frame analysis. True
-   per-frame sync (timestamps embedded per frame) remains future work.
-
-4. **"Three contracts" vs five message types.** The docs emphasize three contracts, but the
-   running system also uses `vr_context` (④) and `unity_behaviour` (⑤), each with its own
-   schema + golden examples in [`contracts/`](../contracts).
-
-5. **One Unity connection at a time.** Both the real Unity POC and `mock_unity.py` connect to
-   `/ws/runtime` (`:8000`); `WsSink` tracks a single active Unity connection.
-
-6. **Resolved — recording paths are now config-driven and consistent.** SQLite is at
-   `backend/data/vcore.db`, XDF at `backend/data/xdf/<session_id>.xdf`, and video at
-   `backend/data/video/<session_id>.<ext>` — each from an independent, fully configurable key
-   (`recording.sqlite_path` / `xdf_dir` / `video_dir`). The DB filename is configurable
-   (default `vcore.db`, no longer `sessions.db`). The old `data_dir`/`vcore.db` mismatch is
-   gone, and `Recorder`/`VideoStore` take these paths directly so each artifact can live on
-   different storage.

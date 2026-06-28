@@ -12,13 +12,15 @@ emits **object-status change requests** to the VR environment.
 
 The system is **plug-and-play along three axes** — indicators, rules, and VR environments —
 with no core-code changes required to exercise any of them. That modularity is enforced by
-three versioned contracts:
+**five versioned contracts** — the single source of truth for every cross-component message:
 
-| #   | Contract                           | Between                     | Carries                                                                                                                        |
-| --- | ---------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| 1   | **Signal Schema**                  | Pipeline → Dashboard/Engine | self-describing channels (name · unit · type · range · display hint)                                                           |
-| 2   | **Rule Grammar**                   | Rule files ↔ Engine/UI      | declarative `IF (signal) → THEN (set object status)`; authored in the UI or dropped in as files                                |
-| 3   | **Object-Status & Status-Request** | Engine ↔ VR Runtime         | runtime declares each object's settable statuses (over WebSocket); engine sends `{target, status, value}` matched against them |
+| #   | Contract                            | Between                       | Carries                                                                                                                          |
+| --- | ----------------------------------- | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| 1   | **Signal Schema**                   | Pipeline → Dashboard/Engine   | self-describing channels (name · unit · type · range · display hint)                                                            |
+| 2   | **Rule Grammar**                    | Rule files ↔ Engine/UI        | declarative `IF (signal) → THEN (set status / invoke action)`; authored in the UI or dropped in as files                        |
+| 3   | **Object-Status, Status & Action**  | Engine ↔ VR Runtime           | runtime declares each object's settable statuses + actions (over WebSocket); engine sends a `{target, status, value}` or action |
+| 4   | **VR Context**                      | VR Runtime → Dashboard        | free-form study/scene context (scene · step · instruction · …) shown beside the signals                                         |
+| 5   | **Unity Behaviour**                 | VR Runtime → Dashboard/Engine | behavioural channels + samples that flow through the same pipeline as sensor signals (charted, rule-evaluable, recorded)        |
 
 ## Start here
 

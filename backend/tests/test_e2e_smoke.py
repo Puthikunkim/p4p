@@ -5,7 +5,7 @@ Unity WS client → recorded to SQLite — without any hardware or LSL runtime.
 
 Stack wired in this test
 ------------------------
-  ReplaySource    — reads fixture CSV + manifest, publishes SampleEvents on bus
+  sample injector — loads the fixture signal manifest + publishes SampleEvents on the bus
   RuleRegistry    — loads a single YAML rule from tmp_path/rules/
   RuleEvaluator   — evaluates rules against each sample
   WsSink          — the /ws/runtime handler, driven in-memory (no socket)
@@ -31,14 +31,12 @@ from vcore.core.models import SampleEvent
 from vcore.core.schema import ActiveManifests
 from vcore.engine.evaluator import RuleEvaluator
 from vcore.engine.registry import RuleRegistry
-from vcore.ingestion.replay_source import ReplaySource
 from vcore.outbound.ws_sink import WsSink
 from vcore.recording.recorder import Recorder
 from vcore.recording.sqlite_store import SqliteStore
 
 _FIXTURES = Path(__file__).parent.parent.parent / "tools" / "fixtures"
 _MANIFEST_PATH = _FIXTURES / "sample_session.manifest.json"
-_CSV_PATH = _FIXTURES / "sample_session.csv"
 
 _OBJECT_MANIFEST: dict[str, Any] = {
     "schema_version": "1.0.0",
@@ -121,7 +119,7 @@ async def _mock_unity(sink: WsSink, received: list[dict[str, Any]]) -> None:
 async def test_signal_to_unity_and_sqlite(
     rules_dir: Path, data_dir: Path
 ) -> None:
-    """Full chain: replay fixture → rule fires → Unity receives StatusRequest → SQLite records session."""
+    """Full chain: sample injected → rule fires → Unity receives StatusRequest → SQLite records session."""
     bus = EventBus()
     manifests = ActiveManifests()
 
@@ -142,32 +140,39 @@ async def test_signal_to_unity_and_sqlite(
     )
     await recorder.start()
 
-    # --- replay source (fast: bump rate to avoid long waits) ---
-    source = ReplaySource(
-        _MANIFEST_PATH,
-        _CSV_PATH,
-        bus=bus,
-        manifests=manifests,
-        stale_timeout_s=30.0,
-        loop=True,
-    )
+    # --- sample injector (replaces a live source: no hardware, no LSL) ---
+    async def _inject_samples() -> None:
+        while True:
+            await bus.publish(
+                Topics.SAMPLE,
+                SampleEvent(
+                    stream_name="sensor.cognitive",
+                    timestamp=time.time(),
+                    values={"cognitive_load": 0.9, "eeg_alpha_power": 50.0, "affect": "stressed"},
+                ),
+            )
+            await asyncio.sleep(0.05)
 
     received: list[dict[str, Any]] = []
+    inject_task: asyncio.Task[None] | None = None
 
     try:
-        # Start mock Unity client — it connects, sends manifest, waits for requests
+        # Mock Unity connects + sends its Object-Status Manifest
         unity_task = asyncio.create_task(_mock_unity(sink, received))
-        # Give the WS connection time to establish and the manifest to propagate
+        # Give the connection time to establish and the manifest to propagate
         await asyncio.sleep(0.1)
 
-        # Start evaluator now that manifests are being populated
+        # Start evaluator now that the object manifest is populated
         await evaluator.start()
 
         # Start session before samples flow
         sid = recorder.start_session("smoke-participant")
 
-        # Start streaming samples; CSV has rows with cognitive_load ≥ 0.4 which triggers the rule
-        await source.start()
+        # Establish the signal manifest (as a live source would on connect), then stream
+        # triggering samples (cognitive_load ≥ 0.4 → the rule fires).
+        manifests.update_signal_manifest(json.loads(_MANIFEST_PATH.read_text()))
+        await bus.publish(Topics.MANIFEST_UPDATED, manifests.signal_manifest)
+        inject_task = asyncio.create_task(_inject_samples())
 
         # Wait up to 3 s for at least one StatusRequest to reach the mock Unity
         deadline = time.monotonic() + 3.0
@@ -178,7 +183,10 @@ async def test_signal_to_unity_and_sqlite(
         await recorder.stop_session()
 
     finally:
-        await source.stop()
+        if inject_task is not None:
+            inject_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await inject_task
         await evaluator.stop()
         unity_task.cancel()
         with contextlib.suppress(asyncio.CancelledError, Exception):
@@ -239,41 +247,3 @@ async def test_rule_not_fired_when_no_object_manifest(
     await evaluator.stop()
 
     assert not fired, f"rule fired despite missing object manifest: {fired}"
-
-
-@pytest.mark.asyncio
-async def test_replay_source_publishes_samples(tmp_path: Path) -> None:
-    """ReplaySource publishes SampleEvents to the bus from the fixture CSV."""
-    bus = EventBus()
-    manifests = ActiveManifests()
-
-    samples: list[SampleEvent] = []
-
-    async def _collect(ev: object) -> None:
-        if isinstance(ev, SampleEvent):
-            samples.append(ev)
-
-    bus.subscribe(Topics.SAMPLE, _collect)
-
-    source = ReplaySource(
-        _MANIFEST_PATH,
-        _CSV_PATH,
-        bus=bus,
-        manifests=manifests,
-        stale_timeout_s=30.0,
-        loop=False,
-    )
-    await source.start()
-
-    # Wait for at least 3 samples (fixture CSV has 20 rows; srate=10 → 0.3 s minimum)
-    deadline = time.monotonic() + 5.0
-    while len(samples) < 3 and time.monotonic() < deadline:
-        await asyncio.sleep(0.05)
-
-    await source.stop()
-
-    assert len(samples) >= 3, f"expected ≥3 samples, got {len(samples)}"
-    first = samples[0]
-    assert "cognitive_load" in first.values
-    assert isinstance(first.values["cognitive_load"], float)
-    assert first.values["affect"] in ("calm", "stressed", "bored", "engaged")

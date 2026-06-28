@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import WebSocket, WebSocketDisconnect
 
@@ -11,8 +11,10 @@ from vcore.core.models import SampleEvent
 from vcore.core.schema import ActiveManifests
 from vcore.engine.evaluator import RuleEvaluator
 from vcore.engine.registry import RuleRegistry
-from vcore.ingestion.base import SignalSource
 from vcore.outbound.ws_sink import WsSink
+
+if TYPE_CHECKING:
+    from vcore.ingestion.lsl_source import LSLSource
 
 log = logging.getLogger(__name__)
 
@@ -39,7 +41,7 @@ class DashboardBridge:
         registry: RuleRegistry,
         evaluator: RuleEvaluator,
         ws_sink: WsSink,
-        signal_source: SignalSource | None = None,
+        signal_source: LSLSource | None = None,
     ) -> None:
         self._bus = bus
         self._manifests = manifests
@@ -52,11 +54,11 @@ class DashboardBridge:
         self._cached_vr_context: object | None = None
 
     @property
-    def signal_source(self) -> SignalSource | None:
+    def signal_source(self) -> LSLSource | None:
         return self._signal_source
 
     @signal_source.setter
-    def signal_source(self, source: SignalSource) -> None:
+    def signal_source(self, source: LSLSource) -> None:
         self._signal_source = source
 
     async def start(self) -> None:

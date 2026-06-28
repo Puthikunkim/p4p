@@ -588,7 +588,7 @@ p4p/
 │   │   └── overload-dim-lights.yaml
 │   ├── vcore/
 │   │   ├── core/                       # ⛔ eventbus.py · schema.py · models.py
-│   │   ├── ingestion/                  # 🔌 base.py · lsl_source.py · replay_source.py
+│   │   ├── ingestion/                  # 🔌 lsl_source.py
 │   │   ├── engine/                     #   registry.py · evaluator.py · degradation.py
 │   │   ├── outbound/                   # 🔌 ws_sink.py (/ws/runtime handler)
 │   │   ├── api/                        # 1️⃣ rules.py (+ manual-trigger 2️⃣) · sessions.py · livekit.py (token mint, 2️⃣)
@@ -705,7 +705,7 @@ LiveKit/video server, [`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
 - **Security:** an **isolated lab LAN** is assumed (plaintext LSL on the wire — a known
   limitation for the ethics write-up). LiveKit media is **WebRTC (DTLS-SRTP), encrypted by
   default**, so the participant video is encrypted even on the LAN. (A WS bearer-token for the
-  dashboard/runtime is sketched in config but **not yet implemented** — see HOW_IT_WORKS §11.)
+  dashboard/runtime is **not yet implemented**.)
 
 ---
 
@@ -741,8 +741,8 @@ The testing *strategy* (the design intent):
   **both** Python (`jsonschema`) and TS (`ajv`) — valid pass, invalid fail — so the two sides
   can never drift from the schema.
 - **Hardware-free by design:** `tools/mock_pipeline.py` (synthetic Signal-Schema stream over LSL)
-  and `tools/mock_unity.py` (headless WS client: manifest + behaviour/context, logs requests),
-  plus `ingestion/replay_source.py`, make the whole loop runnable with **no sensors and no Unity**.
+  and `tools/mock_unity.py` (headless WS client: manifest + behaviour/context, logs requests)
+  make the whole loop runnable with **no sensors and no Unity**.
 - **Degradation:** every row of [§9](#9-failure-modes--graceful-degradation) is asserted as
   *disable-and-warn*, never a crash.
 - **Reproducibility:** raw streams → **XDF** (with clock offsets); the session video aligns to
@@ -771,8 +771,8 @@ Defaults are chosen so none block progress; flag any to change.
    mono spectator camera, on a **LiveKit SFU** (Unity publishes → browser subscribes →
    server-side Track Egress records `.webm`); V-CORE mints tokens + drives the egress.
 7. **Rule file format:** **YAML** authored + JSON-Schema validated; loader also accepts JSON.
-8. **Hardware availability:** assumed not guaranteed → `replay_source` + `mock_pipeline` +
-   `mock_unity` keep everything testable without hardware.
+8. **Hardware availability:** assumed not guaranteed → `mock_pipeline` + `mock_unity`
+   keep everything testable without hardware.
 
 ---
 

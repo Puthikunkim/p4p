@@ -6,21 +6,22 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import pylsl
 
 from vcore.core.eventbus import EventBus, Topics
 from vcore.core.models import LinkStatusEvent, SampleEvent, StaleEvent, WarningEvent
 from vcore.core.schema import ActiveManifests
-from vcore.ingestion.base import LinkState, SignalSource
 
 log = logging.getLogger(__name__)
+
+LinkState = Literal["up", "down", "stale"]
 
 _RESOLVE_TIMEOUT = 10.0  # seconds to wait for the LSL stream to appear
 
 
-class LSLSource(SignalSource):
+class LSLSource:
     """Read a live LSL stream from the sensor pipeline and publish samples onto the event bus.
 
     The Signal Schema manifest is loaded from *manifest_path* (a Contract 1

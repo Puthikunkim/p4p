@@ -1,4 +1,4 @@
-"""Phase 3 tests — ingestion adapters."""
+"""Phase 3 tests — ingestion (LSLSource)."""
 from __future__ import annotations
 
 import asyncio
@@ -9,120 +9,12 @@ from pathlib import Path
 import pytest
 
 from vcore.core.eventbus import EventBus, Topics
-from vcore.core.models import LinkStatusEvent, SampleEvent, StaleEvent
+from vcore.core.models import LinkStatusEvent, SampleEvent
 from vcore.core.schema import ActiveManifests
 from vcore.ingestion.lsl_source import LSLSource
-from vcore.ingestion.replay_source import ReplaySource
 
 FIXTURES = Path(__file__).parent.parent.parent / "tools" / "fixtures"
 MANIFEST = FIXTURES / "sample_session.manifest.json"
-CSV = FIXTURES / "sample_session.csv"
-
-
-def _make_source(*, loop: bool = False, stale_timeout_s: float = 5.0) -> tuple[ReplaySource, EventBus, ActiveManifests]:
-    bus = EventBus()
-    manifests = ActiveManifests()
-    src = ReplaySource(MANIFEST, CSV, bus=bus, manifests=manifests, stale_timeout_s=stale_timeout_s, loop=loop)
-    return src, bus, manifests
-
-
-# ── manifest published ────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_replay_publishes_manifest_before_samples() -> None:
-    src, bus, _ = _make_source()
-    received: list[str] = []
-
-    async def on_manifest(p: object) -> None:
-        received.append("manifest")
-
-    async def on_sample(p: object) -> None:
-        received.append("sample")
-
-    bus.subscribe(Topics.MANIFEST_UPDATED, on_manifest)
-    bus.subscribe(Topics.SAMPLE, on_sample)
-
-    await src.start()
-    await asyncio.sleep(0.05)
-    await src.stop()
-
-    assert received[0] == "manifest"
-    assert "sample" in received
-
-
-# ── samples arrive ────────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_replay_emits_correct_number_of_samples() -> None:
-    src, bus, _ = _make_source(loop=False)
-    samples: list[SampleEvent] = []
-
-    async def on_sample(p: object) -> None:
-        assert isinstance(p, SampleEvent)
-        samples.append(p)
-
-    bus.subscribe(Topics.SAMPLE, on_sample)
-    await src.start()
-    # 10 rows at 10 Hz = 1 s; wait 1.5 s to be sure all rows are consumed
-    await asyncio.sleep(1.5)
-    await src.stop()
-
-    assert len(samples) == 10
-
-
-@pytest.mark.asyncio
-async def test_replay_sample_has_correct_channels() -> None:
-    src, bus, _ = _make_source(loop=False)
-    samples: list[SampleEvent] = []
-
-    async def on_sample(p: object) -> None:
-        assert isinstance(p, SampleEvent)
-        samples.append(p)
-
-    bus.subscribe(Topics.SAMPLE, on_sample)
-    await src.start()
-    await asyncio.sleep(0.2)
-    await src.stop()
-
-    assert len(samples) >= 1
-    first = samples[0]
-    assert set(first.values.keys()) == {"cognitive_load", "eeg_alpha_power", "affect"}
-    assert isinstance(first.values["cognitive_load"], float)
-    assert isinstance(first.values["affect"], str)
-
-
-@pytest.mark.asyncio
-async def test_replay_manifest_stored_in_registry() -> None:
-    src, _, manifests = _make_source()
-    await src.start()
-    await asyncio.sleep(0.05)
-    await src.stop()
-
-    assert manifests.signal_manifest is not None
-    assert manifests.signal_manifest["stream"]["name"] == "sensor.cognitive"
-
-
-# ── stale detection ───────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-async def test_stale_event_emitted_after_silence() -> None:
-    src, bus, _ = _make_source(loop=False, stale_timeout_s=0.5)
-    stale_events: list[StaleEvent] = []
-
-    async def on_stale(p: object) -> None:
-        assert isinstance(p, StaleEvent)
-        stale_events.append(p)
-
-    bus.subscribe(Topics.STALE, on_stale)
-
-    await src.start()
-    # All 10 rows play out in 1 s; wait for them to finish + watchdog fires
-    await asyncio.sleep(2.5)
-    await src.stop()
-
-    assert len(stale_events) >= 1
-    assert stale_events[0].stream_name == "sensor.cognitive"
-    assert stale_events[0].age_s > 0.5
 
 
 # ── LSL link-state watchdog (stale → down) ────────────────────────────────────
@@ -190,8 +82,6 @@ async def test_lsl_source_resolves_and_reads() -> None:
     with tempfile.NamedTemporaryFile(mode="w", suffix=".json", delete=False) as f:
         json.dump(manifest_data, f)
         manifest_tmp = Path(f.name)
-
-    from vcore.ingestion.lsl_source import LSLSource
 
     bus = EventBus()
     manifests = ActiveManifests()
