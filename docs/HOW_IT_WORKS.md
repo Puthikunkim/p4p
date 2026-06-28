@@ -112,8 +112,9 @@ flowchart LR
 - **9001** — A *second*, standalone WebSocket server run by `WsSink`. Used by the headless
   `mock_unity.py`. The real Unity POC uses `8000/ws/runtime` instead. Both funnel into the
   same handler.
-- **7880 / 7881 / 50000–50100·udp** — LiveKit server: signaling + server API (7880), RTC over
-  TCP (7881), and RTC media (UDP range). The video plane lives here, not in FastAPI.
+- **7880 / 7881 / 7882·udp** — LiveKit server: signaling + server API (7880), RTC over TCP
+  (7881, fallback), and RTC media (UDP **7882** — a single port; the stack avoids the
+  Windows-reserved 50000+ range). The video plane lives here, not in FastAPI.
 - **5173** — Vite dev server for the frontend, which **proxies** `/api` and `/ws` to the
   backend (see [`frontend/vite.config.ts`](../frontend/vite.config.ts)).
 
@@ -475,8 +476,9 @@ track to `<VideoFeed>` for the live mirror. It only *views* — **recording is s
 
 `unity-poc/` is a thin, package-ready Unity reference implementation that plays the role of
 the VR runtime ("Jerry") so the whole loop is demonstrable without the partner's real Unity
-project. All scripts live in
-[`unity-poc/Assets/Scripts/`](../unity-poc/Assets/Scripts) and are namespaced `VCore`.
+project. The reusable client ships as an embedded **UPM package** — its scripts live in
+[`unity-poc/Packages/com.vcore.client/Runtime/`](../unity-poc/Packages/com.vcore.client/Runtime)
+and are namespaced `VCore`. (The demo scene's `Assets/Scripts/` holds only `StatusVisualizer.cs`.)
 
 ```mermaid
 flowchart TB
@@ -506,18 +508,18 @@ flowchart TB
   CAM --> LKP -. "publishes video" .-> LIVEKIT[("LiveKit SFU")]
 ```
 
-- **`ObjectStatus`** ([ObjectStatus.cs](../unity-poc/Assets/Scripts/ObjectStatus.cs)) — put one
+- **`ObjectStatus`** ([ObjectStatus.cs](../unity-poc/Packages/com.vcore.client/Runtime/ObjectStatus.cs)) — put one
   on any GameObject to declare a settable status (continuous like `brightness 0–100`, or
   discrete like `density: off/low/high`), addressable by `id` or `tags`. You wire its
   `OnContinuousValue`/`OnDiscreteValue` UnityEvents in the Inspector to the actual effect (e.g.
   a Light's intensity).
-- **`StatusCollector`** ([StatusCollector.cs](../unity-poc/Assets/Scripts/StatusCollector.cs))
+- **`StatusCollector`** ([StatusCollector.cs](../unity-poc/Packages/com.vcore.client/Runtime/StatusCollector.cs))
   — scans the scene for all `ObjectStatus` components and builds the Contract-3b manifest.
-- **`VCoreConnection`** ([VCoreConnection.cs](../unity-poc/Assets/Scripts/VCoreConnection.cs))
+- **`VCoreConnection`** ([VCoreConnection.cs](../unity-poc/Packages/com.vcore.client/Runtime/VCoreConnection.cs))
   — the WebSocket client to `/ws/runtime` (port 8000). On connect it sends the manifest
   (handshake), then listens for `StatusRequest`s and hands them to the dispatcher on Unity's
   main thread. It reconnects with exponential backoff and re-syncs on scene changes.
-- **`RequestDispatcher`** ([RequestDispatcher.cs](../unity-poc/Assets/Scripts/RequestDispatcher.cs))
+- **`RequestDispatcher`** ([RequestDispatcher.cs](../unity-poc/Packages/com.vcore.client/Runtime/RequestDispatcher.cs))
   — resolves an incoming request's `tag`/`id` to the matching `ObjectStatus` components and
   applies the value; unresolved targets are logged and dropped.
 - **`BehaviourReporter` + `BehaviourMetric`** — declare behavioural channels (Contract ⑤) and
@@ -525,9 +527,9 @@ flowchart TB
 - **`VrContextReporter`** — pushes study/scene context (Contract ④) for the dashboard's VR
   Context panel.
 - **`SpectatorCamera` + `LiveKitPublisher`** — render the participant's view to a texture and
-  publish it to the **LiveKit** room; `LiveKitPublisher` ([LiveKitPublisher.cs](../unity-poc/Assets/Scripts/LiveKitPublisher.cs))
+  publish it to the **LiveKit** room; `LiveKitPublisher` ([LiveKitPublisher.cs](../unity-poc/Packages/com.vcore.client/Runtime/LiveKit/LiveKitPublisher.cs))
   fetches a token from `/api/livekit/token` and publishes via the LiveKit Unity SDK.
-- **`BackendConfig`** ([BackendConfig.cs](../unity-poc/Assets/Scripts/BackendConfig.cs)) — a
+- **`BackendConfig`** ([BackendConfig.cs](../unity-poc/Packages/com.vcore.client/Runtime/BackendConfig.cs)) — a
   shared `ScriptableObject` holding the backend host/port so the networked components
   point at the same place.
 

@@ -20,12 +20,19 @@ three versioned contracts:
 | 2   | **Rule Grammar**                   | Rule files ↔ Engine/UI      | declarative `IF (signal) → THEN (set object status)`; authored in the UI or dropped in as files                                |
 | 3   | **Object-Status & Status-Request** | Engine ↔ VR Runtime         | runtime declares each object's settable statuses (over WebSocket); engine sends `{target, status, value}` matched against them |
 
+## Start here
+
+**New to the project? Read [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) first.** It's a
+teaching-style, end-to-end walkthrough of how the system actually works today — backend,
+frontend, the Unity POC, and the sensor pipeline — written to be read top-to-bottom. Then dip
+into the rest as needed (see [Documentation](#documentation)).
+
 ## Status
 
-🟢 **Implemented** — all nine phases complete. The system runs end-to-end: signal ingestion,
-rule evaluation, Unity WebSocket delivery, session recording (XDF + SQLite), schema-driven
-dashboard, rule builder, and participant video mirror over WebRTC. See [`TODO.md`](./TODO.md)
-for a full phase-by-phase checklist.
+🟢 **Implemented** — the system runs end-to-end: signal ingestion, rule evaluation, Unity
+WebSocket delivery, session recording (XDF + SQLite + video), a schema-driven dashboard, the
+rule builder, and a participant video mirror over a **LiveKit** SFU with server-side **Egress**
+recording. See [`TODO.md`](./TODO.md) for the phase-by-phase checklist.
 
 ## Quick start
 
@@ -83,15 +90,20 @@ npm run lint         # ESLint + type check
 Copy `backend/config.example.yaml` → `backend/config.yaml` and adjust LSL stream names,
 WsSink bind address, and (optional) auth token for multi-machine deployments.
 
-## Documents
+## Documentation
 
-- **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — single source of truth for the design: tech
-  stack, patterns, the three contract specs, folder layout, data-flow walkthroughs, failure
-  modes, deployment.
-- **[`TODO.md`](./TODO.md)** — sequenced, atomic implementation checklist (contracts and
-  validators first).
-- **[`contracts/`](./contracts)** — language-neutral JSON Schemas for the three contracts
-  _(created in Phase 1)_.
+Read in this order:
+
+1. **[`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md)** — **start here.** As-built, end-to-end
+   walkthrough of the running system; the canonical "how it works" reference.
+2. **[`ARCHITECTURE.md`](./ARCHITECTURE.md)** — the original design: rationale, design patterns,
+   the contract specifications, and folder layout. Treat it as *design background* — where it
+   differs from the code, HOW_IT_WORKS is authoritative.
+3. **[`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md)** — runbook for the participant-video
+   plane (LiveKit + Egress) and what to change for your network.
+4. **[`contracts/`](./contracts)** — the language-neutral JSON Schemas (the single source of
+   truth for cross-component messages) plus golden valid/invalid examples.
+5. **[`TODO.md`](./TODO.md)** — phase-by-phase implementation checklist.
 
 ## Tech stack (summary)
 
@@ -103,14 +115,3 @@ participant video feed. A thin Unity reference POC (`unity-poc/`). Participant v
 V-CORE only mints tokens and drives the recording. Contracts as JSON Schema, validated on both
 sides. See [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) and
 [`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
-
-Backend (from backend/ directory):
-
-uv run uvicorn vcore.app:app --reload --host 0.0.0.0 --port 8000
-Frontend (from frontend/ directory):
-
-npm run dev
-
-uv run python tools/mock_unity.py
-
-uv run python tools/mock_pipeline.py

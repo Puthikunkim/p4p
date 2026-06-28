@@ -1,6 +1,13 @@
-# V-CORE — Architecture
+# V-CORE — Architecture (design reference)
 
 **V-CORE** — *VR Cognitive-state Observation, Rules & Environment adaptation*
+
+> **New here? Read [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) first** — that's the
+> teaching-style, *as-built* walkthrough of the running system. **This** document is the
+> original **design** reference (rationale, patterns, the contract specs, folder layout). It
+> predates parts of the implementation; where the two differ, HOW_IT_WORKS and the code win.
+> The biggest such difference — the **video plane is now a LiveKit SFU, not the WebRTC
+> signaling-broker design described in §2/§3/§11** — is summarised in the deltas below.
 
 | | |
 |---|---|
@@ -52,7 +59,7 @@
 8. [Data-flow walkthroughs](#8-data-flow-walkthroughs)
 9. [Failure modes & graceful degradation](#9-failure-modes--graceful-degradation)
 10. [Deployment & configuration](#10-deployment--configuration)
-11. [Participant video mirror & recording](#11-participant-video-mirror--recording-webrtc)
+11. [Participant video mirror & recording](#11-participant-video-mirror--recording-livekit)
 12. [Testing & reproducibility](#12-testing--reproducibility)
 13. [Open questions & assumptions](#13-open-questions--assumptions)
 14. [Glossary](#14-glossary)
@@ -101,10 +108,10 @@ contracts** that keep the core fixed:
 > see [§5](#5-the-three-contracts-formal-specifications).*
 >
 > **Amendment 2.** The dashboard adds a **live video mirror of the participant's VR view**
-> during a session (WebRTC), the option to **record it synced to the signal data**, and a
-> **manual rule-trigger** so the researcher can fire a rule on the spot. This is a separate
-> **video/control plane that does not change the three contracts** — see
-> [§11](#11-participant-video-mirror--recording-webrtc).
+> during a session (now on a **LiveKit** SFU), the option to **record it synced to the signal
+> data**, and a **manual rule-trigger** so the researcher can fire a rule on the spot. This is a
+> separate **video plane that does not change the three contracts** — see
+> [§11](#11-participant-video-mirror--recording-livekit).
 
 ### Project context
 
@@ -146,8 +153,8 @@ flowchart LR
     BUS[("Event Bus (pub/sub)")]
     ENG["Rule Engine\n(evaluator + degradation)"]
     REG["Rule Registry\n(files + hot-reload)"]
-    API["Rules API\n(POST/PUT/DELETE)"]
-    SIG["WebRTC signaling broker"]
+    API["Rules API + LiveKit token mint"]
+    LK["LiveKit SFU + Egress\n(separate service)"]
     OUT["Outbound adapter\n(WS runtime + status match)"]
     WSD["WS bridge /ws/dashboard"]
     UI["React dashboard\n(charts + Rule Builder + VideoFeed)"]
@@ -161,7 +168,8 @@ flowchart LR
     UI -- "author rule / manual trigger" --> API --> REG
     ENG --> OUT
     OUT -- "object-status manifest" --> BUS
-    UI <-. "SDP/ICE" .-> SIG
+    REC -. "start/stop Track Egress" .-> LK
+    UI <-. "subscribe (live mirror)" .-> LK
   end
 
   subgraph MB["Machine B — VR Runtime"]
@@ -171,8 +179,8 @@ flowchart LR
   SP == "Contract 1: Signal Schema  «LSL over LAN»" ==> ING
   JERRY == "Contract 3b: Object-Status Manifest  «WS handshake»" ==> OUT
   OUT == "Contract 3a: Status-Change Request  «WebSocket»" ==> JERRY
-  JERRY -. "participant VR view  «WebRTC video, P2P»" .-> UI
-  JERRY <-. "SDP/ICE" .-> SIG
+  JERRY -. "publish spectator cam «LiveKit»" .-> LK
+  LK -. "Track Egress → .webm" .-> REC
 ```
 
 **Reading the diagram:**
@@ -184,9 +192,11 @@ flowchart LR
 - **Contract 3** is bidirectional over **one WebSocket** between V-CORE (A) and Unity (B):
   the runtime declares its object statuses (3b, up); the engine emits status-change requests
   (3a, down).
-- **Video plane (Amendment 2, dashed):** the participant's VR view streams **WebRTC
-  peer-to-peer Unity → dashboard**; V-CORE only **brokers signaling** (SDP/ICE) over its
-  WebSocket and never touches the video bytes. See [§11](#11-participant-video-mirror--recording-webrtc).
+- **Video plane (Amendment 2, dashed):** the participant's VR view is published to a **LiveKit
+  SFU**; the dashboard subscribes for the live mirror and **LiveKit Track Egress** records it to
+  `.webm`. V-CORE only mints access tokens + starts/stops the egress; it never touches the video
+  bytes. See [§11](#11-participant-video-mirror--recording-livekit) and
+  [`docs/HOW_IT_WORKS.md` §9](./docs/HOW_IT_WORKS.md).
 - The **event bus** decouples every producer from every consumer.
 
 ---
@@ -231,14 +241,14 @@ flowchart LR
 | Backend runtime | **Python 3.11**, **FastAPI** + **uvicorn** |
 | LSL ingestion | **pylsl** |
 | Unity control messaging | **WebSocket** (FastAPI server ↔ Unity WS client); transport isolated behind the `ActionSink` adapter |
-| Participant video | **WebRTC** (Unity `com.unity.webrtc` → browser); V-CORE = signaling broker; MJPEG-over-WS POC fallback |
+| Participant video | **LiveKit SFU** — Unity publishes the spectator cam → browser subscribes (live mirror); server-side **Track Egress** records `.webm`; V-CORE mints tokens + drives egress (never relays media) |
 | Models / validation | **pydantic** + **jsonschema** |
 | Rule hot-reload / authoring | **watchdog** + FastAPI **Rules API** (`/api/rules`) → YAML/JSON files |
 | Recording | **XDF** (raw streams) + **SQLite** (sessions/events) + **session video file** (synced via LSL clock) |
-| Frontend | **React 18** + **TypeScript** + **Vite** (browser web app) |
+| Frontend | **React 19** + **TypeScript** + **Vite** (browser web app) |
 | Frontend validation/types | **ajv** + **json-schema-to-typescript** |
 | Charts / state | lightweight chart lib (**uPlot**/**visx**) + **Zustand** |
-| Unity POC | thin C# reference (`unity-poc/`): `ObjectStatus` + WS client + auto-collect + dispatch + spectator-cam WebRTC sender |
+| Unity POC | thin C# reference (`unity-poc/`, UPM package `com.vcore.client`): `ObjectStatus` + WS client + auto-collect + dispatch + spectator-cam **LiveKit publisher** |
 | Tests | **pytest** · **vitest** + **React Testing Library** · cross-language **contract tests** |
 
 ### Resolved product decisions
@@ -252,7 +262,8 @@ flowchart LR
   **WebSocket** control transport. **Package-ready Unity POC** (embedded UPM package). Rules
   authored in the UI are **saved as files** via the Rules API.
 - **Participant video (Amendment 2):** **live mirror + recording synced to signals**, mono
-  spectator camera, **WebRTC** transport with V-CORE as signaling broker.
+  spectator camera, on a **LiveKit SFU** (Unity publishes → browser subscribes → server-side
+  Track Egress records `.webm`); V-CORE mints tokens + drives the egress.
 
 ---
 
@@ -270,7 +281,7 @@ Each pattern satisfies a specific requirement — not chosen for its own sake.
 | **Capability negotiation (handshake)** | `outbound/base.py` ↔ object-status manifest | Rule targets matched to a scene's real objects; disable-and-warn on mismatch |
 | **Auto-discovery (collector)** | `unity-poc/StatusCollector.cs` | Scene self-scan for `ObjectStatus` → manifest, zero per-object wiring |
 | **Write-through authoring** | `api/rules.py` → `backend/rules/` | UI authors rules but **files stay the single source of truth** |
-| **Signaling broker** | `bridge/signaling.py` | Connects the WebRTC video peers (Unity ↔ browser) **without V-CORE relaying the media** |
+| **Media plane (LiveKit)** | `api/livekit.py` · `recording/livekit_recorder.py` | Participant video on a LiveKit SFU; V-CORE mints tokens + drives Track Egress, **never relaying the media** |
 | **Composition root** | `app.py` | One wiring point; adapters/transports injected from `config.yaml`, keeping the core environment-free |
 
 ---
@@ -707,19 +718,19 @@ p4p/
 
 > **Amendment 2 end-to-end.**
 
-1. The researcher hits **Start Session** (New Session). V-CORE opens a session: starts the
-   XDF recorder + SQLite session row, and triggers the **WebRTC signaling** handshake (SDP/ICE
-   over the WS, brokered by `bridge/signaling.py`).
-2. The participant's **spectator-camera view streams WebRTC peer-to-peer Unity → dashboard**;
-   the **VideoFeed** panel in Session Monitor shows it next to the live signal charts and
-   rule activity. Unity also begins recording that camera locally, stamped with the session's
-   LSL start time.
+1. Before the session, Unity has already **published** its spectator camera to the **LiveKit**
+   room (using a publisher token from `/api/livekit/token`), and the dashboard **subscribes**
+   for the live mirror — so the **VideoFeed** panel in Session Monitor shows the participant's
+   view next to the live charts and rule activity.
+2. The researcher hits **Start Session** (New Session). V-CORE opens a session: starts the XDF
+   recorder + SQLite session row, and `LiveKitRecorder` finds the published track and starts a
+   **Track Egress** recording to `<session_id>.webm`, capturing the **LSL clock** at egress start.
 3. The researcher watches the participant get overwhelmed and clicks **Activate** on
    `overload-dim-lights` → a `source:"manual"` status request fires immediately over the
    WebSocket → lights dim — logged as a researcher-triggered event.
-4. On **End Session**, the video stream tears down; Unity uploads its recording to V-CORE,
-   which stores it in the session folder beside the XDF + SQLite and registers it in **Data
-   History** — all aligned on the LSL clock for later review.
+4. On **End Session**, V-CORE **stops the Egress** (capturing the LSL clock at stop too); the
+   `.webm` is already on disk in the session folder beside the XDF + SQLite and is registered in
+   **Data History** — aligned to the signals via the two LSL anchors for later review.
 
 ---
 
@@ -735,7 +746,7 @@ test in Phase 8 of [`TODO.md`](./TODO.md).
 | **Unknown channel type / display hint** | `renderers/registry.ts` lookup miss | **FallbackRenderer** (raw value + badge) |
 | **Schema version skew** | `core/schema.py` SemVer compare | patch/minor → warn + best-effort; **major → refuse + blocking warning** |
 | **Control-link drop** — Pipeline↔A **LSL**, A↔Unity **WS**, A↔browser **WS** | per-adapter heartbeats / connection state | Each **reconnects with backoff independently**; **per-link status** in System Config / Session Monitor; a down Unity link drops requests without crashing the engine |
-| **Video-link drop / WebRTC fails** (Amendment 2) | `RTCPeerConnection` state / ICE failure | **VideoFeed shows "reconnecting"**; renegotiate; **the session, recording, signals, and rule engine are unaffected** (video is a separate plane) |
+| **Video-link drop** (Amendment 2) | LiveKit client connection state | **VideoFeed shows no mirror / reconnects** via the LiveKit SDK; **the session, recording, signals, and rule engine are unaffected** (video is a separate plane) |
 | **Stale signal** (stream up, no recent samples) | last-sample timeout | Channel **stale**; rules referencing it **do not fire on stale data** |
 | **Malformed rule file** / rejected by the Rules API | `engine/registry.py` / `api/rules.py` | File **skipped** / API returns a clear error; other rules load normally |
 | **Invalid contract payload** | `jsonschema` / `ajv` | Rejected at the boundary; the rest of the system is unaffected |
@@ -751,12 +762,14 @@ test in Phase 8 of [`TODO.md`](./TODO.md).
 
 | Machine | Runs | Talks to |
 |---|---|---|
-| **A** | V-CORE (backend + served dashboard) | ← LSL from C · ↔ WS with B · → WS to browsers · brokers WebRTC signaling |
-| **B** | Unity VR runtime "Jerry" | ↔ WS with A · → WebRTC video to the dashboard |
+| **A** | V-CORE (backend + dashboard) + **LiveKit SFU/Egress** | ← LSL from C · ↔ WS with B · → WS to browsers · mints LiveKit tokens + drives Egress |
+| **B** | Unity VR runtime "Jerry" | ↔ WS with A · publishes spectator-cam video to LiveKit |
 | **C** | Sensor pipeline | → LSL to A |
 
-The dashboard is served by A and opened from any LAN machine. The WebRTC video flows
-**directly Unity (B) → browser** (peer-to-peer); V-CORE only brokers the connection setup.
+The dashboard is served by A and opened from any LAN machine. Participant video flows through
+the **LiveKit SFU** (Unity B → SFU → subscribing browsers); V-CORE only mints access tokens and
+drives the Egress recording. Per-network setup (notably LiveKit's `node_ip`) is in
+[`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
 
 ### `config.yaml` (example)
 
@@ -771,15 +784,14 @@ ingestion:
 outbound:
   runtime_ws_path: /ws/runtime    # WebSocket is the only runtime transport
 
-video:                            # Amendment 2
+livekit:                          # Amendment 2 — participant video plane (off by default)
   enabled: true
-  transport: webrtc               # webrtc (default) | mjpeg (POC fallback)
-  camera: spectator_mono
-  resolution: 1280x720
-  fps: 30
-  signaling_path: /ws/signaling
-  record: true                    # capture participant view, synced to signals
-  store_dir: ./data/sessions
+  url: ws://localhost:7880        # what the minted token tells Unity/browser to connect to
+  api_url: http://localhost:7880  # LiveKit server API, used to start/stop Track Egress
+  api_key: devkey
+  api_secret: devsecret…          # change for any real/shared deployment (override via env)
+  room: vcore                     # the shared, always-on room everyone joins
+  egress_out_dir: /out            # Egress writes <session_id>.webm here (mounted to video_dir)
 
 bridge:
   ws_bind: 0.0.0.0:8000
@@ -793,77 +805,77 @@ recording:
 ### Network & security notes
 
 - **Discovery:** LSL resolves streams by name via multicast on a flat LAN; set `known_peers`
-  across subnets. Unity connects *out* to A for both the WS and the WebRTC signaling, so only
-  A needs a reachable bound interface; WebRTC's ICE then establishes the direct media path.
-- **Time sync:** the LSL clock aligns signals, events, and the recorded video (offsets stored
-  in XDF) — the basis for reproducible session review.
+  across subnets. Unity connects *out* to A for the control WS and to the LiveKit SFU for media.
+  LiveKit must advertise A's **LAN IP** (`node_ip`) so both host clients **and** the in-container
+  Egress can reach the media — see [`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
+- **Time sync:** the LSL clock aligns signals, events, and the recorded video (the video is
+  anchored to LSL at egress start + stop) — the basis for reproducible session review.
 - **Security:** an **isolated lab LAN** is assumed (plaintext LSL on the wire — a known
-  limitation for the ethics write-up). Notably, **WebRTC media is encrypted by default
-  (DTLS-SRTP)**, so the participant video is encrypted end-to-end even on the LAN. Optional
-  **WS bearer-token** covers the dashboard, runtime, and signaling channels.
+  limitation for the ethics write-up). LiveKit media is **WebRTC (DTLS-SRTP), encrypted by
+  default**, so the participant video is encrypted even on the LAN. (A WS bearer-token for the
+  dashboard/runtime is sketched in config but **not yet implemented** — see HOW_IT_WORKS §11.)
 
 ---
 
-## 11. Participant video mirror & recording (WebRTC)
+## 11. Participant video mirror & recording (LiveKit)
 
-*(Amendment 2.)* During a study session the researcher must see, in real time, **what the
-participant sees in the headset**, beside the live signals — and that view is **recorded
-synced to the signals** for later review. This is a **separate video plane**; it does **not**
-change the three contracts.
+*(Amendment 2 — as-built.)* During a session the researcher sees a **live mirror of the
+participant's VR view** beside the signals, and that view is **recorded synced to the signals**
+for later review. This is a **separate video plane** and does **not** change the three contracts.
+
+> **Superseded design note.** The original plan was peer-to-peer **WebRTC with V-CORE brokering
+> SDP/ICE** (plus an MJPEG-over-WS fallback). That was **replaced by LiveKit and removed.** The
+> summary below is the as-built design; full detail is in
+> [`docs/HOW_IT_WORKS.md` §9](./docs/HOW_IT_WORKS.md) and the runbook
+> [`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
 
 ### Pipeline
 
 ```
-Unity spectator cam ──encode──▶ WebRTC (DTLS-SRTP, P2P over LAN) ──▶ browser <video>
-                    └─record──▶ session video file (LSL-stamped) ──▶ V-CORE Data History
-        (SDP/ICE setup brokered by V-CORE bridge/signaling.py over the dashboard WS)
+Unity spectator cam ──publish──▶ LiveKit SFU ──▶ subscribing browser <video>   (live mirror)
+                                     └─ Track Egress ──▶ <session_id>.webm      (LSL-anchored)
+     (V-CORE mints access tokens via /api/livekit/token and starts/stops the Egress)
 ```
 
-- **Capture:** a **mono spectator camera** rendering the participant's view (one eye of the
-  stereo pair — full stereo doubles bandwidth for no monitoring benefit). Default 720p @
-  30 fps, configurable.
-- **Transport:** **WebRTC peer-to-peer Unity → browser** (Unity `com.unity.webrtc` → the
-  browser's `RTCPeerConnection` → a `<video>` element). UDP-based and built for real-time;
-  **~50–150 ms glass-to-glass on a LAN**.
-- **V-CORE's role = signaling only.** `bridge/signaling.py` relays the SDP offer/answer + ICE
-  candidates between the two peers over the existing WebSocket. **V-CORE never relays the
-  media**, so video bandwidth never touches the control/data plane.
-- **Fallback:** `video.transport: mjpeg` streams JPEG frames over the WebSocket to a
-  `<canvas>` — simpler for an early POC, higher latency/bandwidth, not for smooth use.
+- **Capture:** a **mono spectator camera** rendering the participant's view (one eye — full
+  stereo doubles bandwidth for no monitoring benefit).
+- **Transport:** Unity **publishes** to a **LiveKit SFU**; browsers **subscribe** for the
+  mirror. Media is WebRTC under the hood (UDP, **DTLS-SRTP encrypted**), ~50–150 ms
+  glass-to-glass on a LAN.
+- **V-CORE's role = orchestration only.** `api/livekit.py` mints publisher/subscriber tokens;
+  `recording/livekit_recorder.py` starts/stops **Track Egress**. V-CORE **never relays media**,
+  so video bandwidth never touches the control/data plane.
 
 ### Recording (synced to signals)
 
-- **Record at the source:** Unity captures the spectator camera to a session video file
-  (highest quality, independent of live-stream conditions), stamped with the session's **LSL
-  start time**. At session end it is uploaded to V-CORE and stored in the session folder
-  beside the XDF + SQLite, registered in **Data History**.
-- **Synchronisation** is via the shared **LSL clock** — the same basis used for XDF — so the
-  video and the signal traces line up on review (do *not* rely on the live display, whose
-  latencies differ). *Alternative (noted):* server-side recording via a recv-only WebRTC peer
-  (`aiortc`) lands the file on A with no upload step but puts V-CORE in the video path.
+- **Server-side Track Egress** records the published track directly to
+  `<video_dir>/<session_id>.webm` (no headless-Chrome compositor) — gated by `livekit.enabled`,
+  and best-effort: a recording failure never aborts the session.
+- **Synchronisation** uses the shared **LSL clock**, captured at egress **start**
+  (`video_lsl_ts`) and **stop** (`video_lsl_ts_end`); the frontend linearly maps the video
+  timeline onto the LSL timeline (drift-corrected, two-point). Good for review (≈±tenths of a
+  second), **not** frame-accurate.
 
 ### Manual rule trigger
 
-The researcher can **fire a rule on the spot** from Session Monitor (the "Activate" button):
-a dashboard control → `/api/rules/{id}/trigger` (or a WS message) → the engine emits the
-rule's status request immediately with `source: "manual"`, in addition to automatic
-condition-based firing. It is recorded as a researcher-attributed event for the session log.
+The researcher can **fire a rule on the spot** from Session Monitor: a control →
+`POST /api/rules/{id}/trigger` → the engine emits the rule's request immediately with
+`source: "manual"`, in addition to automatic firing. Recorded as a researcher-attributed event.
 
 ### Latency & sync at a glance
 
 | Path | Latency | Limited by |
 |---|---|---|
 | Manual trigger → effect in Unity | ~15–25 ms | one Unity render frame, not the WS |
-| Participant video → dashboard | ~50–150 ms (LAN) | WebRTC encode/transport |
+| Participant video → dashboard | ~50–150 ms (LAN) | LiveKit encode/transport |
 
 The live video and the live charts have slightly different latencies; for a human-in-the-loop
-trigger this is harmless, and the **recordings** are aligned precisely via LSL timestamps.
+trigger this is harmless, and the **recordings** are aligned via LSL timestamps.
 
 ### Privacy
 
 The participant's view + physiological signals are human-subjects data: consent, retention,
-and the isolated-LAN assumption apply. WebRTC's default DTLS-SRTP encryption already protects
-the video on the wire.
+and the isolated-LAN assumption apply. LiveKit's WebRTC media is DTLS-SRTP-encrypted on the wire.
 
 ---
 
@@ -904,9 +916,9 @@ Defaults are chosen so none block progress; flag any to change.
 5. **Rule authoring — RESOLVED:** UI writes rule **files** via `POST /api/rules`; files stay
    the single source of truth.
 6. **Participant video (Amendment 2) — RESOLVED: live mirror + recording synced to signals**,
-   mono spectator camera, **WebRTC** with V-CORE as signaling broker. *Open:* (a) record at
-   the source (Unity-side, recommended) vs server-side `aiortc`; (b) one researcher/viewer
-   assumed → P2P; add an SFU only if many simultaneous viewers are needed.
+   mono spectator camera, on a **LiveKit SFU** (Unity publishes → browser subscribes →
+   server-side Track Egress records `.webm`); V-CORE mints tokens + drives the egress. The
+   earlier P2P-WebRTC / `aiortc` options are moot now that LiveKit owns transport + recording.
 7. **Rule file format:** **YAML** authored + JSON-Schema validated; loader also accepts JSON.
 8. **Hardware availability:** assumed not guaranteed → `replay_source` + `mock_pipeline` +
    `mock_unity` keep everything testable without hardware.
@@ -920,8 +932,9 @@ Defaults are chosen so none block progress; flag any to change.
 | **LSL** | *Lab Streaming Layer* — time-synced biosignal streaming over a network; native time-correction + discovery. Also the clock that aligns signals, events, and the recorded video. |
 | **XDF** | *Extensible Data Format* — the LSL-native recording format; multiple streams + clock offsets. |
 | **WebSocket** | Full-duplex TCP connection; carries the Unity **control** link (manifest up, requests down), the dashboard feed, and WebRTC signaling. |
-| **WebRTC** | Real-time media transport (UDP, encrypted via **DTLS-SRTP**); carries the **participant video** peer-to-peer Unity → browser. V-CORE only brokers signaling. |
-| **Signaling** | The small SDP/ICE handshake that lets two WebRTC peers find each other; brokered by `bridge/signaling.py`. |
+| **LiveKit** | The open-source **SFU** that carries the participant video: Unity publishes, browsers subscribe, and **Egress** records server-side. V-CORE mints tokens + drives egress; it never relays media. |
+| **WebRTC** | Real-time media transport (UDP, encrypted via **DTLS-SRTP**) used *under* LiveKit. (The earlier bespoke P2P-WebRTC + `bridge/signaling.py` design was removed.) |
+| **Egress** | LiveKit's server-side recorder; **Track Egress** writes the published camera track to a `.webm`, anchored to the LSL clock. |
 | **Spectator camera** | A mono Unity camera mirroring the participant's headset view for the researcher. |
 | **ObjectStatus** | A Unity component declaring an object's settable statuses (discrete / continuous), addressed by tag/id. |
 | **VCoreAction** | A Unity component declaring a parameterless **action** (command), addressed by scene / tag / id; the free-form counterpart to ObjectStatus. |
