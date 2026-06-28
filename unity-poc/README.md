@@ -72,7 +72,7 @@ should see four GameObjects in the Hierarchy:
 Select **VCoreManager** → on the **VCoreLauncher**, set `Backend Config` to the `BackendConfig`
 whose `Host`/`Port` point at your backend (Machine A). To change the address itself, edit the
 `BackendConfig` asset (`Assets/Settings/BackendConfig.asset`) — it flows to every V-CORE
-component. (Full launcher/`BackendConfig` field reference: [package README §2–3](Packages/com.vcore.client/README.md).)
+component. (Full launcher/`BackendConfig` field reference: [package README §4–5](Packages/com.vcore.client/README.md).)
 
 ### 5  Wire the light-control event (the demo effect)
 
@@ -143,12 +143,12 @@ THEN side offers `campfire_01` with `brightness` and `crackle`.
 These are all **client features documented once in the
 [package README](Packages/com.vcore.client/README.md)** — the same package this POC consumes:
 
-- **Add your own adaptable objects / commands** — `ObjectStatus` (§4) and `VCoreAction` (§5).
+- **Add your own adaptable objects / commands** — `ObjectStatus` (§6) and `VCoreAction` (§7).
 - **Stream behaviour & study context** — `BehaviourReporter` / `BehaviourMetric` and
-  `VrContextReporter`, with real-data snippets (§6).
-- **Author rules before scenes load** — **V-CORE ▸ Bake Project Catalog** (§8).
+  `VrContextReporter`, with real-data snippets (§8–9).
+- **Author rules before scenes load** — **V-CORE ▸ Bake Project Catalog** (§11).
 - **Reuse the client in another project** — copy/reference the package and run
-  **V-CORE ▸ Add to Scene** (§1, §3).
+  **V-CORE ▸ Add to Scene** (§3, §5).
 
 Multi-scene behaviour (`persistAcrossScenes`, manifest re-send on scene load) is covered there
 too.
