@@ -504,7 +504,6 @@
 .video-feed-status--idle        { background: var(--surface-2); color: var(--text-soft); border: 1px solid var(--border); }
 .video-feed-status--connecting  { background: var(--warn-bg); color: var(--warn); }
 .video-feed-status--live        { background: var(--ok-bg); color: var(--ok); }
-.video-feed-status--recording   { background: var(--danger-bg); color: var(--danger); }
 .video-feed-status--error       { background: var(--danger-bg); color: var(--danger); }
 
 .video-feed-player {

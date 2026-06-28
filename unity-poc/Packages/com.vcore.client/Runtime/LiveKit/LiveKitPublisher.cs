@@ -9,9 +9,8 @@ namespace VCore
 {
     /// <summary>
     /// Publishes the <see cref="SpectatorCamera"/> view to a LiveKit room (the media
-    /// plane), replacing the old custom-WebRTC <c>WebRtcSender</c>. V-CORE only mints
-    /// the access token; the browser dashboard subscribes for the live mirror and
-    /// LiveKit Egress records the room server-side.
+    /// plane). V-CORE only mints the access token; the browser dashboard subscribes for
+    /// the live mirror and LiveKit Egress records the room server-side.
     ///
     /// Flow: GET a publisher token from V-CORE (<c>/api/livekit/token</c>) → connect to
     /// the LiveKit room at the URL the token carries → publish the spectator render

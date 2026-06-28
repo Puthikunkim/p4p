@@ -3,8 +3,8 @@ import { useVideoSession } from './videoSession'
 
 /**
  * Displays the shared spectator stream owned by <VideoSessionProvider>. The
- * WebRTC subscription and recording live in the provider, so navigating away
- * from this screen does NOT stop recording.
+ * LiveKit subscription lives in the provider, so navigating away from this
+ * screen does not drop the mirror.
  */
 export function VideoFeed() {
   const { stream, status } = useVideoSession()

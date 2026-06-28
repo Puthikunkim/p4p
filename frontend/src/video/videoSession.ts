@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 
-export type FeedStatus = 'idle' | 'connecting' | 'live' | 'recording' | 'error'
+export type FeedStatus = 'idle' | 'connecting' | 'live' | 'error'
 
 export interface VideoSessionValue {
   stream: MediaStream | null

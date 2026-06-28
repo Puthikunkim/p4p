@@ -4,7 +4,7 @@ namespace VCore
 {
     /// <summary>
     /// Provides a mono spectator camera that renders the participant's view into a
-    /// <see cref="RenderTexture"/> for WebRTC streaming and/or local recording.
+    /// <see cref="RenderTexture"/> for streaming to the dashboard via LiveKit.
     ///
     /// In a VR project, assign the participant's HMD camera to
     /// <see cref="followTarget"/> so the spectator view mirrors head pose.

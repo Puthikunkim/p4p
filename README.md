@@ -32,7 +32,7 @@ into the rest as needed (see [Documentation](#documentation)).
 🟢 **Implemented** — the system runs end-to-end: signal ingestion, rule evaluation, Unity
 WebSocket delivery, session recording (XDF + SQLite + video), a schema-driven dashboard, the
 rule builder, and a participant video mirror over a **LiveKit** SFU with server-side **Egress**
-recording. See [`TODO.md`](./TODO.md) for the phase-by-phase checklist.
+recording.
 
 ## Quick start
 
@@ -106,7 +106,6 @@ Read in this order:
    [`com.vcore.client/README.md`](./unity-poc/Packages/com.vcore.client/README.md)).
 5. **[`contracts/`](./contracts)** — the language-neutral JSON Schemas (the single source of
    truth for cross-component messages) plus golden valid/invalid examples.
-6. **[`TODO.md`](./TODO.md)** — phase-by-phase implementation checklist.
 
 ## Tech stack (summary)
 

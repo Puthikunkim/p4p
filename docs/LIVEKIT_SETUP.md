@@ -133,8 +133,7 @@ The POC publishes its spectator camera to LiveKit via
 2. **Reconcile WebRTC.** The SDK brings its own WebRTC dependency; if it conflicts with the
    existing `com.unity.webrtc` (3.0.0-pre.8), let the LiveKit SDK's required version win.
 3. **Wire the component.** The `VCore` prefab already carries **LiveKitPublisher** on the
-   `SpectatorCamera` object — just assign the **Backend Config** asset. (The old `WebRtcSender`
-   has been removed from the project.)
+   `SpectatorCamera` object — just assign the **Backend Config** asset.
 4. **Enable + run.** Set `livekit.enabled: true`, `docker compose up`, press Play. The token is
    fetched from `/api/livekit/token`; video should appear in the dashboard's Video Mirror.
 5. **Cross-machine:** also set the publisher's `BackendConfig.host` to the Docker host's LAN IP
@@ -151,5 +150,3 @@ The POC publishes its spectator camera to LiveKit via
 - [x] Frontend: `livekit-client` subscriber (live mirror).
 - [x] Unity POC: `LiveKitPublisher.cs` (in the `com.vcore.client` package) + SDK manifest entry —
       verified publishing end-to-end.
-- [x] Legacy path removed: the old `WebRtcSender` / `VideoRecorder`, the backend `SignalingBroker`
-      / `/ws/signaling`, and the browser-upload video endpoints are gone.

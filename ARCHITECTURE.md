@@ -11,7 +11,7 @@
 
 | | |
 |---|---|
-| **Status** | Design approved · implementation gated on per-phase `APPROVE` (see [`TODO.md`](./TODO.md)) |
+| **Status** | Implemented — see [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) for the as-built system |
 | **Doc version** | 1.3.0 (A1: rule authoring + object-status context · A2: LiveKit video mirror + recording + manual trigger · A3: abstract actions · behaviour/VR-context contracts · project catalog) |
 | **Date** | 2026-06-21 |
 | **Contracts version** | 1.0.0 — Signal Schema (1) · Rule Grammar (2) · Object-Status Manifest / Status-Request / Action-Request (3a/3b/3c) · VR Context (4) · Unity Behaviour (5) |
@@ -20,11 +20,9 @@
 > implementation has since moved on in the ways below. Where they conflict, the code +
 > [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) are authoritative.
 >
-> 1. **Video plane → LiveKit.** The participant-video plane was reimplemented on a **LiveKit SFU**
+> 1. **Video plane → LiveKit.** The participant-video plane runs on a **LiveKit SFU**
 >    (Unity publishes → browser subscribes → server-side **Track Egress** recording, LSL-anchored).
->    The original bespoke design (`bridge/signaling.py`, `WebRtcSender.cs`, `VideoRecorder.cs`,
->    browser `MediaRecorder`, MJPEG fallback) is **superseded and removed**; the sections below now
->    describe LiveKit. Current video: [`docs/HOW_IT_WORKS.md` §9](./docs/HOW_IT_WORKS.md) +
+>    Current video: [`docs/HOW_IT_WORKS.md` §9](./docs/HOW_IT_WORKS.md) +
 >    [`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
 > 2. **Abstract actions are implemented** (no longer a skeleton). A rule's `THEN` is now `set`
 >    (object status) **or** `action` (a parameterless command) — Contract **3c** (`action_request`),
@@ -42,8 +40,8 @@
 >
 > The rest (signals, rules, contracts, recording, degradation) remains accurate.
 
-> This document is the **single source of truth** for the V-CORE architecture. If the plan
-> changes, change this file and [`TODO.md`](./TODO.md) first.
+> Treat this as design background. Where it differs from the running system,
+> [`docs/HOW_IT_WORKS.md`](./docs/HOW_IT_WORKS.md) and the code are authoritative.
 
 ---
 
@@ -572,7 +570,7 @@ Validators must **ignore unknown additive properties** rather than reject them.
 
 ```
 p4p/
-├── ARCHITECTURE.md  TODO.md  README.md  docker-compose.yml
+├── ARCHITECTURE.md  README.md  docker-compose.yml
 │
 ├── contracts/                          # ⭐ SINGLE SOURCE OF TRUTH — language-neutral JSON Schema
 │   ├── signal_schema.schema.json          #   Contract 1
@@ -655,8 +653,8 @@ rather than crashes:
 
 ## 9. Failure modes & graceful degradation
 
-Graceful degradation is **mandatory**: a mismatch is a warning, never a crash. Each row has a
-test in Phase 8 of [`TODO.md`](./TODO.md).
+Graceful degradation is **mandatory**: a mismatch is a warning, never a crash. Each row is
+covered by a failure-mode test in the backend suite (`backend/tests/`).
 
 | Condition | Detected by | Behaviour |
 |---|---|---|
@@ -719,10 +717,9 @@ LiveKit/video server, [`docs/LIVEKIT_SETUP.md`](./docs/LIVEKIT_SETUP.md).
 participant's view plus a signal-synced recording — **without touching the three contracts**.
 The design decisions:
 
-- **LiveKit SFU, not bespoke P2P.** The original plan (peer-to-peer WebRTC with V-CORE brokering
-  SDP/ICE, + an MJPEG fallback) was replaced by a LiveKit SFU and removed. Unity publishes the
-  (mono) spectator camera; the dashboard subscribes; **V-CORE only mints tokens + drives Egress
-  and never relays media**, so video bandwidth never touches the control/data plane.
+- **LiveKit SFU.** Unity publishes the (mono) spectator camera; the dashboard subscribes;
+  **V-CORE only mints tokens + drives Egress and never relays media**, so video bandwidth never
+  touches the control/data plane.
 - **Server-side recording.** LiveKit **Track Egress** records the published track to `.webm`
   (gated by `livekit.enabled`, best-effort — a recording failure never aborts the session).
 - **LSL-anchored sync.** The LSL clock is captured at egress **start + stop** and the frontend
@@ -775,8 +772,7 @@ Defaults are chosen so none block progress; flag any to change.
    the single source of truth.
 6. **Participant video (Amendment 2) — RESOLVED: live mirror + recording synced to signals**,
    mono spectator camera, on a **LiveKit SFU** (Unity publishes → browser subscribes →
-   server-side Track Egress records `.webm`); V-CORE mints tokens + drives the egress. The
-   earlier P2P-WebRTC / `aiortc` options are moot now that LiveKit owns transport + recording.
+   server-side Track Egress records `.webm`); V-CORE mints tokens + drives the egress.
 7. **Rule file format:** **YAML** authored + JSON-Schema validated; loader also accepts JSON.
 8. **Hardware availability:** assumed not guaranteed → `replay_source` + `mock_pipeline` +
    `mock_unity` keep everything testable without hardware.
@@ -789,9 +785,9 @@ Defaults are chosen so none block progress; flag any to change.
 |---|---|
 | **LSL** | *Lab Streaming Layer* — time-synced biosignal streaming over a network; native time-correction + discovery. Also the clock that aligns signals, events, and the recorded video. |
 | **XDF** | *Extensible Data Format* — the LSL-native recording format; multiple streams + clock offsets. |
-| **WebSocket** | Full-duplex TCP connection; carries the Unity **control** link (manifest up, requests down), the dashboard feed, and WebRTC signaling. |
+| **WebSocket** | Full-duplex TCP connection; carries the Unity **control** link (manifest up, requests down) and the dashboard feed. |
 | **LiveKit** | The open-source **SFU** that carries the participant video: Unity publishes, browsers subscribe, and **Egress** records server-side. V-CORE mints tokens + drives egress; it never relays media. |
-| **WebRTC** | Real-time media transport (UDP, encrypted via **DTLS-SRTP**) used *under* LiveKit. (The earlier bespoke P2P-WebRTC + `bridge/signaling.py` design was removed.) |
+| **WebRTC** | Real-time media transport (UDP, encrypted via **DTLS-SRTP**) used *under* LiveKit. |
 | **Egress** | LiveKit's server-side recorder; **Track Egress** writes the published camera track to a `.webm`, anchored to the LSL clock. |
 | **Spectator camera** | A mono Unity camera mirroring the participant's headset view for the researcher. |
 | **ObjectStatus** | A Unity component declaring an object's settable statuses (discrete / continuous), addressed by tag/id. |

@@ -369,8 +369,7 @@ mirror, and **LiveKit Egress** records. V-CORE is only the *orchestrator*:
   moment; on session stop it stops the egress. It's gated by `livekit.enabled` and best-effort
   (a recording failure never aborts the session). See [§9](#9-the-participant-video-plane-livekit).
 
-V-CORE never touches the media bytes itself; LiveKit does. *(The earlier custom `/ws/signaling`
-broker + browser `MediaRecorder` path was removed once LiveKit was in place.)*
+V-CORE never touches the media bytes itself; LiveKit does.
 
 ### 4.8 Recording
 
@@ -467,8 +466,7 @@ with no code change.**
 subscriber token from `/api/livekit/token`, connects to the LiveKit room with the
 [`livekit-client`](https://github.com/livekit/client-sdk-js) SDK, and exposes the remote video
 track to `<VideoFeed>` for the live mirror. It only *views* — **recording is server-side**
-(LiveKit Egress), so the browser no longer runs a `MediaRecorder` or uploads anything.
-(Details in [§9](#9-the-participant-video-plane-livekit).)
+(LiveKit Egress). (Details in [§9](#9-the-participant-video-plane-livekit).)
 
 ---
 
@@ -534,8 +532,6 @@ flowchart TB
   point at the same place.
 
 > **Recording** is server-side via LiveKit Egress (see [§9](#9-the-participant-video-plane-livekit)).
-> Two earlier dead-code recorders were removed: the Unity-side `VideoRecorder.cs` (PNG frames →
-> a non-existent endpoint) and the browser-side `MediaRecorder` upload path.
 
 ### 6.1 Reusing the Unity client as a package
 
@@ -752,10 +748,8 @@ nobody is misled. None of them stop the system from running end-to-end.
    [`clear_fog_stressed.yaml`](../backend/rules/clear_fog_stressed.yaml) is now the single
    canonical version.
 
-3. **Resolved — video moved to LiveKit; legacy paths removed.** The participant video plane is
-   now a **LiveKit** SFU with server-side **Track Egress** recording (§4.7, §9). The earlier
-   custom path was deleted entirely: the Unity `WebRtcSender` + `VideoRecorder`, the backend
-   `SignalingBroker` / `/ws/signaling`, and the browser `MediaRecorder` upload endpoints. The
+3. **Video runs on LiveKit.** The participant video plane is a **LiveKit** SFU with server-side
+   **Track Egress** recording (§4.7, §9). The
    one knob you must set per machine is LiveKit's `node_ip` (your LAN IP) — see
    [`LIVEKIT_SETUP.md`](LIVEKIT_SETUP.md). LSL↔video sync uses **two-point** alignment — the
    LSL clock is captured at egress **start** (`video_lsl_ts`) and **stop** (`video_lsl_ts_end`),
