@@ -186,8 +186,7 @@ That's the whole asset. You'll assign it to the launcher in the next step.
 
 > **No prefab is shipped, on purpose.** A prefab stored inside a package is read-only for the
 > projects that use it and can't point at your project's own `BackendConfig`, so it would save
-> almost nothing. Use **Add to Scene** above, or copy the POC's `Assets/Prefabs/VCore.prefab`
-> into your own project as a starting point if you prefer a draggable object.
+> almost nothing. Use **Add to Scene** above instead.
 
 ### The `VCoreLauncher` fields (Inspector)
 
@@ -342,9 +341,9 @@ Method(string)` works — e.g. swapping a material, switching an Animator state,
 > drive: a **built-in property** (e.g. continuous → `Light.intensity`), a **custom script method**
 > (`void SetX(float)` / `void SetX(string)`), **several targets at once**, or a **code listener**
 > (`status.OnContinuousValue.AddListener(v => …)` — there's no stored value to poll, you subscribe).
-> So continuous isn't property-only — the POC's `Cube` wires `brightness` to a script
-> (`StatusVisualizer`) — and discrete doesn't *require* a script if an existing string setter already
-> does what you need.
+> So continuous isn't property-only — you can route it to a **script method** that maps the value to
+> anything (an object's scale, fog density, an animator parameter…) — and discrete doesn't *require* a
+> script if an existing string setter already does what you need.
 
 > **Auto-discovery:** the package finds every `ObjectStatus` in the scene on connect and on each
 > scene load; you don't register them anywhere.
