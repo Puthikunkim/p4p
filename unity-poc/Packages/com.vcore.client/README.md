@@ -232,7 +232,7 @@ We'll make a light whose brightness the backend can set from 0–100.
    | Field (Inspector) | Set it to | Meaning |
    |---|---|---|
    | **Object Id** | leave empty | A unique name for this object. Empty = the GameObject's name is used. |
-   | **Tags** | click **+**, add `ambient_light` | Labels rules can address this object by. A rule targeting a **tag** affects **every** object with that tag — this is what makes one rule work across many scenes. |
+   | **Tags** | click **+**, add `ambient_light` | Labels rules can address this object by. A rule targeting a **tag** affects **every** object that has that tag *and* declares the same status (see *Tag fan-out is per-status* below) — this is what makes one rule work across many scenes. |
    | **Status Name** | `brightness` | The name of the setting as it appears in rules. |
    | **Type** | **Continuous** | `Continuous` = a number between Range Min/Max. (`Discrete` = one of a fixed list of words — see below.) |
    | **Range Min** | `0` | Smallest allowed value (Continuous only). |
@@ -251,17 +251,68 @@ We'll make a light whose brightness the backend can set from 0–100.
 Now, when a rule sends `brightness = 20` to anything tagged `ambient_light`, the package sets the
 light's `intensity` to `20`.
 
-### Discrete statuses (a fixed set of words)
+### Worked example: a campfire "crackle" the backend can switch (discrete)
 
-For a status that is one of several named states (e.g. a fire's crackle being `off` / `low` /
-`high`):
+A **discrete** status is one of a fixed set of words instead of a number. We'll let the backend
+switch a campfire's crackle between `off` / `low` / `high` and play a different sound for each.
+The flow mirrors the continuous example above — the only differences are **Type = Discrete**, the
+value arrives as a **string**, and you wire **On Discrete Value (String)**.
 
-1. Add another **Object Status** component (you can have several on one GameObject — see below).
-2. Set **Status Name** = `crackle`, **Type** = **Discrete**.
-3. Under **Discrete Values**, click **+** for each allowed word and type `off`, `low`, `high`.
-4. Wire **On Discrete Value (String)** the same way as step 4 above, but to a function that takes
-   a **string** (choose it from the **Dynamic string** section) — e.g. a method on your own audio
-   script that switches the crackle sound.
+1. **Pick the object.** Select the campfire GameObject (you can put this on the same object as the
+   `brightness` status — see *Multiple statuses, one object* below).
+2. **Add the status.** **Add Component ▸ "Object Status"** (a second one is fine).
+3. **Fill in the ObjectStatus fields:**
+
+   | Field (Inspector) | Set it to | Meaning |
+   |---|---|---|
+   | **Object Id** | leave empty (or `campfire_01`) | Empty = the GameObject's name. Use the **same id** as the brightness status to group them under one object. |
+   | **Tags** | e.g. `fire` | Labels rules can address it by. |
+   | **Status Name** | `crackle` | The status name as it appears in rules. |
+   | **Type** | **Discrete** | One of a fixed list of words (set below). |
+   | **Discrete Values** | click **+** three times → `off`, `low`, `high` | The allowed words. The backend can only send one of these. |
+
+4. **Write a small script to react to the value.** A discrete value arrives as a **string**, so
+   your method must take a single `string` parameter. Create a C# script (Project window ▸
+   right-click ▸ **Create ▸ C# Script**, name it `CrackleAudio`) with this content:
+
+   ```csharp
+   using UnityEngine;
+
+   // No V-CORE namespace needed — this is just your own reaction code.
+   public class CrackleAudio : MonoBehaviour
+   {
+       public AudioSource source;   // assign in the Inspector
+       public AudioClip lowClip;    // assign in the Inspector
+       public AudioClip highClip;   // assign in the Inspector
+
+       // ONE public method taking a single string = the incoming discrete value.
+       public void SetCrackle(string level)
+       {
+           switch (level)
+           {
+               case "off":  source.Stop(); break;
+               case "low":  source.clip = lowClip;  source.loop = true; source.Play(); break;
+               case "high": source.clip = highClip; source.loop = true; source.Play(); break;
+               default:     Debug.LogWarning($"Unknown crackle level: {level}"); break;
+           }
+       }
+   }
+   ```
+
+5. **Add the script and assign its fields.** Select the campfire GameObject, **Add Component ▸
+   "Crackle Audio"**, then drag an **AudioSource** (Add Component ▸ "Audio Source" if it has none)
+   into **Source** and your two clips into **Low Clip** / **High Clip**.
+6. **Wire the UnityEvent.** On the `crackle` **ObjectStatus**, find **On Discrete Value (String)**:
+   1. Click the **+** at the bottom-right of that box.
+   2. Drag the **campfire GameObject** into the object slot (*None (Object)*).
+   3. Open the function dropdown and choose **CrackleAudio ▸ SetCrackle**.
+   4. **Important:** pick `SetCrackle` from the **Dynamic string** section at the *top* of the
+      dropdown — **not** the "Static Parameters" section. *Dynamic* passes the backend's live value
+      straight through; *Static* would always send one fixed word you type here.
+
+Now when a rule sends `crackle = "high"` to this object, the package calls `SetCrackle("high")` and
+the high crackle sound plays. (If you only need the words and no audio, any public `void
+Method(string)` works — e.g. swapping a material, switching an Animator state, toggling particles.)
 
 ### Field reference
 
@@ -280,6 +331,12 @@ For a status that is one of several named states (e.g. a fire's crackle being `o
 > (e.g. `brightness` + `crackle` on the campfire). They're grouped under one object id with
 > multiple statuses, so they appear together in the rule builder.
 
+> **Tag fan-out is per-status.** A status request carries a target (`{tag}` or `{id}`) **plus** a
+> status name **plus** a value. A tag request reaches **every** object that has that tag *and*
+> declares that status name — objects that have the tag but not the matching status are skipped. So
+> one rule (`tag: ambient_light`, status `brightness`) can drive several objects at once — e.g. a
+> light's `intensity` *and* a prop's scale — which is what keeps rules portable across scenes.
+
 > **Driving from code instead of the Inspector:** if you'd rather not use UnityEvents, leave them
 > empty and read the value yourself — but for most cases the Inspector wiring is enough. The
 > package auto-discovers every `ObjectStatus` in the scene; you don't register them anywhere.
@@ -291,6 +348,15 @@ For a status that is one of several named states (e.g. a fire's crackle being `o
 A `VCoreAction` is the command counterpart to a status: a **named, parameterless action** the
 backend can trigger. Use it when "do this thing" fits better than "set this value" — e.g.
 `advance_scene`, `extinguish`, `play_alarm`.
+
+The two ways to expose a hook to the backend differ only in **whether a value travels with it**:
+
+- **`ObjectStatus`** ([§6](#6-make-objects-adaptable-objectstatus)) = a named **setting that carries
+  a value**. The backend sends `brightness = 20`; *you* decide what that value does (wire it to a
+  light's `intensity`, a prop's scale, …).
+- **`VCoreAction`** = a named **command with no value** — a verb. The backend just says "fire
+  `extinguish`"; *you* decide entirely in Unity what happens (`OnInvoke` → any method, coroutine,
+  Timeline, …).
 
 ### Worked example: an "advance to next scene step" command
 
@@ -306,14 +372,51 @@ backend can trigger. Use it when "do this thing" fits better than "set this valu
    | **Object Id** | *(Object scope only)* | Unique id; empty → GameObject name. |
    | **Tags** | *(Object scope only)* | Tags rules can address it by. |
 
-4. **Wire what it does.** In the **On Invoke** box, click **+**, drag in the GameObject that holds
-   the code you want to run, and pick the method from the dropdown (e.g. your `StudyManager ▸
-   NextStep`). `On Invoke` is a plain UnityEvent, so you can call any public method, start a
-   coroutine, trigger a Timeline, flip a state machine — anything.
+4. **Write the method to run.** `On Invoke` calls a **public method on a component in your scene**,
+   so first make one. Create a script (Project window ▸ right-click ▸ **Create ▸ C# Script**, name
+   it `StudyManager`):
+
+   ```csharp
+   using UnityEngine;
+
+   // No V-CORE namespace needed — this is just your own code.
+   public class StudyManager : MonoBehaviour
+   {
+       public int step;
+
+       // public + returns void → shows cleanly in the UnityEvent dropdown.
+       public void NextStep()
+       {
+           step++;
+           Debug.Log($"Advanced to step {step}");
+       }
+   }
+   ```
+
+5. **Add it and wire the event.** Put `StudyManager` on a GameObject (**Add Component ▸ "Study
+   Manager"**), then on the `VCoreAction`'s **On Invoke** box:
+   1. Click the **+** at the bottom-right. An empty row appears.
+   2. Drag the GameObject holding `StudyManager` into the object slot (*None (Object)*).
+   3. In the function dropdown choose **StudyManager ▸ NextStep**.
+
+   When a rule fires `advance_scene`, `NextStep()` runs. `On Invoke` is a plain UnityEvent, so you
+   can wire several targets at once, or call any public method — start a coroutine, trigger a
+   Timeline, flip a state machine, or call a method that takes one fixed argument you type in the
+   Inspector.
 
 In the dashboard's rule builder, actions appear on the **THEN** side as **`action`** (instead of
 **`set`**). A Scene-scoped action is offered by name; an Object-scoped action is offered against
 its id/tags.
+
+> **Action vs status — and which scope to use.** A *status* always carries a **value** (e.g. set
+> `brightness` = 20); an *action* carries **none** — it's a verb you wire to anything, so it's how
+> you expose a named hook and decide the whole effect in Unity. Use **Object** scope to aim a
+> command at specific object(s): a rule can fire it on **one** (`id: campfire_02`) or a **whole
+> group** (`tag: fire`) with the same fan-out as a status. Use **Scene** scope for a single global
+> command with no target (`advance_scene`) — you can't say "this one". Object scope is *addressed*
+> like a status but isn't one: there's no value, just the command. You *could* fake a command as a
+> one-value discrete status, but you'd be wiring `OnDiscreteValue` and ignoring the string — an
+> action is the clean way to say "just do this".
 
 ---
 
@@ -388,6 +491,12 @@ public class MyStudyLogic : MonoBehaviour
     }
 }
 ```
+
+> **`SetMetric` updates a declared channel — it doesn't *create* one.** A channel must exist first:
+> either in the reporter's **Channels** list (Way 1) or as a `BehaviourMetric` component (Way 2).
+> Calling `SetMetric("foo", …)` for a name that was never declared stores the value but it's
+> **never sent** — only declared channels are streamed. So declare the channel, *then* push values
+> to it. (`BehaviourMetric.Report` always works, because the component *is* the declaration.)
 
 > **Send only real values:** on the **Behaviour Reporter**, untick **Generate Synthetic Data**.
 > Channels with no reported value are then simply not sent.

@@ -119,8 +119,9 @@ flowchart LR
 
 Contracts are **JSON Schema** files in [`contracts/`](../contracts). They are the single
 source of truth for cross-language messages, validated on both the Python and TypeScript
-sides. The design doc talks about "three contracts"; the running code actually uses **five**
-message types (the original three plus two Unity→backend extensions).
+sides. The system speaks **five** contracts: three for the core loop (signals in, rules, status
+changes out — the last with a manifest *up* plus status- and action-requests *down*) and two
+Unity→backend extensions (study/scene context and behavioural channels).
 
 ```mermaid
 flowchart TB
@@ -131,8 +132,9 @@ flowchart TB
     C2["② rule_grammar<br/>IF (signal op threshold) THEN set object status"]
   end
   subgraph Unity["Unity ↔ backend"]
-    C3b["③b object_status_manifest<br/>Unity → backend: what objects can be set"]
+    C3b["③b object_status_manifest<br/>Unity → backend: settable objects + abstract actions"]
     C3a["③a status_request<br/>backend → Unity: set this status to this value"]
+    C3c["③c action_request<br/>backend → Unity: invoke this named action"]
     C4["④ vr_context<br/>Unity → backend: free-form study/scene context"]
     C5["⑤ unity_behaviour<br/>Unity → backend: behavioural channels + samples"]
   end
@@ -141,9 +143,10 @@ flowchart TB
 | # | Schema file | Direction | Carries |
 |---|---|---|---|
 | ① | `signal_schema.schema.json` | pipeline → backend | channels: `name · unit · type (scalar/timeseries/categorical) · range · display.hint` |
-| ② | `rule_grammar.schema.json` | files ↔ engine/UI | `when` (conditions) → `then.set` (target, status, value) + cooldown |
+| ② | `rule_grammar.schema.json` | files ↔ engine/UI | `when` (conditions) → `then.set` (target, status, value) or `then.action` (invoke a command) + cooldown |
 | ③a | `status_request.schema.json` | engine → Unity | `{target, status, value, source: engine\|manual}` |
-| ③b | `object_status_manifest.schema.json` | Unity → engine | each object's `id`, `tags`, and settable `statuses` |
+| ③b | `object_status_manifest.schema.json` | Unity → engine | each object's `id`, `tags`, settable `statuses`, and `abstract_actions` |
+| ③c | `action_request.schema.json` | engine → Unity | `{action, optional target, source: engine\|manual}` — invoke a named command |
 | ④ | `vr_context.schema.json` | Unity → backend | open map of `label → value` (e.g. current scene/step) |
 | ⑤ | `unity_behaviour.schema.json` | Unity → backend | behavioural channels (same shape as ① channels) + sample frames |
 
@@ -381,8 +384,7 @@ Each artifact type has its own independently-configurable location
   against the scene first.
 - [`api/sessions.py`](../backend/vcore/api/sessions.py) — start/stop/list/get sessions, plus
   `GET /api/sessions/{id}/video` to stream the recorded file for playback. (Recording is
-  started/stopped server-side by `LiveKitRecorder` on session start/stop — there's no browser
-  upload endpoint anymore.)
+  started/stopped server-side by `LiveKitRecorder` on session start/stop.)
 - [`api/livekit.py`](../backend/vcore/api/livekit.py) — `GET /api/livekit/token` (see §4.7).
 
 ---
