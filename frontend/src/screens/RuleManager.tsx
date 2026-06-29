@@ -324,7 +324,12 @@ export function RuleManager() {
               const matched = targetType === 'tag'
                 ? objects.filter((o) => o.tags.includes(targetValue))
                 : objects.filter((o) => o.id === targetValue)
-              const statuses = matched.flatMap((o) => o.statuses)
+              // Dedupe by status name: a tag can match several objects that declare the
+              // same status (e.g. `brightness` on both campfire_01 and demo_cube), and a
+              // tag request fans out by name — so the picker should list each name once.
+              const statuses = Array.from(
+                new Map(matched.flatMap((o) => o.statuses).map((s) => [s.name, s])).values(),
+              )
               return (
                 <>
                   <div className="form-row">
