@@ -75,6 +75,9 @@ export function RuleManager() {
   const [thenMode, setThenMode] = useState<'set' | 'action'>('set')
   const [actionKey, setActionKey] = useState('')  // index into abstractActions, or ''
   const [actionName, setActionName] = useState('')  // free-text fallback (scene-level)
+  // Object-scoped action target: address it by its id (default) or one of its tags.
+  const [actionTargetType, setActionTargetType] = useState<'id' | 'tag'>('id')
+  const [actionTargetValue, setActionTargetValue] = useState('')  // chosen tag when type === 'tag'
 
   function openNew() {
     setEditingRule(null)
@@ -92,6 +95,8 @@ export function RuleManager() {
     setThenMode('set')
     setActionKey('')
     setActionName('')
+    setActionTargetType('id')
+    setActionTargetValue('')
     setError(null)
     setShowBuilder(true)
   }
@@ -111,12 +116,26 @@ export function RuleManager() {
       const a = rule.then.action
       setThenMode('action')
       setActionName(a.action)
-      const isScene = a.target == null
-      const idx = abstractActions.findIndex(
-        (d) => d.name === a.action && (d.scope === 'scene') === isScene,
-      )
+      const tgt = a.target
+      let idx: number
+      if (tgt == null) {
+        idx = abstractActions.findIndex((d) => d.name === a.action && d.scope === 'scene')
+        setActionTargetType('id'); setActionTargetValue('')
+      } else if ('tag' in tgt) {
+        idx = abstractActions.findIndex(
+          (d) => d.name === a.action && d.scope === 'object' && (d.tags ?? []).includes(tgt.tag),
+        )
+        if (idx < 0) idx = abstractActions.findIndex((d) => d.name === a.action && d.scope === 'object')
+        setActionTargetType('tag'); setActionTargetValue(tgt.tag)
+      } else {
+        idx = abstractActions.findIndex(
+          (d) => d.name === a.action && d.scope === 'object' && d.id === tgt.id,
+        )
+        if (idx < 0) idx = abstractActions.findIndex((d) => d.name === a.action && d.scope === 'object')
+        setActionTargetType('id'); setActionTargetValue('')
+      }
       setActionKey(idx >= 0 ? String(idx) : '')
-      // leave status/target fields at defaults
+      // leave status/set fields at defaults
       setTargetType('tag'); setTargetValue(''); setStatusName(''); setStatusValue('')
     } else if (rule.then.set) {
       const target = rule.then.set.target
@@ -149,7 +168,16 @@ export function RuleManager() {
       if (abstractActions.length > 0) {
         if (!actionKey) { setError('Pick an action'); return }
         const a = abstractActions[Number(actionKey)]
-        action = { action: a.name, target: a.scope === 'scene' ? undefined : { id: a.id! } }
+        let target: InvokeAction['target']
+        if (a.scope === 'scene') {
+          target = undefined
+        } else if (actionTargetType === 'tag') {
+          if (!actionTargetValue) { setError('Pick a tag'); return }
+          target = { tag: actionTargetValue }
+        } else {
+          target = { id: a.id! }
+        }
+        action = { action: a.name, target }
       } else {
         if (!actionName.trim()) { setError('Enter an action name'); return }
         action = { action: actionName.trim() }  // free-text → scene-level
@@ -370,10 +398,11 @@ export function RuleManager() {
             })()}
             </>)}
             {thenMode === 'action' && (
+              <>
               <div className="form-row">
                 <label>Action</label>
                 {abstractActions.length > 0
-                  ? <Select value={actionKey || undefined} onValueChange={(v) => setActionKey(v)}>
+                  ? <Select value={actionKey || undefined} onValueChange={(v) => { setActionKey(v); setActionTargetType('id'); setActionTargetValue('') }}>
                       <SelectTrigger><SelectValue placeholder="— pick —" /></SelectTrigger>
                       <SelectContent>
                         {abstractActions.map((a, i) => (
@@ -386,6 +415,37 @@ export function RuleManager() {
                   : <Input value={actionName} onChange={(e) => setActionName(e.target.value)} placeholder="action name (scene-level)" />
                 }
               </div>
+              {(() => {
+                const a = actionKey !== '' ? abstractActions[Number(actionKey)] : undefined
+                if (!a || a.scope !== 'object') return null
+                const tags = a.tags ?? []
+                return (
+                  <>
+                    <div className="form-row">
+                      <label>Target</label>
+                      <Select value={actionTargetType} onValueChange={(v) => { setActionTargetType(v as 'id' | 'tag'); setActionTargetValue('') }}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="id">id: {a.id}</SelectItem>
+                          {tags.length > 0 && <SelectItem value="tag">tag</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {actionTargetType === 'tag' && (
+                      <div className="form-row">
+                        <label>Tag</label>
+                        <Select value={actionTargetValue || undefined} onValueChange={(v) => setActionTargetValue(v)}>
+                          <SelectTrigger><SelectValue placeholder="— pick —" /></SelectTrigger>
+                          <SelectContent>
+                            {tags.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+              </>
             )}
             <div className="form-row">
               <label>Cooldown (s)</label>
