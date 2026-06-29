@@ -337,9 +337,17 @@ Method(string)` works — e.g. swapping a material, switching an Animator state,
 > one rule (`tag: ambient_light`, status `brightness`) can drive several objects at once — e.g. a
 > light's `intensity` *and* a prop's scale — which is what keeps rules portable across scenes.
 
-> **Driving from code instead of the Inspector:** if you'd rather not use UnityEvents, leave them
-> empty and read the value yourself — but for most cases the Inspector wiring is enough. The
-> package auto-discovers every `ObjectStatus` in the scene; you don't register them anywhere.
+> **Both events are flexible — not "property for continuous, script for discrete".**
+> `OnContinuousValue` (float) and `OnDiscreteValue` (string) are plain UnityEvents, so **either** can
+> drive: a **built-in property** (e.g. continuous → `Light.intensity`), a **custom script method**
+> (`void SetX(float)` / `void SetX(string)`), **several targets at once**, or a **code listener**
+> (`status.OnContinuousValue.AddListener(v => …)` — there's no stored value to poll, you subscribe).
+> So continuous isn't property-only — the POC's `Cube` wires `brightness` to a script
+> (`StatusVisualizer`) — and discrete doesn't *require* a script if an existing string setter already
+> does what you need.
+
+> **Auto-discovery:** the package finds every `ObjectStatus` in the scene on connect and on each
+> scene load; you don't register them anywhere.
 
 ---
 
@@ -405,18 +413,23 @@ The two ways to expose a hook to the backend differ only in **whether a value tr
    Inspector.
 
 In the dashboard's rule builder, actions appear on the **THEN** side as **`action`** (instead of
-**`set`**). A Scene-scoped action is offered by name; an Object-scoped action is offered against
-its id/tags.
+**`set`**).
 
-> **Action vs status — and which scope to use.** A *status* always carries a **value** (e.g. set
-> `brightness` = 20); an *action* carries **none** — it's a verb you wire to anything, so it's how
-> you expose a named hook and decide the whole effect in Unity. Use **Object** scope to aim a
-> command at specific object(s): a rule can fire it on **one** (`id: campfire_02`) or a **whole
-> group** (`tag: fire`) with the same fan-out as a status. Use **Scene** scope for a single global
-> command with no target (`advance_scene`) — you can't say "this one". Object scope is *addressed*
-> like a status but isn't one: there's no value, just the command. You *could* fake a command as a
-> one-value discrete status, but you'd be wiring `OnDiscreteValue` and ignoring the string — an
-> action is the clean way to say "just do this".
+> **Scope & targeting.** A *status* carries a **value** ("set `brightness` = 20"); an *action*
+> carries **none** — it's a verb you wire to anything, so it's how you expose a named hook and decide
+> the whole effect in Unity. An action's **Scope** (set on the `VCoreAction` component **in Unity** —
+> the dashboard only reflects how Unity declared it; there's no scope toggle there) decides how a
+> rule addresses it:
+>
+> - **Object scope** — offered in the rule builder against its **id/tag**. A rule that targets an
+>   **id** fires only the action(s) on that id whose name matches; a rule that targets a **tag** fires
+>   **every** `VCoreAction` carrying that tag whose name matches — fan-out, exactly like statuses.
+> - **Scene scope** — offered **by name only** (no target). Firing it runs **every** scene-scoped
+>   action with that name (declare the same name on several objects and they all fire).
+>
+> Every case also matches on the **action name**, so only actions whose name matches the request run.
+> You *could* fake a command as a one-value discrete status, but you'd be wiring `OnDiscreteValue` and
+> ignoring the string — an action is the clean way to say "just do this".
 
 ---
 
@@ -656,13 +669,16 @@ With **Persist Across Scenes** ticked on the launcher (the default), the **VCore
 Unity scene loads (via `DontDestroyOnLoad`), with a guard that destroys any duplicate a freshly
 loaded scene might bring in. So **one V-CORE session spans many Unity scenes**.
 
-This gives you two natural scopes:
+Which scope a component has is decided purely by **which GameObject it sits on** — the persistent
+**VCoreManager**, or an ordinary object that belongs to a scene:
 
-- **Session-scoped** (lives for the whole session): channels on the persistent reporter, or a
-  `BehaviourMetric` on the manager itself.
-- **Scene-scoped** (comes and goes with a scene): a `BehaviourMetric` or `ObjectStatus` on a scene
-  object. On each scene load/unload the client re-scans, re-sends the object manifest, and rebuilds
-  its dispatch index — so adaptations always resolve against whatever is actually loaded.
+| Scope | Where the component sits | What it means |
+|---|---|---|
+| **Session** | the persistent **VCoreManager** (or any object you keep alive with `DontDestroyOnLoad`) | Lives for the **whole session**, across scene loads. Put things that should always be running here: the connection / collector / dispatcher, the `BehaviourReporter` and its centralised channels, the `VrContextReporter`, and any `ObjectStatus`, `VCoreAction`, or `BehaviourMetric` you want to persist. |
+| **Scene** | an ordinary GameObject inside a scene | **Comes and goes with that scene** (destroyed on unload). Put per-scene things here: an `ObjectStatus`, `VCoreAction`, or `BehaviourMetric` on a scene prop, plus its helper scripts. |
+
+On each scene load/unload the client **re-scans the loaded scenes, re-sends the object manifest, and
+rebuilds its dispatch index** — so adaptations always resolve against whatever is actually loaded.
 
 ---
 
