@@ -5,8 +5,8 @@ enabled: true
 when:
   all:
     - signal: cognitive_load
-      op: ">="
-      threshold: 0.75
+      op: "=="
+      value: "High"
       sustain_s: 5
 then:
   set:
