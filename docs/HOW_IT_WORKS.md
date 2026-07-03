@@ -99,7 +99,7 @@ flowchart LR
 
 | Wire key | UI label | What it means |
 |---|---|---|
-| `sensor-pipeline` | Sensor Pipeline | The LSL stream is delivering samples. **The critical health signal.** |
+| `sensor-pipeline:<stream>` | `Sensor: <stream>` | One chip **per ingested stream** (e.g. `sensor-pipeline:sensor.physiological`) — that stream is delivering samples. **The critical health signal.** |
 | `unity-ws` | Unity WS | A Unity runtime is connected on the control WebSocket. |
 | `browser-ws` | Browser WS | At least one dashboard browser is connected. |
 
@@ -187,8 +187,9 @@ livekit_recorder = LiveKitRecorder(config.livekit, recorder.store, video_dir)
 ```
 
 On startup it loads the rules, starts the evaluator, begins watching the rules directory,
-starts the WebSocket sink + dashboard bridge + recorder, and — if the default signal manifest
-exists — starts an `LSLSource` reading the stream named `sensor.cognitive`.
+starts the WebSocket sink + dashboard bridge + recorder, and starts **one `LSLSource` per
+configured ingestion stream** (by default `sensor.predictions` and `sensor.physiological`),
+each with its own Contract-1 manifest.
 
 > **Configuration:** `create_app()` now calls `load_config()`
 > ([core/config.py](../backend/vcore/core/config.py)) to read
@@ -225,18 +226,24 @@ async; an exception in one handler is logged and swallowed so it can't take down
 
 ### 4.3 Ingestion — getting signals in
 
-[`ingestion/lsl_source.py`](../backend/vcore/ingestion/lsl_source.py) is the only ingestion
-source wired into the running app. **LSL** (Lab Streaming Layer) is a standard for streaming
-time-synced biosignals over a network. `LSLSource`:
+[`ingestion/lsl_source.py`](../backend/vcore/ingestion/lsl_source.py) is the ingestion source
+wired into the running app. **LSL** (Lab Streaming Layer) is a standard for streaming
+time-synced biosignals over a network. The app runs **one `LSLSource` per configured stream**
+(the pipeline publishes two role-based streams — predictions and physiological). Each `LSLSource`:
 
-1. Loads a Contract-1 **signal manifest** from a JSON sidecar file (default:
-   [`tools/fixtures/full_session.manifest.json`](../tools/fixtures/full_session.manifest.json)).
-   This tells it the channel names/types/order.
-2. Resolves the live LSL stream by name (`sensor.cognitive`), retrying until it appears.
+1. Loads its own Contract-1 **signal manifest** from a JSON sidecar file (the vendored
+   [`predictions.manifest.json`](../tools/fixtures/predictions.manifest.json) /
+   [`physiological.manifest.json`](../tools/fixtures/physiological.manifest.json) by default).
+   This tells it the channel names/types/order. Each manifest is registered into
+   `ActiveManifests`, which exposes the **union of every stream's channels**.
+2. Resolves its live LSL stream by name, retrying until it appears.
 3. On each sample, maps the raw numeric array to `{channel_name: value}` (decoding categorical
-   channels from an index back to a string), and publishes a `SAMPLE` event.
-4. Runs a **watchdog**: if no sample arrives within `stale_timeout_s`, it emits a `STALE`
-   event and flips the `sensor-pipeline` link to `stale`, then `down` if it stays silent.
+   channels from an index back to a string; an absent numeric channel arrives as `NaN`, is passed
+   through, and is rendered as `null` — "no data" — at the JSON boundary), and publishes a
+   `SAMPLE` event.
+4. Runs a **watchdog**: if no sample arrives within `stale_timeout_s`, it emits a `STALE` event
+   and flips **its own** link (`sensor-pipeline:<stream>`) to `stale`, then `down` if it stays
+   silent — so one stream going quiet doesn't mask the others.
 
 ### 4.4 The rule engine
 
