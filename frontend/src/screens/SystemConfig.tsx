@@ -1,5 +1,5 @@
 import { useVCoreStore } from '../ws/store'
-import { LINK_ORDER, linkLabel } from '../ws/links'
+import { orderedLinkKeys, linkLabel } from '../ws/links'
 
 function stateLabel(state: string): string {
   const map: Record<string, string> = {
@@ -15,10 +15,9 @@ function stateLabel(state: string): string {
 export function SystemConfig() {
   const linkStatuses = useVCoreStore((s) => s.linkStatuses)
 
-  // Render the canonical links (Sensor Pipeline, Unity WS, Browser WS) in a stable order,
-  // defaulting any not-yet-reported link to "down" — same as SessionMonitor's link strip,
-  // so every page shows the same three indicators rather than only those already received.
-  const chips = LINK_ORDER.map((key) => ({
+  // One chip per sensor stream (dynamic — a stream reports as `sensor-pipeline:<name>`),
+  // then Unity WS and Browser WS. Same ordering as SessionMonitor's link strip.
+  const chips = orderedLinkKeys(linkStatuses).map((key) => ({
     key,
     name: linkLabel(key),
     state: linkStatuses[key]?.state ?? 'down',

@@ -3,7 +3,7 @@ import type { Channel } from '../contracts/SignalSchema'
 
 export interface RendererProps {
   channel: Channel
-  value: number | string | undefined
+  value: number | string | null | undefined
   history: [number, number][]  // [lsl_timestamp, numeric_value]
 }
 

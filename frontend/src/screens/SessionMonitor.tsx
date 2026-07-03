@@ -1,5 +1,5 @@
 import { useVCoreStore, useChannels } from '../ws/store'
-import { LINK_ORDER, linkLabel } from '../ws/links'
+import { orderedLinkKeys, linkLabel } from '../ws/links'
 import { getRenderer } from '../renderers/registry'
 import { VideoFeed } from '../video/VideoFeed'
 import { Button } from '../components/ui/button'
@@ -43,7 +43,7 @@ export function SessionMonitor() {
     <div className="screen">
       {/* Link status strip */}
       <div className="link-strip">
-        {LINK_ORDER.map((link) => {
+        {orderedLinkKeys(linkStatuses).map((link) => {
           const ls = linkStatuses[link]
           const state = ls?.state ?? 'down'
           return (
@@ -282,7 +282,7 @@ function VrContextPanel() {
 interface SignalPanelProps {
   groupKey: string
   channels: Channel[]
-  latestValues: Record<string, number | string>
+  latestValues: Record<string, number | string | null>
   history: Record<string, [number, number][]>
 }
 

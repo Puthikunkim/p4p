@@ -26,8 +26,8 @@ export interface VCoreStore {
   objectStatusManifest: ObjectStatusManifestContract3B | null
   // project-wide catalog (everything the project can expose, for authoring ahead of time)
   objectStatusCatalog: ObjectStatusManifestContract3B | null
-  // live values: channel name → latest sample value
-  latestValues: Record<string, number | string>
+  // live values: channel name → latest sample value (null = absent / "no data")
+  latestValues: Record<string, number | string | null>
   // history: channel name → circular buffer of [timestamp, value] pairs
   history: Record<string, [number, number][]>
   // rules
@@ -55,7 +55,7 @@ export type ServerMessage =
   | { type: 'signal_manifest'; payload: SignalSchemaContract1 }
   | { type: 'object_status_manifest'; payload: ObjectStatusManifestContract3B }
   | { type: 'object_status_catalog'; payload: ObjectStatusManifestContract3B }
-  | { type: 'sample'; payload: { stream_name: string; timestamp: number; values: Record<string, number | string> } }
+  | { type: 'sample'; payload: { stream_name: string; timestamp: number; values: Record<string, number | string | null> } }
   | { type: 'warning'; payload: { source: string; message: string } }
   | { type: 'link_status'; payload: { link: string; state: string; detail?: string } }
   | { type: 'rule_list'; payload: { rules: RuleGrammarContract2[]; disabled: Record<string, string> } }

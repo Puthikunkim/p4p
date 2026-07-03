@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useVCoreStore } from '../ws/store'
-import { LINK_ORDER, linkLabel } from '../ws/links'
+import { orderedLinkKeys, linkLabel } from '../ws/links'
 import { IconPlay } from '../components/icons'
 import { Button } from '../components/ui/button'
 import { Input } from '../components/ui/input'
@@ -59,7 +59,7 @@ export function NewSession({ onStarted }: Props) {
   // Show all canonical links (defaulting unreported ones to "down") so the System Status
   // panel always lists Sensor Pipeline, Unity WS and Browser WS — consistent with the
   // live monitor — instead of only the links already received over the socket.
-  const systemLinks = LINK_ORDER.map((key) => ({
+  const systemLinks = orderedLinkKeys(linkStatuses).map((key) => ({
     name: linkLabel(key),
     state: linkStatuses[key]?.state ?? 'down',
   }))

@@ -74,6 +74,13 @@
   color: var(--text-h);
 }
 
+/* Absent channel ("no data" / null-from-NaN): greyed and smaller, never shown as 0. */
+.renderer__value--nodata {
+  color: var(--text-soft);
+  font-size: 18px;
+  font-weight: 500;
+}
+
 .renderer__meta {
   font-size: 11px;
   color: var(--text-soft);
