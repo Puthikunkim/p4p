@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "stream": {
+    "name": "sensor.predictions",
+    "source_id": "om-pipeline",
+    "nominal_srate": 2.0
+  },
+  "channels": [
+    {
+      "name": "emotion",
+      "unit": "class",
+      "type": "categorical",
+      "categories": ["0", "1", "2", "3"],
+      "display": { "hint": "quadrant", "label": "Emotion" }
+    },
+    {
+      "name": "cognitive_load",
+      "unit": "class",
+      "type": "categorical",
+      "categories": ["Low", "Medium", "High"],
+      "display": { "hint": "quadrant", "label": "Cognitive Load" }
+    }
+  ]
+}

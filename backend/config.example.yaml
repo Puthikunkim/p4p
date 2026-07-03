@@ -11,12 +11,17 @@
 
 # ── Ingestion (signal pipeline — Machine C) ──────────────────────────────────
 ingestion:
-  # (wired) LSL stream name(s); the first is the primary stream to resolve.
-  lsl_streams:
-    - sensor.cognitive
-  # (wired) Contract-1 signal manifest (sidecar JSON) for the stream's channels.
-  manifest_path: ../tools/fixtures/full_session.manifest.json
-  # (wired) Seconds without a sample before the signal is marked stale.
+  # (wired) LSL streams to ingest — each a role-based stream with its own Contract-1
+  # manifest (sidecar JSON). The manifests are vendored copies of the pipeline's
+  # generated manifests; treat them as the source of truth for channel order.
+  streams:
+    - name: sensor.predictions
+      manifest_path: ../tools/fixtures/predictions.manifest.json
+    - name: sensor.physiological
+      manifest_path: ../tools/fixtures/physiological.manifest.json
+      # (optional) per-stream override; falls back to ingestion.stale_timeout_s below.
+      # stale_timeout_s: 5
+  # (wired) Default seconds without a sample before a stream is marked stale.
   stale_timeout_s: 5
 
 # ── WebSocket bridge (V-CORE server — Machine A) ──────────────────────────────

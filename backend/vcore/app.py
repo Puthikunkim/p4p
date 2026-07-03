@@ -76,9 +76,6 @@ def create_app(
         video_dir = _resolve(config.recording.video_dir)
         sqlite_path = _resolve(config.recording.sqlite_path)
 
-    manifest_path = _resolve(config.ingestion.manifest_path)
-    stream_name = config.ingestion.lsl_streams[0] if config.ingestion.lsl_streams else None
-
     bus = EventBus()
     manifests = ActiveManifests()
     registry = RuleRegistry(rules_dir)
@@ -104,24 +101,34 @@ def create_app(
         await bridge.start()
         await recorder.start()
 
-        lsl_source: LSLSource | None = None
-        if stream_name and manifest_path.exists():
-            lsl_source = LSLSource(
-                stream_name=stream_name,
-                manifest_path=manifest_path,
+        # One LSLSource per configured stream; each carries its own manifest and
+        # per-stream link identity, and registers its channels into the union manifest.
+        lsl_sources: list[LSLSource] = []
+        for stream_cfg in config.ingestion.streams:
+            mpath = _resolve(stream_cfg.manifest_path)
+            if not mpath.exists():
+                log.warning(
+                    "ingestion: manifest not found for stream %s (%s) — skipped",
+                    stream_cfg.name, mpath,
+                )
+                continue
+            lsl_sources.append(LSLSource(
+                stream_name=stream_cfg.name,
+                manifest_path=mpath,
                 bus=bus,
                 manifests=manifests,
-                stale_timeout_s=config.ingestion.stale_timeout_s,
-            )
-            bridge.signal_source = lsl_source
-            await lsl_source.start()
-            log.info("V-CORE LSL source started (stream=%s)", stream_name)
+                stale_timeout_s=stream_cfg.stale_timeout_s or config.ingestion.stale_timeout_s,
+            ))
+        bridge.signal_sources = lsl_sources
+        for source in lsl_sources:
+            await source.start()
+            log.info("V-CORE LSL source started (stream=%s)", source.stream_name)
 
         log.info("V-CORE started (rules_dir=%s)", rules_dir)
         yield
         # ── shutdown ─────────────────────────────────────────────────────────
-        if lsl_source is not None:
-            await lsl_source.stop()
+        for source in lsl_sources:
+            await source.stop()
         await recorder.stop()
         await bridge.stop()
         await ws_sink.stop()

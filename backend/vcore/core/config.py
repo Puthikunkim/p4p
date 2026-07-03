@@ -18,12 +18,31 @@ import yaml
 from pydantic import BaseModel, Field
 
 
+class StreamConfig(BaseModel):
+    # LSL stream name to resolve. (wired)
+    name: str
+    # Contract-1 signal manifest (sidecar JSON) describing this stream's channels. (wired)
+    manifest_path: str
+    # Per-stream stale-timeout override; falls back to ingestion.stale_timeout_s. (wired)
+    stale_timeout_s: float | None = None
+
+
 class IngestionConfig(BaseModel):
-    # LSL stream name(s) to resolve; the first is the primary stream. (wired)
-    lsl_streams: list[str] = ["sensor.cognitive"]
-    # Contract-1 signal manifest (sidecar JSON) describing the stream's channels. (wired)
-    manifest_path: str = "../tools/fixtures/full_session.manifest.json"
-    # Seconds without a sample before the signal is marked stale. (wired)
+    # LSL streams to ingest — each a role-based stream with its own Contract-1 manifest.
+    # The set is fixed by role; adding sensors adds channels to a manifest, not new streams. (wired)
+    streams: list[StreamConfig] = Field(
+        default_factory=lambda: [
+            StreamConfig(
+                name="sensor.predictions",
+                manifest_path="../tools/fixtures/predictions.manifest.json",
+            ),
+            StreamConfig(
+                name="sensor.physiological",
+                manifest_path="../tools/fixtures/physiological.manifest.json",
+            ),
+        ]
+    )
+    # Default seconds without a sample before a stream is marked stale (per-stream override above). (wired)
     stale_timeout_s: float = 5.0
 
 

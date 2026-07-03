@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 from typing import TYPE_CHECKING, Any, Literal
 
 from fastapi import WebSocket, WebSocketDisconnect
@@ -41,25 +42,25 @@ class DashboardBridge:
         registry: RuleRegistry,
         evaluator: RuleEvaluator,
         ws_sink: WsSink,
-        signal_source: LSLSource | None = None,
+        signal_sources: list[LSLSource] | None = None,
     ) -> None:
         self._bus = bus
         self._manifests = manifests
         self._registry = registry
         self._evaluator = evaluator
         self._ws_sink = ws_sink
-        self._signal_source = signal_source
+        self._signal_sources: list[LSLSource] = signal_sources or []
         self._clients: set[WebSocket] = set()
         self._cached_link_states: dict[str, object] = {}
         self._cached_vr_context: object | None = None
 
     @property
-    def signal_source(self) -> LSLSource | None:
-        return self._signal_source
+    def signal_sources(self) -> list[LSLSource]:
+        return self._signal_sources
 
-    @signal_source.setter
-    def signal_source(self, source: LSLSource) -> None:
-        self._signal_source = source
+    @signal_sources.setter
+    def signal_sources(self, sources: list[LSLSource]) -> None:
+        self._signal_sources = sources
 
     async def start(self) -> None:
         self._bus.subscribe(Topics.MANIFEST_UPDATED, self._on_manifest)
@@ -127,15 +128,16 @@ class DashboardBridge:
         await _send(ws, "rule_list", self._rule_list_payload())
         unity_state: Literal["up", "down"] = "up" if self._ws_sink.is_connected else "down"
         await _send(ws, "link_status", LinkStatusEvent(link="unity-ws", state=unity_state).model_dump(mode="json"))
-        if self._signal_source is not None:
-            await _send(ws, "link_status", LinkStatusEvent(link="sensor-pipeline", state=self._signal_source.link_state).model_dump(mode="json"))
+        for source in self._signal_sources:
+            await _send(ws, "link_status", LinkStatusEvent(link=source.link_id, state=source.link_state).model_dump(mode="json"))
         # This very client is, by definition, connected — report browser-ws "up" in the
         # snapshot. The count-gated incremental publish in handle_dashboard is racy under
         # reconnects (e.g. React StrictMode double-mount), so without this a client's own
         # browser-ws may never reach its store.
         await _send(ws, "link_status", LinkStatusEvent(link="browser-ws", state="up").model_dump(mode="json"))
+        live_stream_links = {source.link_id for source in self._signal_sources}
         for key, payload in self._cached_link_states.items():
-            if key == "sensor-pipeline" and self._signal_source is not None:
+            if key in live_stream_links:
                 continue  # already pushed live state above
             if key == "browser-ws":
                 continue  # this client's own connection is reported "up" above; a stale
@@ -211,7 +213,7 @@ class DashboardBridge:
     async def _broadcast(self, msg_type: str, payload: object) -> None:
         if not self._clients:
             return
-        message = json.dumps({"type": msg_type, "payload": payload})
+        message = _dumps({"type": msg_type, "payload": payload})
         dead: list[WebSocket] = []
         for ws in list(self._clients):
             try:
@@ -222,8 +224,28 @@ class DashboardBridge:
             self._clients.discard(ws)
 
 
+def _json_sanitise(value: Any) -> Any:
+    """Replace non-finite floats (NaN/Inf) with None so the payload is valid JSON.
+
+    A bare ``NaN`` token from ``json.dumps`` is invalid JSON and makes the
+    browser's ``JSON.parse`` throw, dropping the whole message. Absent numeric
+    channels arrive as NaN, so we render them as ``null`` ("no data") instead.
+    """
+    if isinstance(value, float):
+        return value if math.isfinite(value) else None
+    if isinstance(value, dict):
+        return {k: _json_sanitise(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_json_sanitise(v) for v in value]
+    return value
+
+
+def _dumps(payload: object) -> str:
+    return json.dumps(_json_sanitise(payload))
+
+
 async def _send(ws: WebSocket, msg_type: str, payload: Any) -> None:
-    await ws.send_text(json.dumps({"type": msg_type, "payload": payload}))
+    await ws.send_text(_dumps({"type": msg_type, "payload": payload}))
 
 
 class _FastAPIWsAdapter:

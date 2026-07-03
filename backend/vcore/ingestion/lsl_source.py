@@ -4,6 +4,7 @@ import asyncio
 import contextlib
 import json
 import logging
+import math
 import time
 from pathlib import Path
 from typing import Any, Literal
@@ -39,8 +40,12 @@ class LSLSource:
         stale_timeout_s: float = 5.0,
         offline_timeout_s: float = 10.0,
         resolve_timeout: float = _RESOLVE_TIMEOUT,
+        link_id: str | None = None,
     ) -> None:
         self._stream_name = stream_name
+        # Per-stream link id so several streams don't overwrite each other's
+        # liveness (e.g. "sensor-pipeline:sensor.physiological").
+        self._link_id = link_id or f"sensor-pipeline:{stream_name}"
         self._manifest_path = Path(manifest_path)
         self._bus = bus
         self._manifests = manifests
@@ -60,6 +65,11 @@ class LSLSource:
     @property
     def stream_name(self) -> str:
         return self._stream_name
+
+    @property
+    def link_id(self) -> str:
+        """Per-stream link key, e.g. ``sensor-pipeline:sensor.physiological``."""
+        return self._link_id
 
     @property
     def link_state(self) -> LinkState:
@@ -118,7 +128,7 @@ class LSLSource:
                 log.warning("lsl_source: stream %r not found, retrying…", self._stream_name)
                 await self._bus.publish(
                     Topics.LINK_STATUS,
-                    LinkStatusEvent(link="sensor-pipeline", state="down", detail=f"waiting for '{self._stream_name}'"),
+                    LinkStatusEvent(link=self._link_id, state="down", detail=f"waiting for '{self._stream_name}'"),
                 )
         if not self._running:
             return
@@ -135,7 +145,7 @@ class LSLSource:
         log.info("lsl_source: connected to %r", self._stream_name)
         await self._bus.publish(
             Topics.LINK_STATUS,
-            LinkStatusEvent(link="sensor-pipeline", state="up"),
+            LinkStatusEvent(link=self._link_id, state="up"),
         )
 
         while self._running:
@@ -148,11 +158,17 @@ class LSLSource:
             for i, name in enumerate(channel_names):
                 raw = sample[i]
                 if channel_types[name] == "categorical":
+                    f = float(raw)
+                    if math.isnan(f):
+                        # Defensive: the pipeline never sends NaN on categoricals,
+                        # but guard rather than crash the decode loop.
+                        values[name] = None
+                        continue
                     cats = channel_categories.get(name, [])
-                    idx = int(round(float(raw)))
+                    idx = int(round(f))
                     values[name] = cats[idx] if 0 <= idx < len(cats) else str(idx)
                 else:
-                    values[name] = float(raw)
+                    values[name] = float(raw)  # numeric NaN passes through → null at JSON boundary
 
             self._last_sample_at = time.monotonic()
             await self._bus.publish(
@@ -167,19 +183,19 @@ class LSLSource:
             age = now - self._last_sample_at
             is_stale = self._last_sample_at > 0 and age > self._stale_timeout_s
             if is_stale and not self._is_stale and not self._is_offline:
-                manifest = self._manifests.signal_manifest
-                name = manifest["stream"]["name"] if manifest else self._stream_name
+                own = self._own_manifest
+                name = own["stream"]["name"] if own else self._stream_name
                 await self._bus.publish(Topics.STALE, StaleEvent(stream_name=name, age_s=age))
-                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="stale"))
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link=self._link_id, state="stale"))
                 self._is_stale = True
                 self._stale_since = now
             elif is_stale and self._is_stale and not self._is_offline and (now - self._stale_since) >= self._offline_timeout_s:
-                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="down", detail="stream went silent"))
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link=self._link_id, state="down", detail="stream went silent"))
                 self._is_stale = False
                 self._is_offline = True
                 self._stale_since = 0.0
             elif not is_stale and self._last_sample_at > 0 and (self._is_stale or self._is_offline):
-                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link="sensor-pipeline", state="up"))
+                await self._bus.publish(Topics.LINK_STATUS, LinkStatusEvent(link=self._link_id, state="up"))
                 self._is_stale = False
                 self._is_offline = False
                 self._stale_since = 0.0

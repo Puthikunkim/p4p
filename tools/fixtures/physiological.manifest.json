@@ -1,0 +1,52 @@
+{
+  "schema_version": "1.0.0",
+  "stream": {
+    "name": "sensor.physiological",
+    "source_id": "om-pipeline",
+    "nominal_srate": 2.0
+  },
+  "channels": [
+    {
+      "name": "heart_rate",
+      "unit": "bpm",
+      "type": "timeseries",
+      "range": { "min": 40, "max": 120 },
+      "display": { "hint": "line_chart", "label": "Heart Rate" }
+    },
+    {
+      "name": "hrv_rmssd",
+      "unit": "ms",
+      "type": "timeseries",
+      "range": { "min": 0, "max": 200 },
+      "display": { "hint": "line_chart", "label": "HRV (RMSSD)" }
+    },
+    {
+      "name": "eda_scr_peaks",
+      "unit": "count",
+      "type": "scalar",
+      "range": { "min": 0, "max": 50 },
+      "display": { "hint": "stat_card", "label": "EDA SCR Peaks" }
+    },
+    {
+      "name": "eda_signal_power",
+      "unit": "a.u.",
+      "type": "timeseries",
+      "range": { "min": 0, "max": 1 },
+      "display": { "hint": "line_chart", "label": "EDA Signal Power" }
+    },
+    {
+      "name": "eeg_engagement",
+      "unit": "ratio",
+      "type": "timeseries",
+      "range": { "min": 0, "max": 3 },
+      "display": { "hint": "line_chart", "label": "EEG Engagement" }
+    },
+    {
+      "name": "eeg_alpha_power",
+      "unit": "uV^2",
+      "type": "timeseries",
+      "range": { "min": 0, "max": 100 },
+      "display": { "hint": "line_chart", "label": "EEG Alpha Power" }
+    }
+  ]
+}

@@ -366,7 +366,7 @@ def test_signal_version_refuse_keeps_old_manifest() -> None:
     result = manifests.update_signal_manifest(major_bump)
 
     assert not result.accepted
-    assert manifests.signal_manifest is old  # pointer unchanged
+    assert manifests.signal_manifest == old  # value unchanged (property returns a fresh union dict)
 
 
 # ── 9. Object-status version skew WARN → accepted + warning ──────────────────

@@ -168,7 +168,10 @@ class SampleEvent(BaseModel):
     model_config = {"extra": "forbid"}
     stream_name: str
     timestamp: float  # LSL clock time
-    values: dict[str, float | str]  # channel name → value
+    # channel name → value; None marks an absent/"no data" channel (e.g. a NaN
+    # categorical). Numeric NaN is passed through as a float and rendered as
+    # null at the JSON boundary (see DashboardBridge).
+    values: dict[str, float | str | None]
 
 
 class StaleEvent(BaseModel):
@@ -179,9 +182,15 @@ class StaleEvent(BaseModel):
 
 
 class LinkStatusEvent(BaseModel):
-    """Network link state change for any of the three links."""
+    """Network link state change for a tracked link.
+
+    Conventional keys: ``unity-ws``, ``browser-ws``, and one per ingested signal
+    stream as ``sensor-pipeline:<stream_name>`` (e.g.
+    ``sensor-pipeline:sensor.physiological``). Kept as a free string so new
+    streams don't require a code change.
+    """
     model_config = {"extra": "forbid"}
-    link: Literal["sensor-pipeline", "unity-ws", "browser-ws"]
+    link: str
     state: Literal["up", "down", "stale", "reconnecting"]
     detail: str | None = None
 

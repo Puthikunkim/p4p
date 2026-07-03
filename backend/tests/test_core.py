@@ -108,7 +108,8 @@ def test_signal_manifest_accepted_on_valid_payload() -> None:
     payload = _load("signal_schema.valid.json")
     result = m.update_signal_manifest(payload)
     assert result.accepted
-    assert m.signal_manifest is payload
+    # signal_manifest returns a fresh union dict (one stream here) equal to the input.
+    assert m.signal_manifest == payload
 
 
 def test_object_status_manifest_accepted_on_valid_payload() -> None:
@@ -159,7 +160,7 @@ def test_previous_manifest_kept_on_refuse() -> None:
     bad = {**good, "schema_version": "2.0.0"}
     m.update_signal_manifest(bad)
 
-    assert m.signal_manifest is good  # untouched
+    assert m.signal_manifest == good  # untouched
 
 
 # ── behavioural channel merge (Unity-declared) ────────────────────────────────

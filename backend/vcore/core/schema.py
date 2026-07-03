@@ -95,7 +95,9 @@ class ActiveManifests:
     """
 
     def __init__(self) -> None:
-        self._signal: dict[str, Any] | None = None
+        # One signal manifest per ingested stream, keyed by stream name and kept
+        # in insertion order; the signal_manifest property exposes their union.
+        self._signals: dict[str, dict[str, Any]] = {}
         self._behaviour_channels: list[dict[str, Any]] = []
         self._object_status: dict[str, Any] | None = None
         self._catalog: dict[str, Any] | None = None
@@ -103,11 +105,18 @@ class ActiveManifests:
     # ── Signal Schema (Contract 1) ────────────────────────────────────────
 
     def update_signal_manifest(self, payload: dict[str, Any]) -> AcceptResult:
+        """Register/replace the signal manifest for **one** stream (keyed by its
+        ``stream.name``).
+
+        Multiple streams coexist; the ``signal_manifest`` property exposes the
+        union of all their channels. On REFUSE that stream's previous manifest
+        (if any) is left unchanged.
+        """
         validate(payload, "signal_schema")
         skew = check_version(payload["schema_version"], "signal_schema")
         if skew == VersionSkew.REFUSE:
             return AcceptResult(skew, f"signal_schema major version mismatch: {payload['schema_version']}")
-        self._signal = payload
+        self._signals[payload["stream"]["name"]] = payload
         warning = f"signal_schema minor version skew: {payload['schema_version']}" if skew == VersionSkew.WARN else None
         return AcceptResult(skew, warning)
 
@@ -126,18 +135,32 @@ class ActiveManifests:
 
     @property
     def signal_manifest(self) -> dict[str, Any] | None:
-        """Active signal manifest = base (sensor-pipeline) manifest ⊕ Unity behavioural channels."""
-        if self._signal is None:
+        """Active signal manifest: the **union of every stream's channels**, plus
+        Unity behavioural channels, in one Contract-1-shaped document.
+
+        Channels are de-duplicated by name (first stream to declare a name wins;
+        names are globally unique across the pipeline's streams by contract). The
+        ``stream`` header is the first registered stream, kept as a representative
+        so the document stays Contract-1-shaped — per-stream identity and liveness
+        are tracked separately via per-stream link status.
+        """
+        if not self._signals:
             return None
-        if not self._behaviour_channels:
-            return self._signal
-        base_names = {ch["name"] for ch in self._signal.get("channels", [])}
-        extra = [ch for ch in self._behaviour_channels if ch["name"] not in base_names]
-        if not extra:
-            return self._signal
-        merged = dict(self._signal)
-        merged["channels"] = [*self._signal.get("channels", []), *extra]
-        return merged
+        streams = list(self._signals.values())
+        channels: list[dict[str, Any]] = []
+        seen: set[str] = set()
+        for manifest in (*streams, {"channels": self._behaviour_channels}):
+            for ch in manifest.get("channels", []):
+                if ch["name"] in seen:
+                    continue
+                seen.add(ch["name"])
+                channels.append(ch)
+        base = streams[0]
+        return {
+            "schema_version": base["schema_version"],
+            "stream": base["stream"],
+            "channels": channels,
+        }
 
     # ── Object-Status Manifest (Contract 3b) ─────────────────────────────
 
