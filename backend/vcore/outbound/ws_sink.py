@@ -224,7 +224,7 @@ class WsSink:
         so it flows to the rule engine, dashboard, and recorder like any signal."""
         if not isinstance(payload, dict) or not payload:
             return
-        values: dict[str, float | str] = {
+        values: dict[str, float | str | None] = {
             k: float(v)
             for k, v in payload.items()
             if isinstance(v, (int, float)) and not isinstance(v, bool)

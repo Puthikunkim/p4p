@@ -49,7 +49,7 @@ class RuleEvaluator:
         self._registry = registry
         self._bus = bus
         self._manifests = manifests
-        self._latest: dict[str, float | str] = {}
+        self._latest: dict[str, float | str | None] = {}
         self._sustain_start: dict[_SustainKey, float] = {}
         self._last_fire: dict[str, float] = {}
         self._disabled: dict[str, str] = {}

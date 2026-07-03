@@ -154,7 +154,7 @@ class LSLSource:
             if sample is None:
                 continue
 
-            values: dict[str, float | str] = {}
+            values: dict[str, float | str | None] = {}
             for i, name in enumerate(channel_names):
                 raw = sample[i]
                 if channel_types[name] == "categorical":
