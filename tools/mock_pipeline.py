@@ -76,12 +76,12 @@ def run(manifest_path: Path, rate: float, pattern: str, scale: float) -> None:
     stream_info = manifest["stream"]
     channels: list[dict] = manifest["channels"]
 
-    # Only scalar/timeseries channels go into the LSL stream (categorical are string)
-    numeric_chs = [c for c in channels if c.get("type") != "categorical"]
-    categorical_chs = [c for c in channels if c.get("type") == "categorical"]
-
     stream_name: str = stream_info["name"]
-    n_channels = len(numeric_chs) + len(categorical_chs)
+    # Emit channels in manifest order so the wire order matches the manifest exactly —
+    # LSLSource decodes positionally. Categoricals are encoded as their integer index
+    # below, but keep their declared position (mixed-type manifests stay aligned).
+    all_channels = channels
+    n_channels = len(all_channels)
 
     info = pylsl.StreamInfo(
         name=stream_name,
@@ -92,7 +92,6 @@ def run(manifest_path: Path, rate: float, pattern: str, scale: float) -> None:
         source_id=stream_info.get("source_id", "mock-pipeline"),
     )
 
-    all_channels = numeric_chs + categorical_chs
     chns = info.desc().append_child("channels")
     for ch in all_channels:
         chn = chns.append_child("channel")
