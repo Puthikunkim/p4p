@@ -21,6 +21,9 @@ The project does not yet publish tagged releases, so history is grouped into
 - Re-vendored the sensor-pipeline manifests to the pipeline team's confirmed source of truth: `emotion` now carries the real valence/arousal quadrant labels (`Positive / High arousal`, …) instead of placeholder indices; `cognitive_load` uses the `level_bar` hint; `eda_scr_peaks` gets `precision: 0` (renders as an integer count) and the physiological time-series channels declare `window_s: 30`.
 - Rewrote the two affect rules to target the real `emotion` channel: `clear-fog-stressed` on `Negative / High arousal`, `increase-fog-bored` on `Negative / Low arousal` (previously keyed on a non-existent `affect` signal, so they never fired).
 
+### Fixed
+- Quadrant renderer: lay the emotion labels on the conventional valence/arousal circumplex (valence horizontal, arousal vertical) instead of raw wire order, and colour the active cell. The colour map now covers both the sensor-pipeline emotion labels and the legacy `affect` labels, so neither the live emotion quadrant nor the mock-pipeline affect quadrant renders grey.
+
 ## [2026-06-28 – 06-29] — Documentation restructure & dead-code cleanup
 
 Reworked the docs to onboard newcomers and stripped superseded scaffolding now
