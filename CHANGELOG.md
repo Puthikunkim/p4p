@@ -14,7 +14,8 @@ The project does not yet publish tagged releases, so history is grouped into
 
 ## [Unreleased]
 
-_Nothing yet._
+### Changed
+- Re-vendored the sensor-pipeline manifests to the pipeline team's confirmed source of truth: `emotion` now carries the real valence/arousal quadrant labels (`Positive / High arousal`, …) instead of placeholder indices; `cognitive_load` uses the `level_bar` hint; `eda_scr_peaks` gets `precision: 0` (renders as an integer count) and the physiological time-series channels declare `window_s: 30`.
 
 ## [2026-06-28 – 06-29] — Documentation restructure & dead-code cleanup
 

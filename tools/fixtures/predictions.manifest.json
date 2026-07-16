@@ -10,7 +10,7 @@
       "name": "emotion",
       "unit": "class",
       "type": "categorical",
-      "categories": ["0", "1", "2", "3"],
+      "categories": ["Positive / High arousal", "Negative / High arousal", "Negative / Low arousal", "Positive / Low arousal"],
       "display": { "hint": "quadrant", "label": "Emotion" }
     },
     {
@@ -18,7 +18,7 @@
       "unit": "class",
       "type": "categorical",
       "categories": ["Low", "Medium", "High"],
-      "display": { "hint": "quadrant", "label": "Cognitive Load" }
+      "display": { "hint": "level_bar", "label": "Cognitive Load" }
     }
   ]
 }
