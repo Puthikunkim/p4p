@@ -151,8 +151,8 @@ flowchart TB
 | ⑤ | `unity_behaviour.schema.json` | Unity → backend | behavioural channels (same shape as ① channels) + sample frames |
 
 **Why a "display hint"?** Each signal channel carries a `display.hint` string like
-`stat_card`, `line_chart`, or `quadrant`. The dashboard uses that string to pick a UI
-component. An *unknown* hint doesn't crash — it falls back to a generic renderer. That's how
+`stat_card`, `line_chart`, `quadrant`, or `level_bar`. The dashboard uses that string to pick a
+UI component. An *unknown* hint doesn't crash — it falls back to a generic renderer. That's how
 adding a new sensor needs **zero** UI code.
 
 **Why "tags" on objects?** A rule can target `{tag: ambient_light}` instead of a specific
@@ -430,7 +430,8 @@ to a React component, registered at startup in
 ```
 stat_card  → StatCard
 line_chart → LineChart
-quadrant   → Quadrant
+quadrant   → Quadrant    (2×2 valence/arousal circumplex, e.g. the emotion channel)
+level_bar  → LevelBar    (ordinal meter for ranked categoricals, e.g. cognitive_load Low/Med/High)
 (unknown)  → FallbackRenderer
 ```
 
