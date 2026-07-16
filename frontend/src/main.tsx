@@ -11,12 +11,14 @@ import { registerRenderer, registerFallback } from './renderers/registry'
 import { StatCard } from './renderers/StatCard'
 import { LineChart } from './renderers/LineChart'
 import { Quadrant } from './renderers/Quadrant'
+import { LevelBar } from './renderers/LevelBar'
 import { FallbackRenderer } from './renderers/FallbackRenderer'
 
 registerFallback(FallbackRenderer)
 registerRenderer('stat_card', StatCard)
 registerRenderer('line_chart', LineChart)
 registerRenderer('quadrant', Quadrant)
+registerRenderer('level_bar', LevelBar)
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

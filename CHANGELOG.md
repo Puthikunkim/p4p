@@ -14,6 +14,9 @@ The project does not yet publish tagged releases, so history is grouped into
 
 ## [Unreleased]
 
+### Added
+- `LevelBar` renderer (`level_bar` hint): a segmented ordinal meter for ranked categoricals (Low < Medium < High) that fills up to the current level along a teal→amber→red severity ramp. Cognitive load now renders through it instead of the 2×2 `quadrant` grid.
+
 ### Changed
 - Re-vendored the sensor-pipeline manifests to the pipeline team's confirmed source of truth: `emotion` now carries the real valence/arousal quadrant labels (`Positive / High arousal`, …) instead of placeholder indices; `cognitive_load` uses the `level_bar` hint; `eda_scr_peaks` gets `precision: 0` (renders as an integer count) and the physiological time-series channels declare `window_s: 30`.
 

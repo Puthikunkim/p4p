@@ -122,6 +122,27 @@
   color: #fff;
 }
 
+/* Ordinal level meter (Low < Medium < High): segments fill up to the current level. */
+.renderer__level-bar {
+  display: flex;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.renderer__level-seg {
+  flex: 1;
+  height: 10px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  transition: background 0.15s var(--ease);
+}
+
+.renderer__level-caption {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 /* ── Session Monitor two-column layout ── */
 
 .monitor-layout {
