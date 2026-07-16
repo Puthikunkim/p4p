@@ -1,12 +1,12 @@
 id: increase-fog-bored
 schema_version: "1.0.0"
-description: "Increase environmental density to re-engage a bored participant"
+description: "Increase environmental density to re-engage a bored participant (negative valence, low arousal)"
 enabled: true
 when:
   all:
-    - signal: affect
+    - signal: emotion
       op: "=="
-      value: bored
+      value: "Negative / Low arousal"
       sustain_s: 5
 then:
   set:

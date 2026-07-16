@@ -19,6 +19,7 @@ The project does not yet publish tagged releases, so history is grouped into
 
 ### Changed
 - Re-vendored the sensor-pipeline manifests to the pipeline team's confirmed source of truth: `emotion` now carries the real valence/arousal quadrant labels (`Positive / High arousal`, …) instead of placeholder indices; `cognitive_load` uses the `level_bar` hint; `eda_scr_peaks` gets `precision: 0` (renders as an integer count) and the physiological time-series channels declare `window_s: 30`.
+- Rewrote the two affect rules to target the real `emotion` channel: `clear-fog-stressed` on `Negative / High arousal`, `increase-fog-bored` on `Negative / Low arousal` (previously keyed on a non-existent `affect` signal, so they never fired).
 
 ## [2026-06-28 – 06-29] — Documentation restructure & dead-code cleanup
 

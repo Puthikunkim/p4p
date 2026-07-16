@@ -1,12 +1,12 @@
 id: clear-fog-stressed
 schema_version: "1.0.0"
-description: "Reduce visual clutter when participant is stressed"
+description: "Reduce visual clutter when the participant is stressed (negative valence, high arousal)"
 enabled: true
 when:
   all:
-    - signal: affect
+    - signal: emotion
       op: "=="
-      value: stressed
+      value: "Negative / High arousal"
       sustain_s: 3
 then:
   set:
