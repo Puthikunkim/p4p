@@ -23,6 +23,17 @@ export function LineChart({ channel, history }: RendererProps) {
   useEffect(() => {
     if (!containerRef.current) return
     const c = CHART_THEME[theme]
+    // window_s (Contract 1 display hint) pins the x-axis to a rolling window of the last
+    // N seconds, so the visible span is fixed regardless of sample rate. Without it, uPlot
+    // auto-scales x to the full data extent (the stored history, capped in the store).
+    const windowS = channel.display.window_s
+    const scales: uPlot.Scales = {}
+    if (channel.range) {
+      scales.y = { range: () => [channel.range!.min, channel.range!.max] as [number, number] }
+    }
+    if (windowS) {
+      scales.x = { range: (_u, _min, max) => [max - windowS, max] as [number, number] }
+    }
     const opts: uPlot.Options = {
       title: channel.display.label,
       width: containerRef.current.clientWidth || 320,
@@ -40,9 +51,7 @@ export function LineChart({ channel, history }: RendererProps) {
         { label: 't (s)', stroke: c.axis, grid: { stroke: c.grid }, ticks: { stroke: c.grid } },
         { label: channel.unit, stroke: c.axis, grid: { stroke: c.grid }, ticks: { stroke: c.grid } },
       ],
-      scales: channel.range
-        ? { y: { range: () => [channel.range!.min, channel.range!.max] } }
-        : {},
+      scales,
     }
     const plot = new uPlot(opts, [[], []], containerRef.current)
     plotRef.current = plot
