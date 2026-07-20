@@ -1,4 +1,4 @@
-# V-CORE
+# V-CORE 
 
 **VR Cognitive-state Observation, Rules & Environment adaptation** — a research platform for
 real-time VR cognitive-state monitoring and adaptation.
