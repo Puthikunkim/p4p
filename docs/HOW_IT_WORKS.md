@@ -33,7 +33,7 @@ sensors read their body and behaviour. V-CORE sits in the middle and does three 
 1. **Reads signals** about the participant's cognitive state (e.g. cognitive load, heart-rate
    variability, an "affect" label like *stressed*), plus behavioural metrics from the VR app
    (e.g. response latency, idle time).
-2. **Evaluates rules** like *"IF cognitive load ≥ 0.75 for 5 seconds THEN dim the lights"*.
+2. **Evaluates rules** like *"IF cognitive load is High for 5 seconds THEN dim the lights"*.
 3. **Sends commands** to the VR scene to adapt the environment, and shows the researcher a
    **live dashboard** (charts + a video mirror of what the participant sees).
 
@@ -262,7 +262,7 @@ brain:
 
 - It keeps `_latest`: a flat dict of the most recent value for every signal seen.
 - On **every** `SAMPLE` event it updates `_latest` and re-checks all enabled rules.
-- A condition like `cognitive_load >= 0.75` with `sustain_s: 5` must stay true for 5 real
+- A condition like `cognitive_load == "High"` with `sustain_s: 5` must stay true for 5 real
   seconds (tracked with a monotonic clock) before it contributes to firing.
 - When a rule's `when` group passes, the rule fires — unless it's still within its
   `cooldown_s` window since the last fire.
@@ -273,10 +273,10 @@ A worked example of the firing logic:
 
 ```mermaid
 flowchart TD
-  S["SAMPLE arrives<br/>cognitive_load = 0.82"] --> U["update _latest"]
+  S["SAMPLE arrives<br/>cognitive_load = High"] --> U["update _latest"]
   U --> L{"rule disabled?"}
   L -- yes --> SKIP["skip"]
-  L -- no --> COND{"condition true?<br/>0.82 >= 0.75"}
+  L -- no --> COND{"condition true?<br/>High == High"}
   COND -- no --> CLR["clear sustain timer"]
   COND -- yes --> SUS{"held >= sustain_s (5s)?"}
   SUS -- no --> WAIT["keep waiting"]
@@ -306,8 +306,8 @@ enabled: true
 when:
   all:
     - signal: cognitive_load
-      op: ">="
-      threshold: 0.75
+      op: "=="
+      value: "High"
       sustain_s: 5
 then:
   set:
@@ -600,7 +600,7 @@ sequenceDiagram
   participant U as Unity
   participant UI as Dashboard
 
-  SP->>LSL: sample (cognitive_load=0.82)
+  SP->>LSL: sample (cognitive_load=High)
   LSL->>BUS: publish SAMPLE
   BUS->>ENG: SAMPLE
   BUS->>UI: sample (chart updates)
