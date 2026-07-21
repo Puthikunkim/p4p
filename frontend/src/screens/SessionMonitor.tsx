@@ -90,34 +90,44 @@ export function SessionMonitor() {
                 <VrContextPanel />
               </div>
               {ungrouped.length > 0 && (
-                <div className="renderer-grid">
-                  {ungrouped.map((ch) => {
-                    const Renderer = getRenderer(ch)
-                    return (
-                      <Renderer
-                        key={ch.name}
-                        channel={ch}
-                        value={latestValues[ch.name]}
-                        history={history[ch.name] ?? []}
-                      />
-                    )
-                  })}
+                <div className="signal-panel signal-panel--pipeline pipeline-panel">
+                  <div className="signal-panel__header">
+                    <span className="signal-panel__title">Pipeline Signals</span>
+                  </div>
+                  <div className="renderer-grid renderer-grid--panelled">
+                    {ungrouped.map((ch) => {
+                      const Renderer = getRenderer(ch)
+                      return (
+                        <Renderer
+                          key={ch.name}
+                          channel={ch}
+                          value={latestValues[ch.name]}
+                          history={history[ch.name] ?? []}
+                        />
+                      )
+                    })}
+                  </div>
                 </div>
               )}
             </>
           ) : (
-            <div className="renderer-grid">
-              {channels.map((ch) => {
-                const Renderer = getRenderer(ch)
-                return (
-                  <Renderer
-                    key={ch.name}
-                    channel={ch}
-                    value={latestValues[ch.name]}
-                    history={history[ch.name] ?? []}
-                  />
-                )
-              })}
+            <div className="signal-panel signal-panel--pipeline pipeline-panel">
+              <div className="signal-panel__header">
+                <span className="signal-panel__title">Pipeline Signals</span>
+              </div>
+              <div className="renderer-grid renderer-grid--panelled">
+                {channels.map((ch) => {
+                  const Renderer = getRenderer(ch)
+                  return (
+                    <Renderer
+                      key={ch.name}
+                      channel={ch}
+                      value={latestValues[ch.name]}
+                      history={history[ch.name] ?? []}
+                    />
+                  )
+                })}
+              </div>
             </div>
           )}
 

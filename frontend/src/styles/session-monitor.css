@@ -350,11 +350,22 @@
 .signal-panel--physiological { --panel-accent: #38bdf8; } /* cyan */
 .signal-panel--behavioural   { --panel-accent: #a78bfa; } /* violet */
 .signal-panel--vr_context    { --panel-accent: #f472b6; } /* pink */
+.signal-panel--pipeline      { --panel-accent: #38bdf8; } /* cyan — sensor pipeline */
 
 /* Deepened variants so the section accents stay legible on the white light-theme cards. */
 .light .signal-panel--physiological { --panel-accent: #0e7fb8; }
 .light .signal-panel--behavioural   { --panel-accent: #7c3aed; }
 .light .signal-panel--vr_context    { --panel-accent: #db2777; }
+.light .signal-panel--pipeline      { --panel-accent: #0e7fb8; }
+
+/* Pipeline Signals: a titled panel wrapping the dense sensor-chart grid, so the
+   pipeline channels read as one labelled section like the other groups. */
+.pipeline-panel { margin-bottom: 18px; }
+
+.renderer-grid--panelled {
+  padding: 12px 13px;
+  margin-bottom: 0;
+}
 
 .signal-panel__header {
   display: flex;
