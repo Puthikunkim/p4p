@@ -328,9 +328,12 @@
 
 .signal-panels {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 12px;
   margin-bottom: 18px;
+  /* Size each panel to its content instead of stretching to the tallest in the row,
+     so a short panel (e.g. VR Context) no longer leaves a tall empty gap. */
+  align-items: start;
 }
 
 .signal-panel {
@@ -406,9 +409,16 @@
 }
 
 .signal-panel__body {
-  display: flex;
-  flex-direction: column;
+  /* Pack readouts two-up rather than one tall stack, so panels with many
+     metrics (Behavioural Markers) stay short and the signals below rise into view. */
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0;
+}
+
+/* Vertical rule on the left column so the two columns read cleanly. */
+.signal-panel__body .renderer:nth-child(odd) {
+  border-right: 1px solid var(--border-strong);
 }
 
 /* Brighter metric titles + clearer separators so each readout within a panel stands out
@@ -443,6 +453,13 @@
 @media (max-width: 900px) {
   .signal-panels {
     grid-template-columns: 1fr;
+  }
+  /* One column per panel on narrow screens; drop the inter-column rule. */
+  .signal-panel__body {
+    grid-template-columns: 1fr;
+  }
+  .signal-panel__body .renderer:nth-child(odd) {
+    border-right: none;
   }
 }
 
@@ -538,6 +555,9 @@
   display: block;
   width: 100%;
   height: auto;
+  /* Cap the live mirror so it never dominates the column; letterbox rather than crop. */
+  max-height: 260px;
+  object-fit: contain;
   background: #07090d;
 }
 
