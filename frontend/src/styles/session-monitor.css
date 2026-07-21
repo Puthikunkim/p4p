@@ -565,10 +565,8 @@
 .video-feed-player {
   display: block;
   width: 100%;
+  /* Fill the panel width at the video's native aspect so there are no letterbox bars. */
   height: auto;
-  /* Cap the live mirror so it never dominates the column; letterbox rather than crop. */
-  max-height: 260px;
-  object-fit: contain;
   background: #07090d;
 }
 
